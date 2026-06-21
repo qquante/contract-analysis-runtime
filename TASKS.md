@@ -617,13 +617,27 @@ Result:
 
 ## PT-026.T01 - Tool Contracts
 
-Status: pending.
+Status: done 2026-06-21.
 
 Tools:
 
 - `vassago_design_run`;
 - `vassago_design_resume`;
 - `vassago_artifact_read`.
+
+Implemented:
+
+- `src/vassago_contract_runtime/tools/contracts.py`;
+- `src/vassago_contract_runtime/tools/runtime_tools.py`;
+- `src/vassago_contract_runtime/runtime_api.py`;
+- `tests/design_runtime/test_tool_contracts.py`.
+
+Current behavior:
+
+- exposes campaign-level contracts only, not fine-grained phase internals;
+- invokes the same runtime path as the CLI;
+- supports aliases `run_design`, `resume_design` and `artifact_read`;
+- keeps local-only/no-broadcast/no-shell policy in each contract.
 
 ## PT-026.T02 - MCP stdio
 
@@ -764,8 +778,8 @@ Current behavior:
 
 # RESUME FROM HERE
 
-Start with `PT-024.T11` runtime Foundry local skeleton/gate if runtime execution
-is needed, or `PT-026.T01` tool contracts if exposing the design runner to
-agents. Current bootstrap runs real local phases 00 through 08 and phase 10.
-Phase 09 remains dry-run unless a runtime-ready report and explicit local
-authorization exist. Keep Foundry runtime local-only and no-broadcast.
+Start with `PT-026.T02` MCP stdio local if exposing the contracts to Hermes, or
+`PT-024.T11` runtime Foundry local phase if a runtime-ready fixture is added.
+Current bootstrap runs real local phases 00 through 08 and phase 10. Phase 09
+remains dry-run unless a runtime-ready report and explicit local authorization
+exist. Keep Foundry runtime local-only and no-broadcast.

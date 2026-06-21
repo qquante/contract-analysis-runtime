@@ -395,3 +395,49 @@ Next:
 RESUME FROM HERE:
 
 Start with `PT-024.T11` only if a runtime-ready gate exists, otherwise implement `PT-026.T01` tool contracts. Use `run-design --bootstrap-adapters` as the smoke command. Do not run Foundry runtime unless `sc01-runtime-ready.json` has `foundry_allowed=true` and the caller passes explicit local authorization. Current tests are 36 OK and `check` passes.
+
+## S-20260621-009 - Agent tool contracts for design runtime
+
+Goal:
+
+- Implement `PT-026.T01` tool contracts for `run_design`, `resume_design` and `artifact_read`.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/runtime_api.py` as the shared programmatic API used by CLI and tools.
+- Added `src/vassago_contract_runtime/tools/contracts.py` with `ToolContract`, `ToolInvocation`, `ToolRunResult` and `ToolRegistry`.
+- Added `src/vassago_contract_runtime/tools/runtime_tools.py` with contracts for:
+  - `vassago_design_run`;
+  - `vassago_design_resume`;
+  - `vassago_artifact_read`.
+- Added `src/vassago_contract_runtime/tools/__init__.py` exports.
+- Updated `src/vassago_contract_runtime/cli.py` to call `runtime_api.py` instead of carrying its own duplicate run/resume/artifact logic.
+- Added `tests/design_runtime/test_tool_contracts.py`.
+
+Decisions:
+
+- Tool contracts are campaign-level only. The top-level agent should not receive phase-level builder tools yet.
+- Tool policy is local-only, no-shell, no-broadcast and no private keys.
+- MCP stdio should wrap this registry in `PT-026.T02`; it should not reimplement run/resume/read behavior.
+
+Validation:
+
+- `$env:PYTHONPATH='src'; python -m unittest tests.design_runtime.test_tool_contracts` passed: 4 tests.
+- `$env:PYTHONPATH='src'; python -m unittest discover -s tests` passed: 40 tests.
+- `$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check` passed.
+
+Blockers:
+
+- No MCP stdio server exists yet.
+- No positive compile-ready fixture exists yet.
+- Phase 09 runtime Foundry remains dry-run unless a runtime-ready report and explicit authorization exist.
+
+Next:
+
+- Implement `PT-026.T02` MCP stdio local over `build_runtime_tool_registry()`.
+- Add a compile-ready fixture to exercise phase 08 positive path.
+- Implement `PT-024.T11` only behind `foundry_allowed=true`.
+
+RESUME FROM HERE:
+
+Start with `PT-026.T02` MCP stdio local. Reuse `build_runtime_tool_registry()` and expose only `vassago_design_run`, `vassago_design_resume` and `vassago_artifact_read`. Keep the MCP server local-only, no shell and no broadcast. Current tests are 40 OK and `check` passes before final validation.

@@ -87,3 +87,17 @@ truth exists, phase 06 writes provider-required state sidecars, phase 07 keeps
 when not compile-ready, and phase 10 writes a final blocked report. Phase 09
 runtime Foundry remains dry-run unless a future runtime-ready report explicitly
 authorizes local execution. No broadcast path is wired.
+
+## Agent Tool Contracts
+
+The internal tool registry lives in `src/vassago_contract_runtime/tools/`.
+Current canonical contracts:
+
+- `vassago_design_run`;
+- `vassago_design_resume`;
+- `vassago_artifact_read`.
+
+These contracts call the same `runtime_api.py` path as the CLI. They are
+local-only, no-shell, no-broadcast and do not expose phase internals to the
+top-level agent. MCP stdio is the next layer and should wrap these contracts,
+not duplicate the runtime.

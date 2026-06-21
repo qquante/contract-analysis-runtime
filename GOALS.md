@@ -50,7 +50,8 @@ of fine-grained builders.
 
 Acceptance:
 
-- top-level agent uses `run_design`, `resume_design`, `artifact_read`;
+- top-level agent uses `run_design`, `resume_design`, `artifact_read`. Done as
+  internal tool contracts in `src/vassago_contract_runtime/tools/`;
 - fine-grained adapters are internal to phases or specialist subagents.
 
 ## G-005 - SC01 corpus as executable knowledge

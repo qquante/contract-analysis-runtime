@@ -6,26 +6,11 @@ import argparse
 import json
 from pathlib import Path
 import sys
-from typing import Any
 
-from .design_runtime.adapters import dry_run_adapters
-from .design_runtime.design_loader import DesignLoadError, load_design
-from .design_runtime.manifest import load_run_manifest
-from .design_runtime.models import ContractTarget, ModelValidationError, RunOptions
-from .design_runtime.runner import resume_design, run_design
-from .artifacts.store import ArtifactStore
-from .contracts import FixtureSourceResolver
-from .phases.corpus_motifs import CorpusMotifsAdapter
-from .phases.compile_only import CompileOnlyAdapter
-from .phases.dossier import DossierAdapter
-from .phases.final_report import FinalReportAdapter
-from .phases.intake import IntakeAdapter
-from .phases.onchain_state import OnChainStateAdapter
-from .phases.proof_pieces import ProofPiecesAdapter
-from .phases.semantic_surface import SemanticSurfaceAdapter
-from .phases.source_truth import SourceTruthAdapter
-from .phases.thesis_acquisition import ThesisAcquisitionAdapter
+from .design_runtime.design_loader import DesignLoadError
+from .design_runtime.models import ModelValidationError
 from .quality import run_checks
+from .runtime_api import read_artifact_from_payload, resume_design_from_payload, run_design_from_payload
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -81,124 +66,41 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_design_command(args: argparse.Namespace) -> int:
-    design_path = _design_path(args.design)
-    design = load_design(design_path)
-    targets = _load_targets(Path(args.targets))
-    if not args.dry_run and not args.bootstrap_adapters:
-        raise ValueError("Use --dry-run or --bootstrap-adapters until all real phase adapters exist.")
-    adapters = _adapters_for(
-        design,
-        dry_run=args.dry_run,
-        bootstrap=args.bootstrap_adapters,
-        source_fixture=args.source_fixture,
-        design_dir=design_path.parent,
+    payload = run_design_from_payload(
+        {
+            "design": args.design,
+            "targets_path": args.targets,
+            "output": args.output,
+            "dry_run": args.dry_run,
+            "bootstrap_adapters": args.bootstrap_adapters,
+            "source_fixture": args.source_fixture,
+            "resume": not args.no_resume,
+        }
     )
-    result = run_design(
-        design,
-        targets,
-        args.output,
-        adapters,
-        RunOptions(resume=not args.no_resume, dry_run=args.dry_run),
-    )
-    print(json.dumps(_result_payload(result), indent=2, sort_keys=True))
-    return 0 if result.failed_count == 0 else 1
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0 if payload["failed_count"] == 0 else 1
 
 
 def _resume_command(args: argparse.Namespace) -> int:
-    manifest = load_run_manifest(args.run)
-    design = load_design_from_manifest(manifest)
-    if not args.dry_run and not args.bootstrap_adapters:
-        raise ValueError("Use --dry-run or --bootstrap-adapters until all real phase adapters exist.")
-    result = resume_design(
-        args.run,
-        _adapters_for(
-            design,
-            dry_run=args.dry_run,
-            bootstrap=args.bootstrap_adapters,
-            source_fixture=args.source_fixture,
-            design_dir=Path("designs") / design.design_id,
-        ),
-        RunOptions(resume=True, dry_run=args.dry_run),
+    payload = resume_design_from_payload(
+        {
+            "run": args.run,
+            "dry_run": args.dry_run,
+            "bootstrap_adapters": args.bootstrap_adapters,
+            "source_fixture": args.source_fixture,
+        }
     )
-    print(json.dumps(_result_payload(result), indent=2, sort_keys=True))
-    return 0 if result.failed_count == 0 else 1
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0 if payload["failed_count"] == 0 else 1
 
 
 def _artifact_read_command(args: argparse.Namespace) -> int:
-    manifest = load_run_manifest(args.run)
-    store = ArtifactStore(args.run, manifest["run_id"])
-    payload = store.read_artifact(args.uri)
+    payload = read_artifact_from_payload({"run": args.run, "uri": args.uri})["artifact"]
     if isinstance(payload, str):
         print(payload)
     else:
         print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
-
-
-def _design_path(value: str) -> Path:
-    path = Path(value)
-    if path.is_file():
-        return path
-    return Path("designs") / value / "design.yaml"
-
-
-def load_design_from_manifest(manifest: dict[str, Any]) -> Any:
-    from .design_runtime.models import DesignSpec
-
-    return DesignSpec.from_json(manifest["design"])
-
-
-def _adapters_for(
-    design: Any,
-    *,
-    dry_run: bool,
-    bootstrap: bool,
-    source_fixture: str | None = None,
-    design_dir: Path | None = None,
-) -> dict[str, Any]:
-    adapters = dry_run_adapters([phase.phase_id for phase in design.phases])
-    if bootstrap and not dry_run:
-        source_resolver = FixtureSourceResolver.from_file(source_fixture) if source_fixture else None
-        adapters["00_intake"] = IntakeAdapter()
-        adapters["01_dossier"] = DossierAdapter(source_resolver)
-        adapters["02_semantic_surface"] = SemanticSurfaceAdapter()
-        adapters["03_corpus_motifs"] = CorpusMotifsAdapter.from_design_dir(str(design_dir or Path("designs") / design.design_id))
-        adapters["04_thesis_acquisition"] = ThesisAcquisitionAdapter()
-        adapters["05_source_truth"] = SourceTruthAdapter()
-        adapters["06_onchain_state"] = OnChainStateAdapter()
-        adapters["07_proof_pieces"] = ProofPiecesAdapter()
-        adapters["08_compile_only"] = CompileOnlyAdapter()
-        adapters["10_final_report"] = FinalReportAdapter()
-    return adapters
-
-
-def _load_targets(path: Path) -> list[ContractTarget]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if isinstance(payload, dict):
-        records = payload.get("targets", [])
-    else:
-        records = payload
-    if not isinstance(records, list) or not records:
-        raise ValueError("Targets file must contain a non-empty list or {'targets': [...]}.")
-    return [ContractTarget.from_json(_target_payload(item)) for item in records]
-
-
-def _target_payload(item: Any) -> dict[str, Any]:
-    if not isinstance(item, dict):
-        raise ValueError("Each target must be an object.")
-    return item
-
-
-def _result_payload(result: Any) -> dict[str, Any]:
-    return {
-        "run_dir": str(result.run_dir),
-        "run_id": result.run_id,
-        "status": result.status,
-        "executed_count": result.executed_count,
-        "skipped_count": result.skipped_count,
-        "failed_count": result.failed_count,
-        "stop_reason": result.stop_reason,
-    }
 
 
 if __name__ == "__main__":

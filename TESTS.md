@@ -50,7 +50,7 @@ python -m unittest discover -s tests
 Result:
 
 ```text
-Ran 36 tests
+Ran 40 tests
 OK
 ```
 
@@ -92,6 +92,9 @@ Coverage added:
 - phase 08 compile-only skeleton.
 - phase 10 final report skeleton.
 - SubprocessFoundryAdapter compile and runtime gate tests with fake runner.
+- Runtime tool contracts for `vassago_design_run`,
+  `vassago_design_resume` and `vassago_artifact_read`.
+- Tool registry alias resolution and unknown-tool fail-closed behavior.
 
 Smoke:
 

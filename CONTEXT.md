@@ -123,4 +123,8 @@ As of 2026-06-21:
 - `SubprocessFoundryAdapter.compile_harness()` can run local `forge build`;
 - `SubprocessFoundryAdapter.run_local_fork()` is gated by explicit
   `runtime_ready=true` and `runtime_authorized=true`;
+- `runtime_api.py` is the shared CLI/tool entrypoint for run/resume/artifact
+  read;
+- `tools/` exposes three campaign-level contracts:
+  `vassago_design_run`, `vassago_design_resume` and `vassago_artifact_read`;
 - no RPC or broadcast path is wired.

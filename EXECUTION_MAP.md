@@ -41,7 +41,7 @@ PT-025.T05 Corpus interface - done 2026-06-21 interface plus local design corpus
 ## Lane D - Agent/MCP
 
 ```text
-PT-026.T01 tool contracts for run_design/resume_design/artifact_read
+PT-026.T01 tool contracts for run_design/resume_design/artifact_read - done 2026-06-21
 PT-026.T02 MCP stdio local
 PT-026.T03 Hermes skill vassago-sc01-design
 PT-026.T04 A2A card for SC01 design runner
@@ -60,7 +60,7 @@ PT-027.T06 only then larger batch
 
 ## Current Next Up
 
-1. Implement PT-024.T11 runtime Foundry local phase only behind `foundry_allowed=true`.
-2. Implement PT-026.T01 tool contracts for run/resume/artifact-read.
-3. Add fixture that produces a compile-ready hypothesis for phase 08 positive coverage.
+1. Implement PT-026.T02 MCP stdio local over the three canonical contracts.
+2. Add fixture that produces a compile-ready hypothesis for phase 08 positive coverage.
+3. Implement PT-024.T11 runtime Foundry local phase only behind `foundry_allowed=true`.
 4. Keep SC01 logic as design phases, not as top-level tool sprawl.
