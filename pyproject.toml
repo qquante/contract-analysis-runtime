@@ -1,0 +1,12 @@
+[project]
+name = "vassago-contract-runtime"
+version = "0.1.0"
+description = "Contract-first campaign runtime for Vassago"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.ruff]
+line-length = 120
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

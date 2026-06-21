@@ -1,0 +1,84 @@
+id: sc01-access
+version: v0.1.0
+title: SC01 Access Control Contract Campaign
+target_model: ContractTarget
+evidence_policy:
+  no_broadcast: true
+  local_runtime_only: true
+  static_never_promotes: true
+phases:
+  - id: "00_intake"
+    name: Intake
+    required: true
+    outputs:
+      - target-manifest.json
+      - scope-policy.json
+  - id: "01_dossier"
+    name: Dossier
+    required: true
+    outputs:
+      - scan-dossier.json
+      - function-index.json
+      - source-manifest.json
+      - compile-context.json
+  - id: "02_semantic_surface"
+    name: Semantic Surface
+    required: true
+    outputs:
+      - access-surface.json
+      - semantic-map.json
+      - guard-map.json
+      - state-write-map.json
+      - role-graph.json
+  - id: "03_corpus_motifs"
+    name: Corpus Motifs
+    required: false
+    outputs:
+      - sc01-corpus-matches.json
+      - sc01-thesis-candidates.json
+  - id: "04_thesis_acquisition"
+    name: Thesis Acquisition
+    required: true
+    outputs:
+      - sc01-thesis-queue.json
+      - sc01-acquisition-report.json
+  - id: "05_source_truth"
+    name: Source Truth
+    required: true
+    outputs:
+      - sc01-source-truth.json
+  - id: "06_onchain_state"
+    name: On-Chain State
+    required: false
+    outputs:
+      - admin-state.json
+      - proxy-state.json
+      - role-state.json
+  - id: "07_proof_pieces"
+    name: Proof Pieces
+    required: true
+    outputs:
+      - sc01-proof-piece-state.json
+      - sc01-exploit-hypotheses.json
+      - sc01-runtime-ready.json
+  - id: "08_compile_only"
+    name: Compile-Only Harness
+    required: false
+    gate: compile_ready
+    outputs:
+      - VassagoSC01Harness.t.sol
+      - compile-result.json
+  - id: "09_runtime_foundry"
+    name: Runtime Foundry Local
+    required: false
+    gate: runtime_ready
+    outputs:
+      - foundry-runtime-result.json
+      - assertion-result.json
+      - evidence.md
+  - id: "10_final_report"
+    name: Final Report
+    required: true
+    outputs:
+      - sc01-final-report.json
+      - sc01-final-report.md

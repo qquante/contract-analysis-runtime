@@ -1,0 +1,28 @@
+id: sc01-uninitialized-implementation
+thesis_id: uninitialized_implementation_proxy
+bug_family: access_control
+missing_property: implementation initialization must be disabled or harmless
+violated_invariant: attacker cannot become privileged actor on an implementation used by live proxies
+entrypoint_type: initializer
+sensitive_sink: owner/admin/governor storage or privileged implementation-local sink
+attacker_capabilities:
+  - call implementation address directly
+exploit_preconditions:
+  - implementation is not initialized or not disabled
+  - privileged implementation-local action has material impact
+search_motifs:
+  - initialize
+  - reinitializer
+  - _disableInitializers
+  - proxyInitialize
+  - delegatecall
+negative_signals:
+  - implementation initialized but no privileged sink
+  - proxy storage unaffected
+  - no live proxy uses implementation
+required_evidence:
+  - implementation/proxy relation
+  - initializer callable
+  - privileged sink reachable
+  - measurable impact
+runtime_runner: initializer_runtime

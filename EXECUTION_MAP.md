@@ -1,0 +1,65 @@
+# Execution Map
+
+## Lane A - Runtime Foundation
+
+```text
+PT-023.T01 DesignSpec / PhaseSpec / GateSpec
+PT-023.T02 RunManifest / TargetManifest / ArtifactIndex
+PT-023.T03 PhaseRunner with resume
+PT-023.T04 CLI skeleton
+PT-023.T05 check command
+```
+
+## Lane B - SC01 Design
+
+```text
+PT-024.T01 designs/sc01-access/design.yaml
+PT-024.T02 phase 00 intake
+PT-024.T03 phase 01 dossier
+PT-024.T04 phase 02 semantic surface
+PT-024.T05 phase 03 corpus motifs
+PT-024.T06 phase 04 thesis acquisition
+PT-024.T07 phase 05 source truth
+PT-024.T08 phase 06 on-chain state
+PT-024.T09 phase 07 proof pieces
+PT-024.T10 phase 08 compile-only
+PT-024.T11 phase 09 runtime Foundry local
+PT-024.T12 phase 10 final report
+```
+
+## Lane C - Adapters
+
+```text
+PT-025.T01 SourceResolver interface
+PT-025.T02 Explorer interface
+PT-025.T03 Slither interface
+PT-025.T04 Foundry interface
+PT-025.T05 ArtifactStore interface
+PT-025.T06 Corpus interface
+```
+
+## Lane D - Agent/MCP
+
+```text
+PT-026.T01 tool contracts for run_design/resume_design/artifact_read
+PT-026.T02 MCP stdio local
+PT-026.T03 Hermes skill vassago-sc01-design
+PT-026.T04 A2A card for SC01 design runner
+```
+
+## Lane E - Validation
+
+```text
+PT-027.T01 unit tests for manifest/resume
+PT-027.T02 fixture targets
+PT-027.T03 local SC01 ground-truth campaign
+PT-027.T04 smoke 5 contracts
+PT-027.T05 smoke 20 contracts
+PT-027.T06 only then larger batch
+```
+
+## Current Next Up
+
+1. Implement PT-023.T01-T03.
+2. Keep SC01 logic as design phases, not as top-level tool sprawl.
+3. Do not start SC02 before this runtime skeleton passes smoke.

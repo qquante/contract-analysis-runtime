@@ -1,0 +1,28 @@
+id: sc01-uups-weak-auth
+thesis_id: uups_weak_auth
+bug_family: access_control
+missing_property: upgrade authorization must be strong and context-correct
+violated_invariant: unauthorized actor cannot change implementation slot
+entrypoint_type: upgrade
+sensitive_sink: EIP-1967 implementation slot
+attacker_capabilities:
+  - call upgrade function on proxy context
+exploit_preconditions:
+  - upgradeTo or upgradeToAndCall reachable
+  - _authorizeUpgrade absent, weak or bypassable
+search_motifs:
+  - upgradeTo
+  - upgradeToAndCall
+  - _authorizeUpgrade
+  - onlyProxy
+  - ERC1967
+negative_signals:
+  - strong onlyOwner where owner is Safe/timelock
+  - onlyProxy with strong authorization
+  - initializer-only noise
+required_evidence:
+  - proxy context
+  - implementation slot reader
+  - upgrade function args codable
+  - unauthorized actor model
+runtime_runner: uups_runtime
