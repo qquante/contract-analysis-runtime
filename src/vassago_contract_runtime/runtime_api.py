@@ -7,12 +7,13 @@ from pathlib import Path
 from typing import Any
 
 from vassago_contract_runtime.artifacts.store import ArtifactStore
-from vassago_contract_runtime.contracts import FixtureSourceResolver
+from vassago_contract_runtime.contracts import ExplorerSourceResolver, FixtureSourceResolver, SourceResolver
 from vassago_contract_runtime.design_runtime.adapters import dry_run_adapters
 from vassago_contract_runtime.design_runtime.design_loader import load_design
 from vassago_contract_runtime.design_runtime.manifest import load_run_manifest
 from vassago_contract_runtime.design_runtime.models import ContractTarget, RunOptions
 from vassago_contract_runtime.design_runtime.runner import resume_design, run_design
+from vassago_contract_runtime.explorer import EtherscanV2ExplorerAdapter
 from vassago_contract_runtime.phases.compile_only import CompileOnlyAdapter
 from vassago_contract_runtime.phases.corpus_motifs import CorpusMotifsAdapter
 from vassago_contract_runtime.phases.dossier import DossierAdapter
@@ -20,9 +21,12 @@ from vassago_contract_runtime.phases.final_report import FinalReportAdapter
 from vassago_contract_runtime.phases.intake import IntakeAdapter
 from vassago_contract_runtime.phases.onchain_state import OnChainStateAdapter
 from vassago_contract_runtime.phases.proof_pieces import ProofPiecesAdapter
+from vassago_contract_runtime.phases.runtime_foundry import RuntimeFoundryAdapter
 from vassago_contract_runtime.phases.semantic_surface import SemanticSurfaceAdapter
 from vassago_contract_runtime.phases.source_truth import SourceTruthAdapter
 from vassago_contract_runtime.phases.thesis_acquisition import ThesisAcquisitionAdapter
+from vassago_contract_runtime.foundry import SubprocessFoundryAdapter
+from vassago_contract_runtime.slither import PythonSlitherAdapter
 
 
 def run_design_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -42,7 +46,10 @@ def run_design_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
             dry_run=dry_run,
             bootstrap=bootstrap,
             source_fixture=payload.get("source_fixture"),
+            source_cache_dir=payload.get("source_cache_dir") or str(Path(payload["output"]) / "_cache" / "etherscan-v2"),
             design_dir=design_path.parent,
+            runtime_authorized=bool(payload.get("runtime_authorized", False)),
+            allow_solc_install=bool(payload.get("allow_solc_install", False)),
         ),
         RunOptions(resume=bool(payload.get("resume", True)), dry_run=dry_run),
     )
@@ -64,7 +71,10 @@ def resume_design_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
             dry_run=dry_run,
             bootstrap=bootstrap,
             source_fixture=payload.get("source_fixture"),
+            source_cache_dir=payload.get("source_cache_dir") or str(Path(run_dir) / "_cache" / "etherscan-v2"),
             design_dir=Path("designs") / design.design_id,
+            runtime_authorized=bool(payload.get("runtime_authorized", False)),
+            allow_solc_install=bool(payload.get("allow_solc_install", False)),
         ),
         RunOptions(resume=True, dry_run=dry_run),
     )
@@ -103,22 +113,33 @@ def adapters_for(
     dry_run: bool,
     bootstrap: bool,
     source_fixture: str | None = None,
+    source_cache_dir: str | None = None,
     design_dir: Path | None = None,
+    runtime_authorized: bool = False,
+    allow_solc_install: bool = False,
 ) -> dict[str, Any]:
     adapters = dry_run_adapters([phase.phase_id for phase in design.phases])
     if bootstrap and not dry_run:
-        source_resolver = FixtureSourceResolver.from_file(source_fixture) if source_fixture else None
+        source_resolver = _source_resolver(source_fixture=source_fixture, source_cache_dir=source_cache_dir)
         adapters["00_intake"] = IntakeAdapter()
         adapters["01_dossier"] = DossierAdapter(source_resolver)
-        adapters["02_semantic_surface"] = SemanticSurfaceAdapter()
+        adapters["02_semantic_surface"] = SemanticSurfaceAdapter(PythonSlitherAdapter(allow_solc_install=allow_solc_install))
         adapters["03_corpus_motifs"] = CorpusMotifsAdapter.from_design_dir(str(design_dir or Path("designs") / design.design_id))
         adapters["04_thesis_acquisition"] = ThesisAcquisitionAdapter()
         adapters["05_source_truth"] = SourceTruthAdapter()
         adapters["06_onchain_state"] = OnChainStateAdapter()
         adapters["07_proof_pieces"] = ProofPiecesAdapter()
-        adapters["08_compile_only"] = CompileOnlyAdapter()
+        foundry = SubprocessFoundryAdapter()
+        adapters["08_compile_only"] = CompileOnlyAdapter(foundry)
+        adapters["09_runtime_foundry"] = RuntimeFoundryAdapter(foundry, runtime_authorized=runtime_authorized)
         adapters["10_final_report"] = FinalReportAdapter()
     return adapters
+
+
+def _source_resolver(*, source_fixture: str | None, source_cache_dir: str | None) -> SourceResolver:
+    if source_fixture:
+        return FixtureSourceResolver.from_file(source_fixture)
+    return ExplorerSourceResolver(EtherscanV2ExplorerAdapter(cache_dir=source_cache_dir))
 
 
 def load_targets_payload(targets: Any, targets_path: str | None = None) -> list[ContractTarget]:

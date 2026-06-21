@@ -29,7 +29,7 @@ class FinalReportAdapter:
             "runtime_ready_count": int(runtime_ready.get("runtime_ready_count") or 0),
             "foundry_allowed": bool(runtime_ready.get("foundry_allowed")),
             "runtime_status": runtime_result.get("status"),
-            "evidence_status": "static_only",
+            "evidence_status": _evidence_status(runtime_result, compile_result),
             "no_broadcast": True,
             "summary": _summary(final_status),
             "next_steps": _next_steps(final_status),
@@ -66,6 +66,14 @@ def _summary(final_status: str) -> str:
     if final_status == "runtime_ready_pending_local_execution":
         return "A runtime-ready hypothesis exists, but local runtime execution has not been run in this phase."
     return f"Final SC01 status: {final_status}."
+
+
+def _evidence_status(runtime_result: dict[str, Any], compile_result: dict[str, Any]) -> str:
+    if runtime_result.get("evidence_status") == "runtime_local":
+        return "runtime_local"
+    if compile_result.get("evidence_status") == "compile_only":
+        return "compile_only"
+    return "static_only"
 
 
 def _next_steps(final_status: str) -> list[str]:

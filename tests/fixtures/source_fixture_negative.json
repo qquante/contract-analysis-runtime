@@ -1,0 +1,47 @@
+{
+  "targets": [
+    {
+      "chain": "eth",
+      "address": "0x3333333333333333333333333333333333333333",
+      "status": "resolved",
+      "provider": "fixture",
+      "abi": [
+        {
+          "type": "function",
+          "name": "initializeMarket",
+          "stateMutability": "payable",
+          "inputs": [],
+          "outputs": []
+        },
+        {
+          "type": "function",
+          "name": "balances",
+          "stateMutability": "view",
+          "inputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        }
+      ],
+      "source_files": {
+        "FixturePublicAccounting.sol": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract FixturePublicAccounting {\n    mapping(address => uint256) public balances;\n    uint256 public totalDeposits;\n\n    event Deposited(address indexed account, uint256 amount);\n\n    function initializeMarket() external payable {\n        require(msg.value > 0, \"zero\");\n        balances[msg.sender] += msg.value;\n        totalDeposits += msg.value;\n        emit Deposited(msg.sender, msg.value);\n    }\n}\n"
+      },
+      "compiler": {
+        "language": "Solidity",
+        "version": "0.8.20"
+      },
+      "metadata": {
+        "fixture_id": "fixture-public-accounting-negative",
+        "source_basis": "Anti-hardcode negative: function name contains initialize but source behavior is user-funded accounting"
+      }
+    }
+  ]
+}

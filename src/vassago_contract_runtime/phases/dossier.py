@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 from vassago_contract_runtime.contracts import ContractTargetRef, NullSourceResolver, SourceResolver
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
 
@@ -77,11 +80,97 @@ def _protocol_fingerprint(source: dict) -> dict:
 
 
 def _compile_context(source: dict) -> dict:
+    source_files = source.get("source_files") or {}
+    if source_files:
+        metadata = dict(source.get("metadata") or {})
+        selected_source_file = _select_source_file(source_files, metadata)
+        compiler = source.get("compiler") or {}
+        compiler_version = _normalize_solc_version(compiler.get("version"))
+        pragma_constraints = _pragma_constraints(source_files)
+        selected_version = compiler_version or _first_pragma_version(pragma_constraints)
+        solc_remaps = _infer_solc_remaps(source_files)
+        return {
+            "status": "available",
+            "source_status": source.get("status"),
+            "provider": source.get("provider"),
+            "compiler": compiler,
+            "compiler_version": compiler_version,
+            "pragma_constraints": pragma_constraints,
+            "selected_source_file": selected_source_file,
+            "target_contract": metadata.get("contract_name"),
+            "source_file_count": len(source_files),
+            "solc_remaps": solc_remaps,
+            "solc_version_selection": {
+                "requested_version": selected_version,
+                "source": "compiler_metadata" if compiler_version else "pragma_constraint" if selected_version else "unknown",
+                "env_var": "SOLC_VERSION" if selected_version else None,
+                "status": "selected" if selected_version else "not_selected",
+            },
+            "blockers": [],
+        }
     return {
         "status": "missing_source",
         "source_status": source.get("status"),
         "provider": source.get("provider"),
         "compiler": source.get("compiler") or {},
-        "source_file_count": len(source.get("source_files") or {}),
+        "source_file_count": 0,
         "blockers": ["compile_context_requires_source_bundle"],
     }
+
+
+def _select_source_file(source_files: dict[str, str], metadata: dict) -> str:
+    explicit = str(metadata.get("selected_source_file") or "").strip()
+    if explicit and explicit in source_files:
+        return explicit
+
+    contract_name = str(metadata.get("contract_name") or "").strip()
+    if contract_name:
+        declaration = re.compile(
+            rf"\b(?:abstract\s+contract|contract|interface|library)\s+{re.escape(contract_name)}\b"
+        )
+        matches = [
+            filename
+            for filename, content in sorted(source_files.items())
+            if declaration.search(str(content))
+        ]
+        if matches:
+            return matches[0]
+
+    return sorted(source_files)[0]
+
+
+def _normalize_solc_version(value: object) -> str:
+    text = str(value or "")
+    match = re.search(r"v?(0\.\d+\.\d+)", text)
+    return match.group(1) if match else ""
+
+
+def _pragma_constraints(source_files: dict[str, str]) -> list[str]:
+    constraints: list[str] = []
+    for content in source_files.values():
+        for match in re.finditer(r"pragma\s+solidity\s+([^;]+);", str(content)):
+            constraints.append(" ".join(match.group(1).split()))
+    return sorted(set(constraints))
+
+
+def _first_pragma_version(constraints: list[str]) -> str:
+    for constraint in constraints:
+        match = re.search(r"(0\.\d+\.\d+)", constraint)
+        if match:
+            return match.group(1)
+    return ""
+
+
+def _infer_solc_remaps(source_files: dict[str, str]) -> list[str]:
+    remaps: set[str] = set()
+    for name in source_files:
+        parts = Path(name).as_posix().split("/")
+        for index, part in enumerate(parts[:-1]):
+            if part != "lib" or index + 1 >= len(parts):
+                continue
+            package = parts[index + 1]
+            if not package or package in {"src", "test", "script"}:
+                continue
+            prefix = "/".join(parts[: index + 2])
+            remaps.add(f"{package}/={prefix}/")
+    return sorted(remaps)

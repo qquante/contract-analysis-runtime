@@ -1,0 +1,131 @@
+{
+  "targets": [
+    {
+      "chain": "eth",
+      "address": "0x4444444444444444444444444444444444444444",
+      "status": "resolved",
+      "provider": "fixture",
+      "abi": [
+        {
+          "type": "function",
+          "name": "owner",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [{"name": "", "type": "address"}]
+        },
+        {
+          "type": "function",
+          "name": "initialize",
+          "stateMutability": "nonpayable",
+          "inputs": [],
+          "outputs": []
+        },
+        {
+          "type": "function",
+          "name": "upgradeTo",
+          "stateMutability": "nonpayable",
+          "inputs": [{"name": "newImplementation", "type": "address"}],
+          "outputs": []
+        }
+      ],
+      "source_files": {
+        "FixtureDisabledInitializer.sol": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract FixtureDisabledInitializer {\n    address public owner;\n\n    constructor() {\n        _disableInitializers();\n    }\n\n    function initialize() external {\n        owner = msg.sender;\n    }\n\n    function upgradeTo(address newImplementation) external {\n        _authorizeUpgrade(newImplementation);\n    }\n\n    function _authorizeUpgrade(address) internal view {\n        require(msg.sender == owner, \"owner\");\n    }\n\n    function _disableInitializers() internal {}\n}\n"
+      },
+      "compiler": {"language": "Solidity", "version": "0.8.20"},
+      "metadata": {
+        "fixture_id": "fixture-disabled-initializer",
+        "contract_name": "FixtureDisabledInitializer"
+      }
+    },
+    {
+      "chain": "eth",
+      "address": "0x5555555555555555555555555555555555555555",
+      "status": "resolved",
+      "provider": "fixture",
+      "abi": [
+        {
+          "type": "function",
+          "name": "owner",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [{"name": "", "type": "address"}]
+        },
+        {
+          "type": "function",
+          "name": "changeOwnerViaOrigin",
+          "stateMutability": "nonpayable",
+          "inputs": [{"name": "newOwner", "type": "address"}],
+          "outputs": []
+        }
+      ],
+      "source_files": {
+        "FixtureTxOriginAdmin.sol": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract FixtureTxOriginAdmin {\n    address public owner;\n\n    constructor() {\n        owner = msg.sender;\n    }\n\n    function changeOwnerViaOrigin(address newOwner) external {\n        require(tx.origin == owner, \"origin\");\n        owner = newOwner;\n    }\n}\n"
+      },
+      "compiler": {"language": "Solidity", "version": "0.8.20"},
+      "metadata": {
+        "fixture_id": "fixture-tx-origin-admin",
+        "contract_name": "FixtureTxOriginAdmin"
+      }
+    },
+    {
+      "chain": "eth",
+      "address": "0x6666666666666666666666666666666666666666",
+      "status": "resolved",
+      "provider": "fixture",
+      "abi": [
+        {
+          "type": "function",
+          "name": "operators",
+          "stateMutability": "view",
+          "inputs": [{"name": "", "type": "address"}],
+          "outputs": [{"name": "", "type": "bool"}]
+        },
+        {
+          "type": "function",
+          "name": "grantOperator",
+          "stateMutability": "nonpayable",
+          "inputs": [{"name": "account", "type": "address"}],
+          "outputs": []
+        }
+      ],
+      "source_files": {
+        "FixtureOpenRoleAdmin.sol": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract FixtureOpenRoleAdmin {\n    mapping(address => bool) public operators;\n\n    function grantOperator(address account) external {\n        operators[account] = true;\n    }\n}\n"
+      },
+      "compiler": {"language": "Solidity", "version": "0.8.20"},
+      "metadata": {
+        "fixture_id": "fixture-open-role-admin",
+        "contract_name": "FixtureOpenRoleAdmin"
+      }
+    },
+    {
+      "chain": "eth",
+      "address": "0x7777777777777777777777777777777777777777",
+      "status": "resolved",
+      "provider": "fixture",
+      "abi": [
+        {
+          "type": "function",
+          "name": "status",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [{"name": "", "type": "uint256"}]
+        },
+        {
+          "type": "function",
+          "name": "settleRound",
+          "stateMutability": "nonpayable",
+          "inputs": [],
+          "outputs": []
+        }
+      ],
+      "source_files": {
+        "FixturePublicLifecycle.sol": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract FixturePublicLifecycle {\n    uint256 public status;\n    uint256 public round;\n\n    function settleRound() external {\n        require(block.timestamp > 1 days, \"early\");\n        status = 2;\n        round += 1;\n    }\n}\n"
+      },
+      "compiler": {"language": "Solidity", "version": "0.8.20"},
+      "metadata": {
+        "fixture_id": "fixture-public-lifecycle",
+        "contract_name": "FixturePublicLifecycle"
+      }
+    }
+  ]
+}

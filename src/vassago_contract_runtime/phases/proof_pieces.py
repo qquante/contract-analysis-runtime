@@ -94,7 +94,8 @@ def _read_optional_json(context: PhaseContext, phase_id: str, name: str) -> dict
 
 
 def _proof_piece(review: dict[str, Any], admin_state: dict, proxy_state: dict, role_state: dict) -> dict[str, Any]:
-    missing = set(review.get("missing_proof_pieces") or ProofPiecesAdapter.REQUIRED_PIECES)
+    raw_missing = review.get("missing_proof_pieces")
+    missing = set(raw_missing if raw_missing is not None else ProofPiecesAdapter.REQUIRED_PIECES)
     state_blockers = []
     for state in (admin_state, proxy_state, role_state):
         state_blockers.extend(state.get("blockers") or [])
@@ -128,7 +129,7 @@ def _hypothesis(piece: dict[str, Any]) -> dict[str, Any]:
         "candidate_id": piece.get("candidate_id"),
         "thesis_id": piece.get("thesis_id"),
         "compile_ready": True,
-        "runtime_ready": False,
+        "runtime_ready": True,
         "runtime_blockers": ["compile_only_not_run", "explicit_runtime_authorization_required"],
         "evidence_status": "candidate",
     }
@@ -137,6 +138,8 @@ def _hypothesis(piece: dict[str, Any]) -> dict[str, Any]:
 def _blockers(pieces: list[dict[str, Any]]) -> list[str]:
     if not pieces:
         return ["no_source_truth_reviews"]
+    if any(piece.get("non_compile_pieces_complete") for piece in pieces):
+        return ["compile_only_not_run", "explicit_runtime_authorization_required"]
     blockers = set()
     for piece in pieces:
         blockers.update(piece.get("missing_pieces") or [])

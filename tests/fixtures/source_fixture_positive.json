@@ -1,0 +1,66 @@
+{
+  "targets": [
+    {
+      "chain": "eth",
+      "address": "0x2222222222222222222222222222222222222222",
+      "status": "resolved",
+      "provider": "fixture",
+      "abi": [
+        {
+          "type": "function",
+          "name": "owner",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "initialize",
+          "stateMutability": "nonpayable",
+          "inputs": [],
+          "outputs": []
+        },
+        {
+          "type": "function",
+          "name": "upgradeTo",
+          "stateMutability": "nonpayable",
+          "inputs": [
+            {
+              "name": "newImplementation",
+              "type": "address"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "type": "event",
+          "name": "Upgraded",
+          "inputs": [
+            {
+              "name": "implementation",
+              "type": "address",
+              "indexed": true
+            }
+          ]
+        }
+      ],
+      "source_files": {
+        "FixtureUUPSPositive.sol": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\ncontract FixtureUUPSPositive {\n    address public owner;\n\n    event Upgraded(address indexed implementation);\n\n    function initialize() external {\n        owner = msg.sender;\n    }\n\n    function upgradeTo(address newImplementation) external {\n        _authorizeUpgrade(newImplementation);\n        emit Upgraded(newImplementation);\n    }\n\n    function _authorizeUpgrade(address) internal view {\n        require(msg.sender == owner, \"owner\");\n    }\n}\n"
+      },
+      "compiler": {
+        "language": "Solidity",
+        "version": "0.8.20"
+      },
+      "metadata": {
+        "fixture_id": "fixture-uups-positive",
+        "contract_name": "FixtureUUPSPositive",
+        "source_basis": "OpenZeppelin UUPS uninitialized implementation advisory pattern"
+      }
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "targets": [
+    {
+      "chain": "eth",
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "label": "eth-usdc-fiat-token-proxy"
+    },
+    {
+      "chain": "eth",
+      "address": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
+      "label": "eth-erc4337-entrypoint-v06"
+    },
+    {
+      "chain": "eth",
+      "address": "0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552",
+      "label": "eth-safe-singleton-130"
+    },
+    {
+      "chain": "base",
+      "address": "0x498581fF718922c3f8e6A244956aF099B2652b2b",
+      "label": "base-uniswap-v4-poolmanager"
+    },
+    {
+      "chain": "bsc",
+      "address": "0xa5f8C5Dbd5F286960b9d90548680aE5ebFf07652",
+      "label": "bsc-pancakeswap-masterchef-v2"
+    }
+  ]
+}

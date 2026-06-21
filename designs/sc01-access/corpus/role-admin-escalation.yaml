@@ -1,0 +1,28 @@
+id: sc01-role-admin-escalation
+thesis_id: role_admin_escalation
+bug_family: access_control
+missing_property: role lifecycle changes must be guarded by a valid admin relation
+violated_invariant: unauthorized actor cannot grant, revoke or self-escalate privileged roles
+entrypoint_type: role_lifecycle
+sensitive_sink: role/admin/operator/guardian storage or AccessControl role mutation
+attacker_capabilities:
+  - call public or weakly guarded role lifecycle functions
+exploit_preconditions:
+  - role mutation function is reachable
+  - admin relation is missing, self-admin, or bypassable
+search_motifs:
+  - grantRole
+  - revokeRole
+  - _setRoleAdmin
+  - operator
+  - guardian
+  - roles
+negative_signals:
+  - strong onlyOwner where owner is Safe or timelock
+  - AccessControl admin relation proves expected admin
+required_evidence:
+  - role graph
+  - actor model
+  - role reader
+  - role delta
+runtime_runner: role_admin_runtime

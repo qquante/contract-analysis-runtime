@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
 from vassago_contract_runtime.foundry import FoundryAdapter, FoundryHarnessInput, NullFoundryAdapter
+from vassago_contract_runtime.sc01_source import (
+    contract_name_for_harness,
+    render_initializer_call,
+    should_use_uups_initializer_harness,
+)
 
 
 class CompileOnlyAdapter:
@@ -15,7 +20,7 @@ class CompileOnlyAdapter:
     def run(self, context: PhaseContext) -> PhaseResult:
         ready = _read_json(context, "07_proof_pieces", "sc01-runtime-ready.json")
         source_manifest = _read_json(context, "01_dossier", "source-manifest.json")
-        harness = _sentinel_harness()
+        harness = render_sc01_harness(source_manifest)
         compile_ready_count = int(ready.get("compile_ready_count") or 0)
         if compile_ready_count <= 0:
             result = {
@@ -71,6 +76,34 @@ def _sentinel_harness() -> str:
             "contract VassagoSC01Harness {",
             "    function __compileOnlySentinel() external pure returns (bool) {",
             "        return true;",
+            "    }",
+            "}",
+            "",
+        ]
+    )
+
+
+def render_sc01_harness(source_manifest: dict) -> str:
+    if should_use_uups_initializer_harness(source_manifest):
+        return _uups_initializer_harness(source_manifest)
+    return _sentinel_harness()
+
+
+def _uups_initializer_harness(source_manifest: dict) -> str:
+    contract_name = contract_name_for_harness(source_manifest)
+    init_call = render_initializer_call(source_manifest)
+    return "\n".join(
+        [
+            "// SPDX-License-Identifier: MIT",
+            "pragma solidity ^0.8.24;",
+            "",
+            f'import "../src/{contract_name}.sol";',
+            "",
+            "contract VassagoSC01Harness {",
+            "    function testUnauthorizedCallerCanInitializeImplementation() external {",
+            f"        {contract_name} target = new {contract_name}();",
+            f"        {init_call}",
+            "        require(target.owner() == address(this), \"owner not seized\");",
             "    }",
             "}",
             "",

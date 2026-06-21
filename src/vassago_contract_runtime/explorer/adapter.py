@@ -315,13 +315,20 @@ def _parse_abi(value: Any) -> list[dict[str, Any]] | None:
 
 def _parse_source_files(record: dict[str, Any]) -> dict[str, str]:
     source = str(record.get("SourceCode") or "")
-    filename = str(record.get("ContractFileName") or record.get("ContractName") or "Contract.sol")
+    filename = _flat_source_filename(record)
     if not source:
         return {}
     parsed = _parse_standard_json_source(source)
     if parsed:
         return parsed
     return {filename: source}
+
+
+def _flat_source_filename(record: dict[str, Any]) -> str:
+    filename = str(record.get("ContractFileName") or record.get("ContractName") or "Contract.sol").strip()
+    if not filename:
+        return "Contract.sol"
+    return filename if filename.endswith(".sol") else f"{filename}.sol"
 
 
 def _parse_standard_json_source(source: str) -> dict[str, str]:

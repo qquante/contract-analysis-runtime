@@ -41,6 +41,11 @@ class SourceResolver(Protocol):
         """Resolve source context for one contract target."""
 
 
+class ExplorerContextAdapter(Protocol):
+    def get_contract_context(self, target: ContractTargetRef) -> Any:
+        """Return Explorer source context for one contract target."""
+
+
 class NullSourceResolver:
     """Read-only placeholder used before provider adapters exist."""
 
@@ -108,6 +113,51 @@ class FixtureSourceResolver:
                 **dict(record.get("metadata") or {}),
             },
             error=record.get("error"),
+        )
+
+
+class ExplorerSourceResolver:
+    """Source resolver backed by a read-only Explorer adapter.
+
+    This bridges Explorer contract context into the narrower SourceResolver
+    contract used by phase 01. It does not know about Etherscan specifically;
+    runtime wiring decides which Explorer adapter and cache to use.
+    """
+
+    def __init__(self, explorer: ExplorerContextAdapter) -> None:
+        self.explorer = explorer
+
+    def resolve(self, target: ContractTargetRef) -> SourceResolution:
+        context = self.explorer.get_contract_context(target)
+        context_json = context.to_json() if hasattr(context, "to_json") else dict(context)
+        if context_json.get("status") != "resolved":
+            return SourceResolution(
+                status=str(context_json.get("status") or "unresolved"),
+                provider=str(context_json.get("provider") or "explorer"),
+                target=target,
+                metadata={
+                    "evidence_status": "read_only_real",
+                    "source": "explorer",
+                    **dict(context_json.get("metadata") or {}),
+                },
+                error=context_json.get("error"),
+            )
+        compiler_version = str((context_json.get("metadata") or {}).get("compiler_version") or "")
+        compiler = {"language": "Solidity", "version": compiler_version} if compiler_version else {}
+        return SourceResolution(
+            status="resolved",
+            provider=str(context_json.get("provider") or "explorer"),
+            target=target,
+            abi=context_json.get("abi"),
+            source_files=dict(context_json.get("source_files") or {}),
+            compiler=compiler,
+            proxy_context=dict(context_json.get("proxy_context") or {}),
+            metadata={
+                "evidence_status": "read_only_real",
+                "source": "explorer",
+                **dict(context_json.get("metadata") or {}),
+            },
+            error=context_json.get("error"),
         )
 
 

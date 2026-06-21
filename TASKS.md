@@ -5,16 +5,26 @@ here without reading the old Vassago conversation.
 
 ## Current Status
 
-Repository bootstrap complete.
+Repository bootstrap plus positive local SC01 runtime path complete.
 
-PT-023.T01-T05, PT-024.T01-T08, PT-025.T01-T05 and PT-025.T03B are implemented and covered by unit tests.
+PT-023.T01-T05, PT-024.T01-T12, PT-025.T01-T05, PT-025.T03B, PT-025.T04B
+and PT-026.T01-T03 are implemented and covered by tests.
+PT-024.T13-T18 are implemented: source-backed positive/negative verification,
+normalized Slither IR-first semantic surface, real Slither Python API IR
+extraction, local solc version selection and controlled compiler cache
+provisioning via solc-select.
+PT-025.T01B is implemented: phase 01 can resolve real ABI/source through the
+read-only Etherscan V2 Explorer adapter when no `--source-fixture` is supplied.
+PT-027.T01 first adversarial fixture slice is implemented: disabled
+initializer, tx.origin authorization, open role-admin mutation and public
+lifecycle noise.
 
 ## NEXT UP
 
-1. `PT-024.T09` - implement phase 07 proof pieces skeleton.
-2. `PT-024.T10` - implement phase 08 compile-only skeleton.
-3. `PT-024.T12` - implement phase 10 final report skeleton.
-4. `PT-025.T04B` - implement real Foundry subprocess adapter.
+1. `PT-027.T02B` - optionally rerun curated 5 with `--allow-solc-install` to provision solc 0.4.24 for USDC.
+2. `PT-027.T01B` - expand adversarial fixtures for no-op guard, post-check modifier, Safe/module, bridge endpoint/source and ERC4337 validator.
+3. `PT-027.T03` - run 20 curated contracts only after deciding compiler provisioning policy.
+4. `PT-024.T19` - add per-target Slither failure summary if larger smoke shows repeated compile/import misses.
 
 ---
 
@@ -430,7 +440,7 @@ Result:
 
 ## PT-024.T09 - Phase 07 Proof Pieces
 
-Status: pending.
+Status: done, 2026-06-21.
 
 Purpose:
 
@@ -453,7 +463,7 @@ Outputs:
 
 ## PT-024.T10 - Phase 08 Compile-Only
 
-Status: pending.
+Status: done, 2026-06-21.
 
 Purpose:
 
@@ -472,7 +482,7 @@ Statuses:
 
 ## PT-024.T11 - Phase 09 Runtime Foundry Local
 
-Status: pending.
+Status: done, 2026-06-21.
 
 Purpose:
 
@@ -485,6 +495,7 @@ Rules:
 - no live transaction;
 - local/fork only;
 - fixed block where possible.
+- explicit `--runtime-authorized` required.
 
 Outputs:
 
@@ -494,14 +505,22 @@ Outputs:
 
 Statuses:
 
-- `reproduced_runtime`;
+- `runtime_completed`;
+- `blocked_runtime_authorization_required`;
 - `not_reproduced`;
 - `runtime_failed`;
 - `inconclusive`.
 
+Result:
+
+- Added `src/vassago_contract_runtime/phases/runtime_foundry.py`.
+- Runtime uses `SubprocessFoundryAdapter.run_local_fork()`.
+- Local positive fixture passed `forge test --match-contract VassagoSC01Harness`.
+- No broadcast command is generated.
+
 ## PT-024.T12 - Phase 10 Final Report
 
-Status: pending.
+Status: done, 2026-06-21.
 
 Outputs:
 
@@ -523,7 +542,7 @@ Report must include:
 
 ## PT-025.T01 - SourceResolver Adapter
 
-Status: done, 2026-06-21, interface plus null and local fixture adapters.
+Status: done, 2026-06-21, interface plus null, local fixture and Explorer-backed adapters.
 
 Interface:
 
@@ -540,9 +559,36 @@ Result:
 - Added `src/vassago_contract_runtime/contracts/source_resolver.py`.
 - Added `src/vassago_contract_runtime/contracts/target.py`.
 - Implemented `SourceResolver` protocol, `SourceResolution`, `NullSourceResolver`
-  and `FixtureSourceResolver`.
+  `FixtureSourceResolver` and `ExplorerSourceResolver`.
 - Local fixture source input is supported through `--source-fixture`.
-- Etherscan/Sourcify provider adapters are still future work.
+- When no `--source-fixture` is supplied, bootstrap mode uses
+  `ExplorerSourceResolver(EtherscanV2ExplorerAdapter(...))`.
+- Default cache path is `<run>/_cache/etherscan-v2`; override with
+  `--source-cache-dir`.
+- Sourcify provider adapter is still future work.
+
+## PT-025.T01B - Explorer-backed SourceResolver wiring
+
+Status: done, 2026-06-21.
+
+Implemented:
+
+- `ExplorerSourceResolver` bridges `ExplorerContractContext` to
+  `SourceResolution`;
+- `runtime_api.adapters_for()` now chooses:
+  - `FixtureSourceResolver` when `--source-fixture` is supplied;
+  - Etherscan V2 read-only Explorer source resolver otherwise;
+- CLI and MCP/tool payloads accept `source_cache_dir`;
+- if `ETHERSCAN_API_KEY` is missing, the resolver returns structured
+  unresolved state instead of falling back to fake data.
+
+Validation:
+
+- fake Explorer mapping test;
+- runtime wiring test confirms no-fixture bootstrap uses Explorer resolver and
+  cache path;
+- no live API smoke was run in this session because `ETHERSCAN_API_KEY` was not
+  set in the shell.
 
 ## PT-025.T02 - Explorer Adapter
 
@@ -708,32 +754,87 @@ Validation:
 
 ## PT-027.T01 - Local Fixtures
 
-Status: pending.
+Status: done first slice, 2026-06-21.
 
-Create fixtures:
+Implemented:
+
+- `tests/fixtures/targets_adversarial.json`;
+- `tests/fixtures/source_fixture_adversarial.json`;
+- `designs/sc01-access/corpus/tx-origin-auth.yaml`;
+- `designs/sc01-access/corpus/role-admin-escalation.yaml`;
+- `designs/sc01-access/corpus/public-lifecycle-noise.yaml`;
+- regression test
+  `BootstrapPhaseTests.test_adversarial_fixture_suite_routes_without_false_foundry_promotion`.
+
+Covered cases:
+
+- disabled initializer with `_disableInitializers()` is not promoted;
+- `tx.origin` authorization is routed as a thesis/guard signal but remains
+  non-Foundry until proof pieces exist;
+- open role-admin/operator mutation is routed as a thesis but remains blocked;
+- public lifecycle function `settleRound()` is rejected as `public_lifecycle`.
+
+Remaining fixture expansion:
 
 - missing critical guard;
 - safe public deposit;
 - no-op guard;
 - post-check modifier;
-- uninitialized implementation;
-- weak UUPS;
 - Safe module;
-- bridge endpoint;
+- bridge endpoint/source validation;
 - ERC4337 validator;
-- role self-admin.
+- role self-admin with role graph.
+
+## PT-027.T01B - Local Fixtures Expansion
+
+Status: pending.
+
+Add the remaining adversarial/metamorphic cases listed above. Keep each case
+local-only and assert that `foundry_allowed` changes only when all proof pieces
+are complete.
 
 ## PT-027.T02 - SC01 Smoke 5 Contracts
 
-Status: pending.
+Status: done first real smoke, 2026-06-21.
 
 Run design on 5 known contracts.
 
 Acceptance:
 
-- no crash;
-- phase report complete;
-- no false reproduced evidence.
+- no crash. Done after regex fix.
+- phase report complete. Done: all 5 targets completed 11 phases.
+- no false reproduced evidence. Done: all final reports are
+  `blocked_no_runtime_ready`, `foundry_allowed=false`.
+
+Targets:
+
+- ETH USDC FiatTokenProxy;
+- ETH ERC-4337 EntryPoint v0.6;
+- ETH Safe Singleton 1.3.0;
+- Base Uniswap v4 PoolManager;
+- BSC PancakeSwap MasterChefV2.
+
+Results:
+
+- source resolution via Etherscan V2 worked for all 5;
+- Slither Python completed for 4/5;
+- USDC Slither failed with `solc_version_cache_missing` for `0.4.24`;
+- source truth stayed `blocked` for all 5, with no runtime evidence promoted.
+
+Bug fixed during smoke:
+
+- `sc01_source._is_user_funded_accounting()` had an invalid regex branch for
+  plain assignment paths. Fixed and covered by
+  `test_public_normal_behavior_handles_plain_assignment_without_regex_error`.
+
+## PT-027.T02B - Curated 5 With Compiler Provisioning
+
+Status: pending.
+
+Run the same curated set with explicit `--allow-solc-install` if we want USDC's
+Solidity `0.4.24` source to be Slither-analyzed locally.
+
+Do not make this default. It is a setup/smoke action only.
 
 ## PT-027.T03 - SC01 Smoke 20 Curated Contracts
 
@@ -820,9 +921,278 @@ Current behavior:
 
 # RESUME FROM HERE
 
-Start with a Hermes smoke using
-`hermes --skills vassago-sc01-design ...` on the fixture target, or move to
-`PT-026.T04` A2A card if the skill behavior is acceptable. Current bootstrap
-runs real local phases 00 through 08 and phase 10. Phase 09 remains dry-run
-unless a runtime-ready report and explicit local authorization exist. Keep
-Foundry runtime local-only and no-broadcast.
+Start with `PT-024.T13`. Current bootstrap runs phases 00 through 10, including
+local Foundry runtime when `foundry_allowed=true` and `--runtime-authorized` is
+explicitly passed. The positive UUPS fixture already reaches
+`runtime_completed`; keep it as regression while replacing the metadata shortcut
+with source/IR-backed verification.
+
+## PT-024.T13 - Source-backed positive verification
+
+Status: done, 2026-06-21.
+
+Replace the current local-positive fixture shortcut with a source-backed verifier
+for uninitialized implementation/UUPS initializer cases.
+
+Acceptance:
+
+- verifies `initialize()` writability from source/IR, not fixture metadata alone;
+- verifies no `_disableInitializers()`;
+- verifies `owner()` or equivalent reader;
+- keeps live contracts blocked without proxy/state impact evidence;
+- preserves the local positive fixture as a regression test.
+
+Result:
+
+- Added `src/vassago_contract_runtime/sc01_source.py`.
+- `source_truth.py` now verifies the positive initializer path from source:
+  `initialize()`, admin write, missing `_disableInitializers()`, admin reader
+  and upgrade sink.
+- `source_fixture_positive.json` no longer uses `local_positive_sc01_case`.
+- `onchain_state.py` only clears local state blockers for fixture provider
+  plus source-backed verification; live contracts still need proxy/state
+  sidecars.
+- `compile_only.py` renders the initializer harness from source-backed
+  verification instead of metadata.
+
+## PT-024.T14 - Source-backed negative verification
+
+Status: done, 2026-06-21.
+
+Add negative source-truth policies for safe public lifecycle/accounting paths so
+SC01 does not promote public deposits, fee accrual, keeper actions or protocol
+lifecycle transitions into access-control proof pieces.
+
+Result:
+
+- Added `evaluate_public_normal_behavior()` in
+  `src/vassago_contract_runtime/sc01_source.py`.
+- Added negative fixture:
+  `tests/fixtures/source_fixture_negative.json` and
+  `tests/fixtures/targets_negative.json`.
+- Source-truth now emits `source_truth_rejected` when all candidates are
+  rejected by source-backed negative policy.
+- Anti-hardcode case `initializeMarket()` is rejected as
+  `caller_funded_accounting`, despite matching the `initialize` motif.
+- Foundry remains blocked for rejected candidates.
+
+## PT-024.T15 - Slither IR source extraction
+
+Status: done, 2026-06-21.
+
+Use Slither subprocess/Python IR outputs as the primary source for function
+bodies, writes, modifiers and calls when compile context is available.
+
+Result:
+
+- `compile-context.json` now becomes `status=available` when the source bundle
+  exists, including selected source file and target contract metadata.
+- `SemanticSurfaceAdapter` accepts a `SlitherAdapter` and consumes normalized
+  `ir.functions[]` as primary extraction.
+- `access-surface.json` now records `slither` summary and per-function
+  `extraction_source`.
+- If Slither IR is unavailable or no adapter is configured, phase 02 falls back
+  to the previous ABI/source heuristic and records the degraded source.
+- Tests prove that, with compile context and Slither IR, state writes and guard
+  signals come from `slither_ir` instead of the heuristic parser.
+
+Limit:
+
+- The current `SubprocessSlitherAdapter` invokes Slither CLI JSON, which is
+  detector output, not full SlithIR. Full real IR extraction is tracked as
+  `PT-024.T16`.
+
+## PT-024.T16 - Real Slither Python API IR extraction
+
+Status: done, 2026-06-21.
+
+Use Slither Python API when installed to populate the normalized IR contract
+with function modifiers, state reads/writes, calls, inheritance and source refs.
+Keep CLI detector JSON as auxiliary detector context, not as proof of writes.
+
+Result:
+
+- Added `PythonSlitherAdapter` in
+  `src/vassago_contract_runtime/slither/adapter.py`.
+- The adapter imports `slither.slither.Slither` optionally and returns
+  `status=unavailable` when the package is not installed.
+- It writes source bundles into an ephemeral workspace, runs Slither from that
+  workspace for Windows path compatibility, and normalizes:
+  - contract names and inheritance;
+  - function signatures, visibility and mutability;
+  - modifiers;
+  - state reads/writes;
+  - variables read/written;
+  - internal/external calls;
+  - condition expressions;
+  - SlithIR operation strings;
+  - source excerpts and source mapping.
+- `runtime_api.py` now wires `SemanticSurfaceAdapter(PythonSlitherAdapter())`
+  in bootstrap mode.
+- Local fixtures use compiler-compatible pragma `^0.8.0` so the installed
+  Slither/solc path can exercise real IR.
+- `pyproject.toml` exposes optional dependency group:
+  `pip install .[slither]`.
+
+Validation:
+
+- Real Slither Python smoke on `tests/fixtures/source_fixture_positive.json`
+  produced `slither.status=completed`, `provider=slither_python`,
+  `ir_status=completed`, `initialize().extraction_source=slither_ir`,
+  `state_write_signals=["owner"]`, and final `runtime_completed`.
+- Real Slither Python smoke on the negative fixture produced
+  `initializeMarket().extraction_source=slither_ir`,
+  `state_write_signals=["balances", "totalDeposits"]`, and remained
+  `source_truth_rejected`.
+
+Limit:
+
+- Real contracts can still fail Slither when source pragma/compiler version does
+  not match the local solc. This is tracked as `PT-024.T17`.
+
+## PT-024.T17 - Slither compiler/version selection
+
+Status: done, 2026-06-21.
+
+Use compile context to select or provision the correct solc for Slither Python
+runs. Until this exists, incompatible pragmas produce a structured
+`slither_python_analysis_failed` error and phase 02 falls back to heuristic
+extraction.
+
+Result:
+
+- `compile-context.json` now records:
+  - `compiler_version`;
+  - Solidity `pragma_constraints`;
+  - `solc_version_selection.requested_version`;
+  - selection source (`compiler_metadata` or `pragma_constraint`).
+- `PythonSlitherAdapter` reads `solc_version_selection` and sets
+  `SOLC_VERSION` while Slither Python runs.
+- The adapter records compiler metadata in `access-surface.json.slither`:
+  - requested version;
+  - current detected `solc --version`;
+  - selection status;
+  - env var used.
+- Environment variables and working directory are restored after Slither runs.
+- If Slither cannot compile, the error remains structured and phase 02 falls
+  back to heuristic extraction.
+
+Validation:
+
+- Positive fixture smoke produced:
+  `compiler_selection.status=current_matches_requested`,
+  `requested_version=0.8.20`, `current_solc_version=0.8.20`,
+  `initialize().extraction_source=slither_ir`, and final
+  `runtime_completed`.
+- Negative fixture smoke produced:
+  `initializeMarket().extraction_source=slither_ir`,
+  `state_write_signals=["balances", "totalDeposits"]`,
+  `source_truth_rejected`, and `foundry_allowed=false`.
+
+Limit:
+
+- T17 selects/uses installed compiler versions. It does not download or
+  provision missing solc versions. If real targets need missing versions,
+  implement `PT-024.T18`.
+
+## PT-024.T18 - Slither compiler cache/provisioning
+
+Status: done, 2026-06-21.
+
+Add a controlled compiler cache/provisioning strategy for missing solc versions.
+Do this only after curated real-contract smoke quantifies compiler misses.
+
+Result:
+
+- Added `src/vassago_contract_runtime/slither/solc_manager.py`.
+- Added `SolcSelectManager`, which:
+  - lists installed versions with `solc-select versions`;
+  - reports `compiler_cache_missing` without installing by default;
+  - installs with `solc-select install <version>` only when explicitly allowed;
+  - never calls `solc-select use`;
+  - leaves per-run version selection to `SOLC_VERSION`.
+- `PythonSlitherAdapter` now uses the manager before invoking Slither.
+- Missing compiler versions fail fast with structured
+  `solc_version_cache_missing`, allowing phase 02 fallback.
+- CLI/tool payload now supports explicit `allow_solc_install`.
+- `access-surface.json.slither.compiler_selection.provisioning` records cache
+  status, installed versions, manager, install attempt and errors.
+
+Validation:
+
+- Unit tests cover cache miss without install, install only when allowed, env
+  restoration and Slither skip when requested compiler is missing.
+- Positive smoke `runs/sc01-positive-t18` completed with
+  `provisioning.status=current_matches_requested`, `install_attempted=false`,
+  `slither_ir`, and final `runtime_completed`.
+- Negative smoke `runs/sc01-negative-t18` completed with Slither IR and stayed
+  `source_truth_rejected`, `foundry_allowed=false`.
+
+Limit:
+
+- `allow_solc_install` can download compiler binaries through solc-select. Keep
+  it off for deterministic/offline runs and only enable it in a controlled
+  setup step or explicit provider smoke.
+
+## PT-024.T19 - Slither failure summary by target
+
+Status: planned if needed.
+
+Aggregate Slither compiler/import failures across a curated real-contract run
+so we can decide whether misses come from compiler cache, missing imports,
+unsupported source bundles or real parser failures.
+
+## PT-027.T02 - SC01 smoke 5 curated real contracts
+
+Status: done, 2026-06-21.
+
+Run five curated real contracts with real Etherscan V2 source resolution,
+compile-context generation and Slither Python IR:
+
+- ETH EntryPoint v0.6;
+- BSC PancakeSwap MasterChefV2;
+- Base Uniswap v4 PoolManager;
+- ETH Safe Singleton 1.3.0;
+- ETH USDC FiatTokenProxy.
+
+Fixes made during the smoke:
+
+- `ExplorerSourceResolver` now adapts Etherscan V2 contract context into the
+  phase 01 `SourceResolver` contract.
+- CLI/tool payload supports `--source-cache-dir`.
+- Flat Etherscan source names without `.sol` are normalized before writing
+  source bundles.
+- `compile-context.json.selected_source_file` now selects the source declaring
+  `metadata.contract_name`, not the first file alphabetically.
+- `compile-context.json.solc_remaps` now infers Foundry-style `lib/<pkg>`
+  remappings such as `solmate/=lib/v4-core/lib/solmate/`.
+- Source-truth regex no longer crashes on plain assignment patterns.
+
+Final real smoke:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-curated-real-5.json --output runs/sc01-curated-real-5-v4 --bootstrap-adapters
+```
+
+Result:
+
+- `executed_count=55`;
+- `failed_count=0`;
+- all 5 `source-manifest.json` files resolved through `etherscan_v2`;
+- all 5 `access-surface.json.slither.status=completed`;
+- selected source files:
+  - `contracts/core/EntryPoint.sol`;
+  - `contracts/MasterChefV2.sol`;
+  - `lib/v4-core/src/PoolManager.sol`;
+  - `contracts/GnosisSafe.sol`;
+  - `FiatTokenProxy.sol`;
+- all 5 final reports are `blocked_no_runtime_ready`;
+- all 5 have `foundry_allowed=false`.
+
+Limit:
+
+- This proves the read-only source/compile/Slither path works for the curated
+  sample. It does not prove an SC01 vulnerability. Foundry runtime remains
+  gated until source truth, actor, args, reader, delta and predicate are all
+  complete.

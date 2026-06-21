@@ -1,0 +1,9 @@
+{
+  "targets": [
+    {
+      "chain": "eth",
+      "address": "0x3333333333333333333333333333333333333333",
+      "label": "fixture-public-accounting-negative"
+    }
+  ]
+}

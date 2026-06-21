@@ -1,16 +1,24 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import subprocess
 from urllib.parse import parse_qs, urlparse
 import tempfile
 import unittest
 
-from vassago_contract_runtime.contracts import ContractTargetRef
+from vassago_contract_runtime.contracts import ContractTargetRef, ExplorerSourceResolver
 from vassago_contract_runtime.design_runtime.models import ContractTarget
-from vassago_contract_runtime.explorer import EtherscanV2ExplorerAdapter, NullExplorerAdapter
+from vassago_contract_runtime.explorer import EtherscanV2ExplorerAdapter, ExplorerContractContext, NullExplorerAdapter
 from vassago_contract_runtime.foundry import FoundryHarnessInput, NullFoundryAdapter, SubprocessFoundryAdapter
-from vassago_contract_runtime.slither import NullSlitherAdapter, SlitherInput, SubprocessSlitherAdapter
+from vassago_contract_runtime.slither import (
+    NullSlitherAdapter,
+    PythonSlitherAdapter,
+    SlitherInput,
+    SolcProvisionResult,
+    SolcSelectManager,
+    SubprocessSlitherAdapter,
+)
 
 
 class ProviderAdapterTests(unittest.TestCase):
@@ -64,6 +72,7 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertEqual(second.metadata["cache_hit"], True)
         self.assertEqual(len(calls), 1)
         self.assertEqual(first.abi[0]["name"], "initialize")
+        self.assertIn("Fixture.sol", first.source_files)
         self.assertIn("Fixture", " ".join(first.source_files.values()))
 
     def test_etherscan_v2_logs_are_read_only_and_structured(self) -> None:
@@ -87,6 +96,37 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertEqual(result.status, "resolved")
         self.assertEqual(result.to_json()["log_count"], 1)
         self.assertEqual(result.metadata["evidence_status"], "read_only_real")
+
+    def test_explorer_source_resolver_maps_explorer_context_to_source_resolution(self) -> None:
+        target = ContractTargetRef.from_target(ContractTarget("eth", "0x1111111111111111111111111111111111111111"))
+
+        class FakeExplorer:
+            def get_contract_context(self, requested: ContractTargetRef) -> ExplorerContractContext:
+                self.requested = requested
+                return ExplorerContractContext(
+                    status="resolved",
+                    provider="fake_explorer",
+                    target=requested,
+                    abi=[{"type": "function", "name": "owner", "inputs": [], "outputs": []}],
+                    source_files={"Target.sol": "contract Target { address public owner; }"},
+                    proxy_context={"proxy": "1", "implementation": "0ximpl"},
+                    metadata={
+                        "contract_name": "Target",
+                        "compiler_version": "v0.8.20+commit.a1b79de6",
+                        "evidence_status": "read_only_real",
+                    },
+                )
+
+        explorer = FakeExplorer()
+        resolution = ExplorerSourceResolver(explorer).resolve(target)
+
+        self.assertEqual(explorer.requested, target)
+        self.assertEqual(resolution.status, "resolved")
+        self.assertEqual(resolution.provider, "fake_explorer")
+        self.assertEqual(resolution.compiler["version"], "v0.8.20+commit.a1b79de6")
+        self.assertEqual(resolution.proxy_context["implementation"], "0ximpl")
+        self.assertEqual(resolution.metadata["source"], "explorer")
+        self.assertEqual(resolution.metadata["evidence_status"], "read_only_real")
 
     def test_null_slither_adapter_is_unavailable(self) -> None:
         result = NullSlitherAdapter().analyze(SlitherInput(target_id="CT-test", source_files={}))
@@ -128,6 +168,158 @@ class ProviderAdapterTests(unittest.TestCase):
 
         self.assertEqual(result.status, "unavailable")
         self.assertEqual(result.error["code"], "slither_executable_not_found")
+
+    def test_python_slither_adapter_normalizes_ir_with_fake_api(self) -> None:
+        calls: list[dict[str, str]] = []
+
+        class FakeVariable:
+            def __init__(self, name: str) -> None:
+                self.name = name
+
+        class FakeSourceMapping:
+            content = "function initialize() external onlyOwner { owner = msg.sender; }"
+            start = 10
+            length = 64
+            lines = [3]
+            filename = "Fixture.sol"
+
+        class FakeNode:
+            type = "IF"
+            expression = "require(msg.sender == owner)"
+            irs = ["owner := msg.sender"]
+
+        class FakeFunction:
+            name = "initialize"
+            full_name = "initialize()"
+            visibility = "external"
+            state_mutability = "nonpayable"
+            parameters = []
+            modifiers = [FakeVariable("onlyOwner")]
+            state_variables_written = [FakeVariable("owner"), FakeVariable("balances(address)")]
+            state_variables_read = [FakeVariable("owner()")]
+            variables_written = [FakeVariable("owner")]
+            variables_read = [FakeVariable("msg.sender")]
+            internal_calls = [FakeVariable("_authorizeUpgrade")]
+            high_level_calls = []
+            low_level_calls = []
+            library_calls = []
+            external_calls_as_expressions = []
+            nodes = [FakeNode()]
+            source_mapping = FakeSourceMapping()
+
+        class FakeContract:
+            name = "Fixture"
+            inheritance = [FakeVariable("Ownable")]
+            functions = [FakeFunction()]
+
+        class FakeSlither:
+            def __init__(self, target: str) -> None:
+                self.target = target
+                calls.append({"target": target, "cwd_name": Path.cwd().name, "solc_version": os.environ.get("SOLC_VERSION", "")})
+                self.contracts = [FakeContract()]
+
+        old_solc_version = os.environ.get("SOLC_VERSION")
+        result = PythonSlitherAdapter(FakeSlither).analyze(
+            SlitherInput(
+                target_id="CT-test",
+                source_files={"Fixture.sol": "contract Fixture {}"},
+                compile_context={
+                    "selected_source_file": "Fixture.sol",
+                    "solc_version_selection": {"requested_version": "0.8.20", "source": "compiler_metadata"},
+                },
+                target_contract="Fixture",
+            )
+        )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.provider, "slither_python")
+        self.assertEqual(result.ir["status"], "completed")
+        self.assertEqual(result.ir["functions"][0]["signature"], "initialize()")
+        self.assertEqual(result.ir["functions"][0]["state_writes"], ["balances", "owner"])
+        self.assertEqual(result.ir["functions"][0]["state_reads"], ["owner"])
+        self.assertEqual(result.ir["functions"][0]["modifiers"], ["onlyOwner"])
+        self.assertIn("owner := msg.sender", result.ir["functions"][0]["slithir_operations"])
+        self.assertEqual(calls[0]["target"], "Fixture.sol")
+        self.assertEqual(calls[0]["solc_version"], "0.8.20")
+        self.assertEqual(os.environ.get("SOLC_VERSION"), old_solc_version)
+        self.assertEqual(result.metadata["compiler_selection"]["requested_version"], "0.8.20")
+
+    def test_solc_select_manager_reports_cache_missing_without_install(self) -> None:
+        calls: list[list[str]] = []
+
+        def runner(command: list[str], timeout_seconds: int) -> subprocess.CompletedProcess:
+            calls.append(command)
+            if command == ["solc-select", "versions"]:
+                return subprocess.CompletedProcess(command, 0, stdout="0.8.20\n", stderr="")
+            raise AssertionError(command)
+
+        result = SolcSelectManager(runner=runner, current_version_getter=lambda: "0.8.20").prepare(
+            "0.8.24",
+            allow_install=False,
+        )
+
+        self.assertEqual(result.status, "compiler_cache_missing")
+        self.assertEqual(result.requested_version, "0.8.24")
+        self.assertEqual(result.installed_versions, ["0.8.20"])
+        self.assertEqual(calls, [["solc-select", "versions"]])
+
+    def test_solc_select_manager_installs_only_when_allowed(self) -> None:
+        calls: list[list[str]] = []
+
+        def runner(command: list[str], timeout_seconds: int) -> subprocess.CompletedProcess:
+            calls.append(command)
+            if command == ["solc-select", "versions"] and len(calls) == 1:
+                return subprocess.CompletedProcess(command, 0, stdout="0.8.20\n", stderr="")
+            if command == ["solc-select", "install", "0.8.24"]:
+                return subprocess.CompletedProcess(command, 0, stdout="installed", stderr="")
+            if command == ["solc-select", "versions"]:
+                return subprocess.CompletedProcess(command, 0, stdout="0.8.20\n0.8.24\n", stderr="")
+            raise AssertionError(command)
+
+        result = SolcSelectManager(runner=runner, current_version_getter=lambda: "0.8.20").prepare(
+            "0.8.24",
+            allow_install=True,
+        )
+
+        self.assertEqual(result.status, "installed")
+        self.assertEqual(result.requested_version, "0.8.24")
+        self.assertTrue(result.install_attempted)
+        self.assertEqual(calls[1], ["solc-select", "install", "0.8.24"])
+
+    def test_python_slither_adapter_skips_when_requested_compiler_missing(self) -> None:
+        class FakeManager:
+            def prepare(self, requested_version: str, *, allow_install: bool = False) -> SolcProvisionResult:
+                self.requested_version = requested_version
+                self.allow_install = allow_install
+                return SolcProvisionResult(
+                    status="compiler_cache_missing",
+                    requested_version=requested_version,
+                    current_solc_version="0.8.20",
+                    installed_versions=["0.8.20"],
+                    manager="fake",
+                )
+
+        class ShouldNotRun:
+            def __init__(self, target: str) -> None:
+                raise AssertionError("Slither should not run when compiler cache is missing.")
+
+        manager = FakeManager()
+        result = PythonSlitherAdapter(ShouldNotRun, solc_manager=manager).analyze(
+            SlitherInput(
+                target_id="CT-test",
+                source_files={"Fixture.sol": "contract Fixture {}"},
+                compile_context={
+                    "selected_source_file": "Fixture.sol",
+                    "solc_version_selection": {"requested_version": "0.8.24", "source": "compiler_metadata"},
+                },
+            )
+        )
+
+        self.assertEqual(result.status, "failed")
+        self.assertEqual(result.error["code"], "solc_version_cache_missing")
+        self.assertEqual(result.metadata["compiler_selection"]["provisioning"]["status"], "compiler_cache_missing")
+        self.assertEqual(manager.requested_version, "0.8.24")
+        self.assertEqual(manager.allow_install, False)
 
     def test_null_foundry_adapter_blocks_compile_and_runtime(self) -> None:
         item = FoundryHarnessInput(target_id="CT-test", harness_name="Harness", source_files={}, test_files={})

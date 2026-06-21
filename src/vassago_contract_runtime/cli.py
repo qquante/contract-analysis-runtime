@@ -28,6 +28,20 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--dry-run", action="store_true", help="Write manifests and dry-run artifacts only.")
     run.add_argument("--source-fixture", help="Local JSON source fixture for phase 01 dossier.")
     run.add_argument(
+        "--source-cache-dir",
+        help="Filesystem cache directory for read-only Explorer source context. Defaults to <output>/_cache/etherscan-v2.",
+    )
+    run.add_argument(
+        "--runtime-authorized",
+        action="store_true",
+        help="Allow local Foundry runtime when the design runtime gate is satisfied.",
+    )
+    run.add_argument(
+        "--allow-solc-install",
+        action="store_true",
+        help="Allow solc-select to install missing solc versions for Slither. Default is no install.",
+    )
+    run.add_argument(
         "--bootstrap-adapters",
         action="store_true",
         help="Run implemented bootstrap adapters and dry-run the rest.",
@@ -38,6 +52,20 @@ def main(argv: list[str] | None = None) -> int:
     resume.add_argument("--run", required=True, help="Run directory.")
     resume.add_argument("--dry-run", action="store_true", help="Use dry-run adapters.")
     resume.add_argument("--source-fixture", help="Local JSON source fixture for phase 01 dossier.")
+    resume.add_argument(
+        "--source-cache-dir",
+        help="Filesystem cache directory for read-only Explorer source context. Defaults to <run>/_cache/etherscan-v2.",
+    )
+    resume.add_argument(
+        "--runtime-authorized",
+        action="store_true",
+        help="Allow local Foundry runtime when the design runtime gate is satisfied.",
+    )
+    resume.add_argument(
+        "--allow-solc-install",
+        action="store_true",
+        help="Allow solc-select to install missing solc versions for Slither. Default is no install.",
+    )
     resume.add_argument(
         "--bootstrap-adapters",
         action="store_true",
@@ -82,6 +110,9 @@ def _run_design_command(args: argparse.Namespace) -> int:
             "dry_run": args.dry_run,
             "bootstrap_adapters": args.bootstrap_adapters,
             "source_fixture": args.source_fixture,
+            "source_cache_dir": args.source_cache_dir,
+            "runtime_authorized": args.runtime_authorized,
+            "allow_solc_install": args.allow_solc_install,
             "resume": not args.no_resume,
         }
     )
@@ -96,6 +127,9 @@ def _resume_command(args: argparse.Namespace) -> int:
             "dry_run": args.dry_run,
             "bootstrap_adapters": args.bootstrap_adapters,
             "source_fixture": args.source_fixture,
+            "source_cache_dir": args.source_cache_dir,
+            "runtime_authorized": args.runtime_authorized,
+            "allow_solc_install": args.allow_solc_install,
         }
     )
     print(json.dumps(payload, indent=2, sort_keys=True))

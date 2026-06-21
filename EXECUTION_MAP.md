@@ -23,8 +23,15 @@ PT-024.T07 phase 05 source truth - done 2026-06-21 skeleton
 PT-024.T08 phase 06 on-chain state - done 2026-06-21 skeleton
 PT-024.T09 phase 07 proof pieces - done 2026-06-21 skeleton
 PT-024.T10 phase 08 compile-only - done 2026-06-21 skeleton
-PT-024.T11 phase 09 runtime Foundry local - pending gated runtime adapter wiring
+PT-024.T11 phase 09 runtime Foundry local - done 2026-06-21 local-only gated adapter
 PT-024.T12 phase 10 final report - done 2026-06-21 skeleton
+PT-024.T13 source-backed positive verification - done 2026-06-21
+PT-024.T14 source-backed negative verification - done 2026-06-21
+PT-024.T15 Slither IR source extraction - done 2026-06-21 normalized IR first, heuristic fallback
+PT-024.T16 real Slither Python API IR extraction - done 2026-06-21
+PT-024.T17 Slither compiler/version selection - done 2026-06-21
+PT-024.T18 Slither compiler cache/provisioning - done 2026-06-21 controlled solc-select cache
+PT-024.T19 Slither failure summary by target - planned if curated smoke needs it
 ```
 
 ## Lane C - Adapters
@@ -32,6 +39,7 @@ PT-024.T12 phase 10 final report - done 2026-06-21 skeleton
 ```text
 PT-025.T01 SourceResolver interface - done 2026-06-21 interface plus null and fixture adapters
 PT-025.T02 Explorer interface - done 2026-06-21 interface plus Etherscan V2 cache adapter
+PT-025.T01B Explorer-backed SourceResolver wiring - done 2026-06-21
 PT-025.T03 Slither interface - done 2026-06-21 interface plus subprocess adapter
 PT-025.T04 Foundry interface - done 2026-06-21 interface plus null adapter
 PT-025.T04B Foundry subprocess adapter - done 2026-06-21 local-only compile/runtime gate
@@ -50,17 +58,19 @@ PT-026.T04 A2A card for SC01 design runner
 ## Lane E - Validation
 
 ```text
-PT-027.T01 unit tests for manifest/resume
-PT-027.T02 fixture targets
-PT-027.T03 local SC01 ground-truth campaign
-PT-027.T04 smoke 5 contracts
-PT-027.T05 smoke 20 contracts
-PT-027.T06 only then larger batch
+PT-027.T01 local SC01 adversarial fixture expansion - done first slice 2026-06-21
+PT-027.T01B remaining adversarial/metamorphic fixtures
+PT-027.T02 SC01 smoke 5 curated real contracts - done 2026-06-21, run baseline runs/sc01-curated-real-5-v4
+PT-027.T03 SC01 smoke 20 curated contracts
+PT-027.T04 only then larger batch
 ```
 
 ## Current Next Up
 
-1. Run Hermes smoke with `vassago-sc01-design`.
-2. Implement PT-026.T04 A2A card for SC01 design runner.
-3. Add fixture that produces a compile-ready hypothesis for phase 08 positive coverage.
-4. Implement PT-024.T11 runtime Foundry local phase only behind `foundry_allowed=true`.
+1. Inspect `runs/sc01-curated-real-5-v4` source-truth/proof-piece blockers and
+   decide whether to improve source-truth policies or corpus records.
+2. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
+   Safe/module, bridge endpoint/source and ERC4337 validator.
+3. Add per-target Slither/source summary only if a larger real smoke shows
+   repeated compiler/import misses.
+4. Implement PT-026.T04 A2A card after the design runtime remains stable.

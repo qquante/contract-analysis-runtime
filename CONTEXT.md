@@ -93,7 +93,8 @@ The old Vassago repo contains many working adapters and tools. This repo should
 not copy the entire tool surface. It should import or reimplement only behind
 deep Interfaces:
 
-- SourceResolver Adapter. Interface done; null and local fixture resolver done.
+- SourceResolver Adapter. Interface done; null, local fixture and
+  Explorer-backed resolver done.
 - Explorer Adapter. Interface plus Etherscan V2 read-only cache adapter done.
 - Slither Adapter. Interface plus null and subprocess adapter done.
 - Foundry Adapter. Interface plus null adapter done.
@@ -107,22 +108,41 @@ As of 2026-06-21:
 - phase 00 intake is a real local adapter;
 - phase 01 dossier is a real local skeleton adapter;
 - phase 01 can consume ABI/source through `--source-fixture`;
+- phase 01 can consume real read-only Explorer source context through
+  Etherscan V2 when no `--source-fixture` is supplied;
 - phase 02 semantic surface is a real local skeleton adapter;
+- phase 02 now prefers normalized Slither IR when compile context and a
+  Slither adapter/payload are available, then falls back to ABI/source
+  heuristic with explicit `extraction_source`;
 - phase 03 corpus motifs is a real local skeleton adapter;
 - phase 04 thesis acquisition is a real local skeleton adapter;
 - phase 05 source truth is a real local skeleton adapter;
 - phase 06 on-chain state is a real local skeleton adapter;
 - phase 07 proof pieces is a real local skeleton adapter;
 - phase 08 compile-only is a real local skeleton adapter;
-- phase 09 runtime Foundry remains dry-run in bootstrap mode;
+- phase 09 runtime Foundry has a local-only gated adapter;
 - phase 10 final report is a real local skeleton adapter;
-- Etherscan V2 provider exists behind the Explorer interface but is not called
-  by default;
+- Etherscan V2 provider is now called by phase 01 in bootstrap mode when no
+  `--source-fixture` is supplied; missing `ETHERSCAN_API_KEY` returns a
+  structured unresolved source state;
 - Slither subprocess adapter exists but is not called by bootstrap mode;
+- Slither CLI JSON is treated as detector context only; full function
+  writes/modifiers/calls require normalized IR or the Python API path;
+- Slither Python API adapter is wired in bootstrap mode and fills normalized IR
+  when `slither-analyzer` plus compatible local solc are available;
 - Foundry interface exists with null and subprocess adapters;
 - `SubprocessFoundryAdapter.compile_harness()` can run local `forge build`;
 - `SubprocessFoundryAdapter.run_local_fork()` is gated by explicit
   `runtime_ready=true` and `runtime_authorized=true`;
+- positive local fixture `tests/fixtures/source_fixture_positive.json` reaches
+  `runtime_ready_count=1`, compiles with `forge build`, and runs local
+  `forge test` only when `--runtime-authorized` is passed;
+- source-backed verifier `src/vassago_contract_runtime/sc01_source.py` now
+  drives that positive path; it no longer depends on
+  `metadata.local_positive_sc01_case`;
+- the same module contains source-backed negative policy for public normal
+  behavior; `initializeMarket()` in the negative fixture is rejected as
+  `caller_funded_accounting` and cannot reach Foundry;
 - `runtime_api.py` is the shared CLI/tool entrypoint for run/resume/artifact
   read;
 - `tools/` exposes three campaign-level contracts:
@@ -135,3 +155,180 @@ As of 2026-06-21:
 - Hermes skill `vassago-sc01-design` is installed locally and versioned under
   `designs/sc01-access/prompts/vassago-sc01-design.md`;
 - no RPC or broadcast path is wired.
+- no RPC or broadcast path is wired.
+
+## Explorer-backed source resolution
+
+`PT-025.T01B` wires real read-only source resolution into phase 01:
+
+- `src/vassago_contract_runtime/contracts/source_resolver.py` defines
+  `ExplorerSourceResolver`.
+- `src/vassago_contract_runtime/runtime_api.py` chooses
+  `FixtureSourceResolver` when `--source-fixture` is supplied.
+- Without `--source-fixture`, bootstrap mode uses
+  `ExplorerSourceResolver(EtherscanV2ExplorerAdapter(...))`.
+- Default cache path is `<output>/_cache/etherscan-v2` for `run-design` and
+  `<run>/_cache/etherscan-v2` for `resume`.
+- CLI/tool payloads can override the cache path through `source_cache_dir` /
+  `--source-cache-dir`.
+
+Safety:
+
+- Explorer source resolution is read-only.
+- It uses `ETHERSCAN_API_KEY` from the environment.
+- If the key is absent, artifacts record `etherscan_api_key_missing`; no fake
+  source is generated.
+- Cache keys exclude the API key.
+
+## Slither IR Extraction State
+
+`PT-024.T15` is implemented in conservative form:
+
+- `01_dossier/compile-context.json` is `available` when source files exist;
+- `02_semantic_surface/access-surface.json` records a `slither` summary;
+- functions extracted from normalized IR are marked
+  `extraction_source=slither_ir` and `confidence=high`;
+- when no Slither adapter or IR payload exists, the phase falls back to
+  `abi_source_heuristic` / `abi_only`.
+
+`PT-024.T16` adds real Slither Python API extraction:
+
+- `PythonSlitherAdapter` imports `slither.slither.Slither` optionally;
+- source bundles are written to an ephemeral workspace;
+- the adapter runs from that workspace to avoid Windows absolute-path issues;
+- normalized IR includes modifiers, state reads/writes, variables read/written,
+  internal/external calls, conditions, SlithIR operation strings and source
+  mapping;
+- `runtime_api.py` wires it by default in bootstrap mode.
+
+Current limit:
+
+Slither real runs use controlled compiler cache/provisioning:
+
+- `PT-024.T17` selects installed compiler versions by setting `SOLC_VERSION`
+  from `compile-context.json`.
+- `PT-024.T18` adds `SolcSelectManager`, which lists the local solc-select
+  cache and can install missing versions only when `allow_solc_install=true`.
+- The runtime never calls `solc-select use`, so global compiler state is not
+  changed.
+- `access-surface.json.slither.compiler_selection.provisioning` records
+  installed versions, cache status, install attempt, manager and errors.
+- With default settings, missing compilers produce structured
+  `solc_version_cache_missing` and phase 02 falls back to heuristic extraction.
+
+## Current Positive Fixture
+
+The local positive SC01 fixture models the historical UUPS uninitialized
+implementation pattern:
+
+```text
+tests/fixtures/targets_positive.json
+tests/fixtures/source_fixture_positive.json
+```
+
+Command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets_positive.json --output runs/sc01-positive-local-runtime --source-fixture tests/fixtures/source_fixture_positive.json --bootstrap-adapters --runtime-authorized
+```
+
+Expected current result:
+
+```text
+source_truth_verified_count=1
+runtime_ready_count=1
+compile_status=compile_only_passed
+runtime_status=runtime_completed
+evidence_status=runtime_local
+no_broadcast=true
+```
+
+Negative anti-hardcode fixture:
+
+```text
+tests/fixtures/targets_negative.json
+tests/fixtures/source_fixture_negative.json
+```
+
+This fixture intentionally contains `initializeMarket()` so the corpus emits an
+initializer-like candidate. Source truth rejects it as caller-funded accounting:
+
+```text
+source_truth_rejected_count=1
+runtime_ready_count=0
+foundry_allowed=false
+```
+
+Limit:
+
+This is a local regression fixture, not a live-contract claim. The source-backed
+verifier proves initializer/write/reader/sink conditions from local source, but
+real contracts still need proxy/state impact before runtime.
+
+## Current Real Curated Smoke
+
+`PT-027.T02` current baseline is:
+
+```text
+runs/sc01-curated-real-5-v4
+```
+
+Targets:
+
+- ETH EntryPoint v0.6;
+- BSC PancakeSwap MasterChefV2;
+- Base Uniswap v4 PoolManager;
+- ETH Safe Singleton 1.3.0;
+- ETH USDC FiatTokenProxy.
+
+Current result:
+
+- all 5 source bundles resolved through Etherscan V2;
+- all 5 compile contexts selected the correct target source file;
+- all 5 Slither Python runs completed;
+- PoolManager required inferred remapping
+  `solmate/=lib/v4-core/lib/solmate/`;
+- all 5 final reports are `blocked_no_runtime_ready`;
+- all 5 have `foundry_allowed=false`.
+
+This means the read-only Explorer/source/Slither path works for the curated
+sample. It does not mean SC01 found a vulnerability. Runtime Foundry remains
+blocked until a fresh report has complete proof pieces and
+`foundry_allowed=true`.
+
+## Current Adversarial Fixture Slice
+
+`PT-027.T01` first slice adds local adversarial SC01 coverage:
+
+```text
+tests/fixtures/targets_adversarial.json
+tests/fixtures/source_fixture_adversarial.json
+designs/sc01-access/corpus/tx-origin-auth.yaml
+designs/sc01-access/corpus/role-admin-escalation.yaml
+designs/sc01-access/corpus/public-lifecycle-noise.yaml
+```
+
+Covered behavior:
+
+- `FixtureDisabledInitializer` has `initialize()` and `upgradeTo(...)`, but
+  constructor calls `_disableInitializers()`. It must not become source-truth
+  verified.
+- `FixtureTxOriginAdmin` uses `tx.origin == owner`. It must route as
+  `tx_origin_authorization` but must not reach Foundry without complete proof
+  pieces.
+- `FixtureOpenRoleAdmin` has public `grantOperator(address)`. It must route as
+  `role_admin_escalation` but remains blocked until role reader/delta and actor
+  model are complete.
+- `FixturePublicLifecycle` has public `settleRound()` and timestamp-gated
+  lifecycle writes. It must be rejected as `public_lifecycle`.
+
+Primary regression:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_phases -v
+```
+
+This is anti-hardcode coverage. It is not live-chain evidence and does not prove
+severity.

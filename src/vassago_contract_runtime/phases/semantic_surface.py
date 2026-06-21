@@ -7,6 +7,7 @@ from typing import Any
 
 from vassago_contract_runtime.design_runtime.models import short_hash
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
+from vassago_contract_runtime.slither import SlitherAdapter, SlitherInput
 
 
 class SemanticSurfaceAdapter:
@@ -16,10 +17,19 @@ class SemanticSurfaceAdapter:
     must validate through stronger adapters.
     """
 
+    def __init__(self, slither: SlitherAdapter | None = None) -> None:
+        self.slither = slither
+
     def run(self, context: PhaseContext) -> PhaseResult:
         function_index = _read_json(context, "01_dossier", "function-index.json")
         source_manifest = _read_json(context, "01_dossier", "source-manifest.json")
-        functions = [_surface_function(item, source_manifest) for item in function_index.get("functions", [])]
+        compile_context = _read_json(context, "01_dossier", "compile-context.json")
+        slither_context = _slither_context(context, source_manifest, compile_context, self.slither)
+        slither_functions = _slither_functions(slither_context)
+        functions = [
+            _surface_function(item, source_manifest, slither_functions)
+            for item in function_index.get("functions", [])
+        ]
         guards = [_guard_for(function) for function in functions]
         writes = _state_write_map(functions)
         role_graph = _role_graph(functions, source_manifest)
@@ -32,7 +42,8 @@ class SemanticSurfaceAdapter:
                     "function_count": len(functions),
                     "functions": functions,
                     "evidence_status": "static_only",
-                    "extraction_sources": ["abi", "local_source_heuristic"],
+                    "extraction_sources": _extraction_sources(functions),
+                    "slither": _slither_summary(slither_context),
                     "warning": "Static semantic surface. Later source-truth phase must validate any candidate.",
                 },
                 "semantic-map.json": {
@@ -66,10 +77,103 @@ def _read_json(context: PhaseContext, phase_id: str, name: str) -> dict:
     return payload
 
 
-def _surface_function(function: dict[str, Any], source_manifest: dict[str, Any]) -> dict[str, Any]:
+def _slither_context(
+    context: PhaseContext,
+    source_manifest: dict[str, Any],
+    compile_context: dict[str, Any],
+    slither: SlitherAdapter | None,
+) -> dict[str, Any]:
+    manifest_ir = _manifest_slither_ir(source_manifest)
+    if manifest_ir:
+        return {
+            "status": "completed",
+            "provider": "source_manifest",
+            "ir": manifest_ir,
+            "detectors": [],
+            "error": None,
+        }
+    source_files = dict(source_manifest.get("source_files") or {})
+    if compile_context.get("status") != "available":
+        return {
+            "status": "skipped",
+            "provider": "not_invoked",
+            "ir": {},
+            "detectors": [],
+            "error": {"code": "compile_context_unavailable", "message": "No compile context available."},
+        }
+    if slither is None:
+        return {
+            "status": "skipped",
+            "provider": "not_configured",
+            "ir": {},
+            "detectors": [],
+            "error": {"code": "slither_adapter_not_configured", "message": "No Slither adapter configured."},
+        }
+    result = slither.analyze(
+        SlitherInput(
+            target_id=context.target.target_id,
+            source_files=source_files,
+            compile_context=compile_context,
+            target_contract=compile_context.get("target_contract"),
+        )
+    )
+    payload = result.to_json()
+    return {
+        "status": payload.get("status"),
+        "provider": payload.get("provider"),
+        "ir": payload.get("ir") or {},
+        "detectors": payload.get("detectors") or [],
+        "error": payload.get("error"),
+        "metadata": payload.get("metadata") or {},
+    }
+
+
+def _manifest_slither_ir(source_manifest: dict[str, Any]) -> dict[str, Any]:
+    metadata = dict(source_manifest.get("metadata") or {})
+    for key in ("slither_ir", "slither_surface"):
+        value = metadata.get(key)
+        if isinstance(value, dict):
+            return value
+    value = source_manifest.get("slither_ir")
+    return value if isinstance(value, dict) else {}
+
+
+def _slither_functions(slither_context: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    ir = slither_context.get("ir") if isinstance(slither_context, dict) else {}
+    if not isinstance(ir, dict):
+        return {}
+    functions = ir.get("functions")
+    if not isinstance(functions, list):
+        contracts = ir.get("contracts")
+        functions = []
+        if isinstance(contracts, list):
+            for contract in contracts:
+                if isinstance(contract, dict) and isinstance(contract.get("functions"), list):
+                    functions.extend(contract["functions"])
+    indexed: dict[str, dict[str, Any]] = {}
+    for item in functions or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        signature = str(item.get("signature") or item.get("full_name") or "").strip()
+        if signature:
+            indexed[signature] = item
+        if name:
+            indexed.setdefault(name, item)
+    return indexed
+
+
+def _surface_function(
+    function: dict[str, Any],
+    source_manifest: dict[str, Any],
+    slither_functions: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
     name = str(function.get("name") or "")
     inputs = list(function.get("inputs") or [])
     signature = f"{name}({','.join(str(item.get('type') or '') for item in inputs)})"
+    slither_function = slither_functions.get(signature) or slither_functions.get(name)
+    if slither_function:
+        return _surface_function_from_slither(function, signature, slither_function, source_manifest)
     body = _find_function_body(name, source_manifest)
     return {
         "function_id": f"FN-{short_hash(signature)}",
@@ -87,6 +191,41 @@ def _surface_function(function: dict[str, Any], source_manifest: dict[str, Any])
         "call_signals": _call_signals(body),
         "extraction_source": "abi_source_heuristic" if body else "abi_only",
         "confidence": "medium" if body else "low",
+    }
+
+
+def _surface_function_from_slither(
+    function: dict[str, Any],
+    signature: str,
+    slither_function: dict[str, Any],
+    source_manifest: dict[str, Any],
+) -> dict[str, Any]:
+    name = str(function.get("name") or slither_function.get("name") or "")
+    body = str(slither_function.get("source_excerpt") or slither_function.get("source") or "")
+    if not body:
+        body = _find_function_body(name, source_manifest)
+    modifiers = _string_list(slither_function, "modifiers")
+    state_writes = _string_list(slither_function, "state_writes", "state_write_signals", "writes")
+    calls = _string_list(slither_function, "calls", "internal_calls", "external_calls", "call_signals")
+    guard_signals = sorted(set(_guard_signals(body) + _guard_signals_from_slither(slither_function)))
+    return {
+        "function_id": f"FN-{short_hash(signature)}",
+        "name": name,
+        "signature": signature,
+        "selector": None,
+        "selector_status": "not_calculated_without_keccak",
+        "stateMutability": function.get("stateMutability") or slither_function.get("stateMutability"),
+        "inputs": list(function.get("inputs") or []),
+        "outputs": list(function.get("outputs") or []),
+        "source_excerpt": body[:2000],
+        "source_status": "found" if body else "not_found",
+        "guard_signals": guard_signals,
+        "state_write_signals": sorted(set(state_writes or _write_signals(body))),
+        "call_signals": sorted(set(calls or _call_signals(body))),
+        "modifiers": modifiers,
+        "slither_refs": list(slither_function.get("evidence_refs") or []),
+        "extraction_source": "slither_ir",
+        "confidence": "high",
     }
 
 
@@ -117,6 +256,41 @@ def _guard_signals(body: str) -> list[str]:
     if "require(" in body or "revert " in body or "if (" in body:
         signals.append("inline_condition")
     return sorted(set(signals))
+
+
+def _guard_signals_from_slither(function: dict[str, Any]) -> list[str]:
+    signals = []
+    values = " ".join(_string_list(function, "modifiers", "requires", "conditions", "guards")).lower()
+    if "tx.origin" in values:
+        signals.append("tx_origin_check")
+    if "hasrole" in values or "onlyrole" in values or "accesscontrol" in values:
+        signals.append("role_check")
+    if "owner" in values or "onlyowner" in values or "msg.sender" in values:
+        signals.append("owner_check")
+    if "initializer" in values:
+        signals.append("initializer_check")
+    if "_authorizeupgrade" in values:
+        signals.append("upgrade_check")
+    if values and any(marker in values for marker in ("require", "revert", "only", "guard")):
+        signals.append("inline_condition")
+    return sorted(set(signals))
+
+
+def _string_list(payload: dict[str, Any], *keys: str) -> list[str]:
+    values: list[str] = []
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    text = item.get("name") or item.get("canonical_name") or item.get("variable") or item.get("signature")
+                    if text:
+                        values.append(str(text))
+                elif item is not None:
+                    values.append(str(item))
+        elif isinstance(value, str):
+            values.append(value)
+    return sorted({item for item in values if item})
 
 
 def _write_signals(body: str) -> list[str]:
@@ -209,4 +383,27 @@ def _role_graph(functions: list[dict[str, Any]], source_manifest: dict[str, Any]
         "nodes": nodes,
         "edges": edges,
         "evidence_status": "static_only",
+    }
+
+
+def _extraction_sources(functions: list[dict[str, Any]]) -> list[str]:
+    sources = {"abi"}
+    sources.update(str(function.get("extraction_source") or "unknown") for function in functions)
+    return sorted(sources)
+
+
+def _slither_summary(slither_context: dict[str, Any]) -> dict[str, Any]:
+    ir = slither_context.get("ir") if isinstance(slither_context, dict) else {}
+    functions = _slither_functions(slither_context)
+    detectors = slither_context.get("detectors") if isinstance(slither_context, dict) else []
+    metadata = slither_context.get("metadata") if isinstance(slither_context, dict) else {}
+    compiler_selection = metadata.get("compiler_selection") if isinstance(metadata, dict) else None
+    return {
+        "status": slither_context.get("status"),
+        "provider": slither_context.get("provider"),
+        "function_count": len(functions),
+        "detector_count": len(detectors) if isinstance(detectors, list) else 0,
+        "ir_status": ir.get("status") if isinstance(ir, dict) else None,
+        "compiler_selection": compiler_selection,
+        "error": slither_context.get("error"),
     }

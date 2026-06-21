@@ -1,0 +1,24 @@
+id: sc01-tx-origin-auth
+thesis_id: tx_origin_authorization
+bug_family: access_control
+missing_property: authorization must not rely on tx.origin
+violated_invariant: attacker cannot proxy a privileged user through tx.origin-based authorization
+entrypoint_type: authorization_check
+sensitive_sink: owner/admin/role/config state write
+attacker_capabilities:
+  - call a malicious intermediate contract
+exploit_preconditions:
+  - privileged user can be induced to call attacker-controlled contract
+  - target checks tx.origin instead of msg.sender or validated signer
+search_motifs:
+  - tx.origin
+  - txOrigin
+  - origin
+negative_signals:
+  - tx.origin used only in an event or view helper
+  - no sensitive state write or privileged call
+required_evidence:
+  - source truth for tx.origin guard
+  - sensitive state delta
+  - proxy caller model
+runtime_runner: tx_origin_runtime

@@ -5,6 +5,9 @@ description = "Contract-first campaign runtime for Vassago"
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+slither = ["slither-analyzer"]
+
 [tool.ruff]
 line-length = 120
 

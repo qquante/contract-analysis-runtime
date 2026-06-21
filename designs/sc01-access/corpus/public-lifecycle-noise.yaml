@@ -1,0 +1,26 @@
+id: sc01-public-lifecycle-noise
+thesis_id: public_lifecycle_noise
+bug_family: access_control
+missing_property: public lifecycle functions should not be promoted as access-control gaps without admin-state delta
+violated_invariant: public protocol lifecycle cannot be treated as privileged bypass without effect proof
+entrypoint_type: lifecycle
+sensitive_sink: protocol lifecycle state
+attacker_capabilities:
+  - call public lifecycle/accounting function
+exploit_preconditions:
+  - public function appears to write state
+  - source truth proves this is not normal protocol lifecycle
+search_motifs:
+  - settle
+  - expire
+  - epoch
+  - round
+  - currentDay
+negative_signals:
+  - block.timestamp gated lifecycle
+  - block.number gated lifecycle
+  - no owner/admin/role write
+required_evidence:
+  - source truth classification
+  - admin-state write proof if claiming SC01
+runtime_runner: none

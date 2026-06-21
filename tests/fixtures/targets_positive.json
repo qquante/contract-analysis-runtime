@@ -1,0 +1,9 @@
+{
+  "targets": [
+    {
+      "chain": "eth",
+      "address": "0x2222222222222222222222222222222222222222",
+      "label": "fixture-uups-positive"
+    }
+  ]
+}
