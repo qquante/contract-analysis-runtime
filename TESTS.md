@@ -50,7 +50,7 @@ python -m unittest discover -s tests
 Result:
 
 ```text
-Ran 40 tests
+Ran 46 tests
 OK
 ```
 
@@ -95,6 +95,8 @@ Coverage added:
 - Runtime tool contracts for `vassago_design_run`,
   `vassago_design_resume` and `vassago_artifact_read`.
 - Tool registry alias resolution and unknown-tool fail-closed behavior.
+- MCP stdio server initialize, tools/list, tools/call and notification tests.
+- CLI stdio smoke for initialize + tools/list.
 
 Smoke:
 
@@ -122,6 +124,26 @@ CompileStatus=compile_skipped_not_ready
 FoundryCalled=false
 FinalStatus=blocked_no_runtime_ready
 ThesisIds=uninitialized_implementation_proxy,uups_weak_auth
+```
+
+MCP stdio smoke:
+
+```powershell
+$env:PYTHONPATH='src'
+$inputJson = @(
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"smoke"}}}',
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}',
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+) -join "`n"
+$inputJson | python -m vassago_contract_runtime.cli mcp --stdio
+```
+
+Result:
+
+```text
+initialize returned tools capability.
+tools/list returned vassago_design_run, vassago_design_resume and vassago_artifact_read.
+stdout contained only JSON-RPC responses.
 ```
 
 ## Not Allowed As Test Evidence

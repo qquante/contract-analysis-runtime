@@ -73,6 +73,7 @@ python -m vassago_contract_runtime.cli run-design --design sc01-access --targets
 python -m vassago_contract_runtime.cli resume --run runs/sc01-smoke --dry-run
 python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets.json --output runs/sc01-bootstrap --bootstrap-adapters
 python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets.json --source-fixture tests/fixtures/source_fixture.json --output runs/sc01-fixture-bootstrap --bootstrap-adapters
+python -m vassago_contract_runtime.cli mcp --stdio
 ```
 
 Bootstrap execution exists for phase 00 intake, phase 01 dossier skeleton,
@@ -101,3 +102,26 @@ These contracts call the same `runtime_api.py` path as the CLI. They are
 local-only, no-shell, no-broadcast and do not expose phase internals to the
 top-level agent. MCP stdio is the next layer and should wrap these contracts,
 not duplicate the runtime.
+
+## MCP stdio
+
+Local MCP stdio is available through:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli mcp --stdio
+```
+
+Supported MCP methods:
+
+- `initialize`;
+- `notifications/initialized`;
+- `ping`;
+- `tools/list`;
+- `tools/call`.
+
+Only three tools are exposed:
+
+- `vassago_design_run`;
+- `vassago_design_resume`;
+- `vassago_artifact_read`.

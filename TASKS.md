@@ -641,9 +641,36 @@ Current behavior:
 
 ## PT-026.T02 - MCP stdio
 
-Status: pending.
+Status: done 2026-06-21.
 
 Local-only stdio first.
+
+Implemented:
+
+- `src/vassago_contract_runtime/mcp/server.py`;
+- `src/vassago_contract_runtime/mcp/__init__.py`;
+- CLI command `python -m vassago_contract_runtime.cli mcp --stdio`;
+- `tests/design_runtime/test_mcp_server.py`.
+
+Exposed methods:
+
+- `initialize`;
+- `notifications/initialized`;
+- `ping`;
+- `tools/list`;
+- `tools/call`.
+
+Exposed tools:
+
+- `vassago_design_run`;
+- `vassago_design_resume`;
+- `vassago_artifact_read`.
+
+Current behavior:
+
+- newline-delimited JSON-RPC over stdin/stdout;
+- stdout contains only MCP JSON-RPC messages;
+- no shell tool, no broadcast tool, no phase-internal tools.
 
 ## PT-026.T03 - Hermes Skill
 
@@ -778,8 +805,8 @@ Current behavior:
 
 # RESUME FROM HERE
 
-Start with `PT-026.T02` MCP stdio local if exposing the contracts to Hermes, or
-`PT-024.T11` runtime Foundry local phase if a runtime-ready fixture is added.
-Current bootstrap runs real local phases 00 through 08 and phase 10. Phase 09
-remains dry-run unless a runtime-ready report and explicit local authorization
-exist. Keep Foundry runtime local-only and no-broadcast.
+Start with `PT-026.T03` Hermes skill `vassago-sc01-design`, pointing it at
+`python -m vassago_contract_runtime.cli mcp --stdio`. Current bootstrap runs
+real local phases 00 through 08 and phase 10. Phase 09 remains dry-run unless a
+runtime-ready report and explicit local authorization exist. Keep Foundry
+runtime local-only and no-broadcast.

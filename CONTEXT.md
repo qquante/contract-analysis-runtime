@@ -127,4 +127,7 @@ As of 2026-06-21:
   read;
 - `tools/` exposes three campaign-level contracts:
   `vassago_design_run`, `vassago_design_resume` and `vassago_artifact_read`;
+- `mcp/` exposes a local stdio MCP server over those three contracts;
+- CLI command `python -m vassago_contract_runtime.cli mcp --stdio` is
+  available;
 - no RPC or broadcast path is wired.

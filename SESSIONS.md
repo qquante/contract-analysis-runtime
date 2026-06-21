@@ -441,3 +441,48 @@ Next:
 RESUME FROM HERE:
 
 Start with `PT-026.T02` MCP stdio local. Reuse `build_runtime_tool_registry()` and expose only `vassago_design_run`, `vassago_design_resume` and `vassago_artifact_read`. Keep the MCP server local-only, no shell and no broadcast. Current tests are 40 OK and `check` passes before final validation.
+
+## S-20260621-010 - MCP stdio local over runtime tool contracts
+
+Goal:
+
+- Implement `PT-026.T02` MCP stdio local over `build_runtime_tool_registry()`.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/mcp/server.py`.
+- Added `src/vassago_contract_runtime/mcp/__init__.py`.
+- Added CLI command: `python -m vassago_contract_runtime.cli mcp --stdio`.
+- Added `tests/design_runtime/test_mcp_server.py`.
+- Updated docs/control files for PT-026.T02.
+
+Decisions:
+
+- MCP stdio wraps only the campaign-level registry from `build_runtime_tool_registry()`.
+- Exposed methods are intentionally small: `initialize`, `notifications/initialized`, `ping`, `tools/list` and `tools/call`.
+- No shell, no broadcast and no fine-grained phase tools are exposed.
+- The implementation is dependency-free and speaks newline-delimited JSON-RPC over stdio.
+
+Validation:
+
+- `$env:PYTHONPATH='src'; python -m unittest tests.design_runtime.test_mcp_server` passed: 6 tests.
+- `$env:PYTHONPATH='src'; python -m unittest discover -s tests` passed: 46 tests.
+- `$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check` passed.
+- CLI stdio smoke passed:
+  `initialize` returned tools capability and `tools/list` returned exactly `vassago_design_run`, `vassago_design_resume` and `vassago_artifact_read`.
+
+Blockers:
+
+- Hermes skill `vassago-sc01-design` does not exist yet.
+- No positive compile-ready fixture exists yet.
+- Phase 09 runtime Foundry remains dry-run unless a runtime-ready report and explicit authorization exist.
+
+Next:
+
+- Implement `PT-026.T03` Hermes skill `vassago-sc01-design`.
+- Add a compile-ready fixture to exercise phase 08 positive path.
+- Implement `PT-024.T11` only behind `foundry_allowed=true`.
+
+RESUME FROM HERE:
+
+Start with `PT-026.T03` Hermes skill. Configure it to launch `python -m vassago_contract_runtime.cli mcp --stdio`, call `vassago_design_run`, read `sc01-final-report.json` via `vassago_artifact_read`, and avoid fine-grained phase tools. Current tests are 46 OK and `check` passes before final validation.

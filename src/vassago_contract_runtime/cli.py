@@ -9,6 +9,7 @@ import sys
 
 from .design_runtime.design_loader import DesignLoadError
 from .design_runtime.models import ModelValidationError
+from .mcp import run_stdio
 from .quality import run_checks
 from .runtime_api import read_artifact_from_payload, resume_design_from_payload, run_design_from_payload
 
@@ -47,6 +48,9 @@ def main(argv: list[str] | None = None) -> int:
     artifact_read.add_argument("--run", required=True, help="Run directory.")
     artifact_read.add_argument("--uri", required=True, help="Artifact URI.")
 
+    mcp = sub.add_parser("mcp", help="Run the local MCP server.")
+    mcp.add_argument("--stdio", action="store_true", help="Use stdio transport.")
+
     args = parser.parse_args(argv)
     try:
         if args.command == "check":
@@ -59,6 +63,10 @@ def main(argv: list[str] | None = None) -> int:
             return _resume_command(args)
         if args.command == "artifact-read":
             return _artifact_read_command(args)
+        if args.command == "mcp":
+            if not args.stdio:
+                raise ValueError("Only local stdio MCP is supported. Pass --stdio.")
+            return run_stdio()
     except (DesignLoadError, ModelValidationError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
