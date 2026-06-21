@@ -71,7 +71,8 @@ python -m unittest discover -s tests
 python -m vassago_contract_runtime.cli check
 python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets.json --output runs/sc01-smoke --dry-run
 python -m vassago_contract_runtime.cli resume --run runs/sc01-smoke --dry-run
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets.json --output runs/sc01-bootstrap --bootstrap-adapters
 ```
 
-Only dry-run execution exists right now. Real phase adapters are tracked in
-`TASKS.md`.
+Bootstrap execution exists for phase 00 intake and phase 01 dossier skeleton.
+The remaining phases are dry-run until their adapters are implemented.

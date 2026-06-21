@@ -14,8 +14,8 @@ PT-023.T05 check command - done 2026-06-21
 
 ```text
 PT-024.T01 designs/sc01-access/design.yaml - done 2026-06-21
-PT-024.T02 phase 00 intake - next
-PT-024.T03 phase 01 dossier - next
+PT-024.T02 phase 00 intake - done 2026-06-21
+PT-024.T03 phase 01 dossier - done 2026-06-21 skeleton only
 PT-024.T04 phase 02 semantic surface
 PT-024.T05 phase 03 corpus motifs
 PT-024.T06 phase 04 thesis acquisition
@@ -30,7 +30,7 @@ PT-024.T12 phase 10 final report
 ## Lane C - Adapters
 
 ```text
-PT-025.T01 SourceResolver interface
+PT-025.T01 SourceResolver interface - done 2026-06-21 interface plus null adapter
 PT-025.T02 Explorer interface
 PT-025.T03 Slither interface
 PT-025.T04 Foundry interface
@@ -60,7 +60,8 @@ PT-027.T06 only then larger batch
 
 ## Current Next Up
 
-1. Implement PT-024.T02 as a real intake phase adapter.
-2. Implement PT-024.T03 dossier skeleton with local/dry adapters first.
-3. Keep SC01 logic as design phases, not as top-level tool sprawl.
-4. Do not start SC02 before this runtime skeleton passes smoke.
+1. Implement PT-025.T05 Corpus Adapter interface.
+2. Implement PT-024.T05 corpus motifs skeleton.
+3. Implement PT-025.T02 Explorer Adapter interface.
+4. Add a fixture/local SourceResolver adapter before network providers.
+5. Keep SC01 logic as design phases, not as top-level tool sprawl.

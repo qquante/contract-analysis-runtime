@@ -127,3 +127,44 @@ Next:
 
 - Implement `PT-024.T02` phase 00 intake as a real adapter.
 - Implement `PT-024.T03` phase 01 dossier skeleton.
+
+## S-20260621-004 - Intake, dossier skeleton and SourceResolver interface
+
+Goal:
+
+- Implement `PT-024.T02`, `PT-024.T03` and `PT-025.T01`.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/contracts/target.py`.
+- Added `src/vassago_contract_runtime/contracts/source_resolver.py`.
+- Added `src/vassago_contract_runtime/phases/intake.py`.
+- Added `src/vassago_contract_runtime/phases/dossier.py`.
+- Updated CLI bootstrap mode to run real phase 00/01 adapters and dry-run the
+  remaining phases.
+- Added `tests/design_runtime/test_phases.py`.
+
+Decisions:
+
+- `NullSourceResolver` is explicit: status `unresolved`, provider `null`,
+  no network.
+- Phase 01 dossier is a skeleton until SourceResolver providers exist.
+- `--bootstrap-adapters` means phase 00/01 are real local adapters and later
+  phases remain dry-run.
+
+Validation:
+
+- `$env:PYTHONPATH='src'; python -m unittest discover -s tests` passed:
+  24 tests.
+
+Blockers:
+
+- No Etherscan/Sourcify/local fixture SourceResolver adapter yet.
+- No Explorer Adapter yet.
+- No Corpus Adapter yet.
+
+Next:
+
+- Implement `PT-025.T05` Corpus Adapter interface.
+- Implement `PT-024.T05` corpus motifs skeleton.
+- Implement local fixture SourceResolver before network providers.

@@ -17,7 +17,7 @@ Status labels:
 
 | Area | Command | Expected |
 | --- | --- | --- |
-| Unit | `python -m unittest discover -s tests` | all pass; current: 21 passed |
+| Unit | `python -m unittest discover -s tests` | all pass; current: 24 passed |
 | Check | `python -m vassago_contract_runtime.cli check` | passes; validates SC01 design and safety checks |
 | Design dry run | `python -m vassago_contract_runtime.cli run-design --dry-run ...` | passes; manifests + dry-run artifacts |
 | Resume | `python -m vassago_contract_runtime.cli resume --run ... --dry-run` | passes; skips completed phases |
@@ -50,7 +50,7 @@ python -m unittest discover -s tests
 Result:
 
 ```text
-Ran 21 tests
+Ran 24 tests
 OK
 ```
 
@@ -71,6 +71,10 @@ Coverage added:
 - CLI `run-design --dry-run`;
 - CLI `resume --dry-run`;
 - CLI `artifact-read`.
+- SourceResolver interface and NullSourceResolver;
+- phase 00 intake real local adapter;
+- phase 01 dossier skeleton adapter;
+- CLI `run-design --bootstrap-adapters`.
 
 ## Not Allowed As Test Evidence
 

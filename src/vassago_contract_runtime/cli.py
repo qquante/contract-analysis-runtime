@@ -14,6 +14,8 @@ from .design_runtime.manifest import load_run_manifest
 from .design_runtime.models import ContractTarget, ModelValidationError, RunOptions
 from .design_runtime.runner import resume_design, run_design
 from .artifacts.store import ArtifactStore
+from .phases.dossier import DossierAdapter
+from .phases.intake import IntakeAdapter
 from .quality import run_checks
 
 
@@ -29,11 +31,21 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--targets", required=True, help="JSON target list.")
     run.add_argument("--output", required=True, help="Run output directory.")
     run.add_argument("--dry-run", action="store_true", help="Write manifests and dry-run artifacts only.")
+    run.add_argument(
+        "--bootstrap-adapters",
+        action="store_true",
+        help="Run implemented bootstrap adapters for phases 00/01 and dry-run the rest.",
+    )
     run.add_argument("--no-resume", action="store_true", help="Do not resume an existing run directory.")
 
     resume = sub.add_parser("resume", help="Resume an existing run.")
     resume.add_argument("--run", required=True, help="Run directory.")
     resume.add_argument("--dry-run", action="store_true", help="Use dry-run adapters.")
+    resume.add_argument(
+        "--bootstrap-adapters",
+        action="store_true",
+        help="Use implemented bootstrap adapters for phases 00/01 and dry-run the rest.",
+    )
 
     artifact_read = sub.add_parser("artifact-read", help="Read an artifact by vassago:// URI.")
     artifact_read.add_argument("--run", required=True, help="Run directory.")
@@ -60,9 +72,9 @@ def main(argv: list[str] | None = None) -> int:
 def _run_design_command(args: argparse.Namespace) -> int:
     design = load_design(_design_path(args.design))
     targets = _load_targets(Path(args.targets))
-    if not args.dry_run:
-        raise ValueError("Only --dry-run is implemented until real phase adapters exist.")
-    adapters = dry_run_adapters([phase.phase_id for phase in design.phases])
+    if not args.dry_run and not args.bootstrap_adapters:
+        raise ValueError("Use --dry-run or --bootstrap-adapters until all real phase adapters exist.")
+    adapters = _adapters_for(design, dry_run=args.dry_run, bootstrap=args.bootstrap_adapters)
     result = run_design(
         design,
         targets,
@@ -75,11 +87,15 @@ def _run_design_command(args: argparse.Namespace) -> int:
 
 
 def _resume_command(args: argparse.Namespace) -> int:
-    if not args.dry_run:
-        raise ValueError("Only --dry-run resume is implemented until real phase adapters exist.")
     manifest = load_run_manifest(args.run)
-    phase_ids = [phase["id"] for phase in manifest["design"]["phases"]]
-    result = resume_design(args.run, dry_run_adapters(phase_ids), RunOptions(resume=True, dry_run=True))
+    design = load_design_from_manifest(manifest)
+    if not args.dry_run and not args.bootstrap_adapters:
+        raise ValueError("Use --dry-run or --bootstrap-adapters until all real phase adapters exist.")
+    result = resume_design(
+        args.run,
+        _adapters_for(design, dry_run=args.dry_run, bootstrap=args.bootstrap_adapters),
+        RunOptions(resume=True, dry_run=args.dry_run),
+    )
     print(json.dumps(_result_payload(result), indent=2, sort_keys=True))
     return 0 if result.failed_count == 0 else 1
 
@@ -100,6 +116,20 @@ def _design_path(value: str) -> Path:
     if path.is_file():
         return path
     return Path("designs") / value / "design.yaml"
+
+
+def load_design_from_manifest(manifest: dict[str, Any]) -> Any:
+    from .design_runtime.models import DesignSpec
+
+    return DesignSpec.from_json(manifest["design"])
+
+
+def _adapters_for(design: Any, *, dry_run: bool, bootstrap: bool) -> dict[str, Any]:
+    adapters = dry_run_adapters([phase.phase_id for phase in design.phases])
+    if bootstrap and not dry_run:
+        adapters["00_intake"] = IntakeAdapter()
+        adapters["01_dossier"] = DossierAdapter()
+    return adapters
 
 
 def _load_targets(path: Path) -> list[ContractTarget]:

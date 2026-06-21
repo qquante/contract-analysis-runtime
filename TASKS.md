@@ -7,14 +7,14 @@ here without reading the old Vassago conversation.
 
 Repository bootstrap complete.
 
-PT-023.T01-T05 and PT-024.T01 are implemented and covered by unit tests.
+PT-023.T01-T05, PT-024.T01-T03 and PT-025.T01 are implemented and covered by unit tests.
 
 ## NEXT UP
 
-1. `PT-024.T02` - implement phase 00 intake as a real adapter.
-2. `PT-024.T03` - implement phase 01 dossier as a local/dry adapter first.
-3. `PT-025.T01` - define SourceResolver Adapter interface.
-4. `PT-025.T05` - define Corpus Adapter interface.
+1. `PT-025.T05` - define Corpus Adapter interface.
+2. `PT-024.T05` - implement phase 03 corpus motifs skeleton.
+3. `PT-025.T02` - define Explorer Adapter interface.
+4. `PT-024.T03B` - add fixture/local SourceResolver adapter with ABI/source input.
 
 ---
 
@@ -223,7 +223,7 @@ Result:
 
 ## PT-024.T02 - Phase 00 Intake
 
-Status: pending.
+Status: done, 2026-06-21.
 
 Inputs:
 
@@ -241,9 +241,15 @@ Rules:
 - normalize address;
 - no RPC needed.
 
+Result:
+
+- Added `src/vassago_contract_runtime/phases/intake.py`.
+- The adapter writes `target-manifest.json` and `scope-policy.json`.
+- It is a real local adapter, not a dry-run artifact.
+
 ## PT-024.T03 - Phase 01 Dossier
 
-Status: pending.
+Status: done, 2026-06-21, skeleton only.
 
 Purpose:
 
@@ -262,6 +268,13 @@ Outputs:
 - `protocol-fingerprint.json`;
 - `source-manifest.json`;
 - `compile-context.json`.
+
+Result:
+
+- Added `src/vassago_contract_runtime/phases/dossier.py`.
+- Added `NullSourceResolver` skeleton through PT-025.T01.
+- Dossier status is `skeleton` until a provider/local fixture resolver exists.
+- No network/RPC/Explorer/Slither/Foundry is used.
 
 ## PT-024.T04 - Phase 02 Semantic Surface
 
@@ -472,7 +485,7 @@ Report must include:
 
 ## PT-025.T01 - SourceResolver Adapter
 
-Status: pending.
+Status: done, 2026-06-21, interface plus null adapter.
 
 Interface:
 
@@ -483,6 +496,13 @@ Must support:
 - Etherscan-compatible APIs;
 - Sourcify;
 - local fixture.
+
+Result:
+
+- Added `src/vassago_contract_runtime/contracts/source_resolver.py`.
+- Added `src/vassago_contract_runtime/contracts/target.py`.
+- Implemented `SourceResolver` protocol, `SourceResolution` and `NullSourceResolver`.
+- Etherscan/Sourcify/local fixture adapters are still future work.
 
 ## PT-025.T02 - Explorer Adapter
 
