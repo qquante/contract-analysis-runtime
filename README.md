@@ -76,6 +76,12 @@ python -m vassago_contract_runtime.cli run-design --design sc01-access --targets
 python -m vassago_contract_runtime.cli mcp --stdio
 ```
 
+Hermes wrapper:
+
+```powershell
+C:\Users\PC\Desktop\vassago-contract-runtime\scripts\hermes-vassago-contract-runtime-mcp.cmd
+```
+
 Bootstrap execution exists for phase 00 intake, phase 01 dossier skeleton,
 phase 02 semantic surface, phase 03 corpus motifs, phase 04 thesis acquisition,
 phase 05 source truth skeleton, phase 06 on-chain state skeleton, phase 07
@@ -125,3 +131,21 @@ Only three tools are exposed:
 - `vassago_design_run`;
 - `vassago_design_resume`;
 - `vassago_artifact_read`.
+
+## Hermes Skill
+
+Local Hermes skill:
+
+```text
+C:\Users\PC\AppData\Local\hermes\skills\domain\vassago-sc01-design\SKILL.md
+```
+
+Versioned prompt source:
+
+```text
+designs/sc01-access/prompts/vassago-sc01-design.md
+```
+
+The skill should call `mcp_vassago_contract_runtime_vassago_design_run` first
+and then read `sc01-final-report.json` with
+`mcp_vassago_contract_runtime_vassago_artifact_read`.

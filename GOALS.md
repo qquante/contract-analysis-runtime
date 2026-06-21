@@ -54,6 +54,8 @@ Acceptance:
   internal tool contracts in `src/vassago_contract_runtime/tools/`;
 - local MCP stdio exposes only campaign-level tools. Done in
   `src/vassago_contract_runtime/mcp/`;
+- Hermes skill `vassago-sc01-design` points to the local MCP server and starts
+  with `vassago_design_run`. Done locally and prompt versioned in repo;
 - fine-grained adapters are internal to phases or specialist subagents.
 
 ## G-005 - SC01 corpus as executable knowledge

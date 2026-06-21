@@ -486,3 +486,45 @@ Next:
 RESUME FROM HERE:
 
 Start with `PT-026.T03` Hermes skill. Configure it to launch `python -m vassago_contract_runtime.cli mcp --stdio`, call `vassago_design_run`, read `sc01-final-report.json` via `vassago_artifact_read`, and avoid fine-grained phase tools. Current tests are 46 OK and `check` passes before final validation.
+
+## S-20260621-011 - Hermes skill for SC01 design runtime
+
+Goal:
+
+- Implement `PT-026.T03` Hermes skill `vassago-sc01-design` pointing to the local MCP stdio runtime.
+
+What was done:
+
+- Added wrapper `scripts/hermes-vassago-contract-runtime-mcp.cmd`.
+- Installed local Hermes skill at `C:\Users\PC\AppData\Local\hermes\skills\domain\vassago-sc01-design\SKILL.md`.
+- Added versioned prompt source at `designs/sc01-access/prompts/vassago-sc01-design.md`.
+- Registered Hermes MCP server `vassago_contract_runtime` with command `scripts/hermes-vassago-contract-runtime-mcp.cmd`.
+- Updated docs/control files.
+
+Decisions:
+
+- The skill starts with `mcp_vassago_contract_runtime_vassago_design_run`.
+- It reads `sc01-final-report.json` through `mcp_vassago_contract_runtime_vassago_artifact_read`.
+- It escalates to legacy `vassago-sc01-access` only after a final report exists and requests deeper access-control analysis.
+- It must not call shell or fine-grained legacy tools while the design-runtime MCP is available.
+
+Validation:
+
+- `hermes mcp test vassago_contract_runtime` connected and discovered 3 tools.
+- `hermes skills list` shows `vassago-sc01-design` enabled as a local domain skill.
+
+Blockers:
+
+- Full Hermes LLM smoke has not been run yet in this commit.
+- No positive compile-ready fixture exists yet.
+- Phase 09 runtime Foundry remains dry-run unless a runtime-ready report and explicit authorization exist.
+
+Next:
+
+- Run an interactive or CLI Hermes smoke with `--skills vassago-sc01-design` against the fixture target.
+- Implement `PT-026.T04` A2A card if the skill behavior is acceptable.
+- Add a compile-ready fixture to exercise phase 08 positive path.
+
+RESUME FROM HERE:
+
+Start by running a Hermes smoke using `vassago-sc01-design`. Ask it to run the fixture SC01 design through `vassago_contract_runtime`, then verify it used `vassago_design_run` and `vassago_artifact_read` instead of shell. If that passes, implement `PT-026.T04` A2A card.

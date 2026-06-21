@@ -130,4 +130,8 @@ As of 2026-06-21:
 - `mcp/` exposes a local stdio MCP server over those three contracts;
 - CLI command `python -m vassago_contract_runtime.cli mcp --stdio` is
   available;
+- Hermes MCP server `vassago_contract_runtime` is configured locally and points
+  to `scripts/hermes-vassago-contract-runtime-mcp.cmd`;
+- Hermes skill `vassago-sc01-design` is installed locally and versioned under
+  `designs/sc01-access/prompts/vassago-sc01-design.md`;
 - no RPC or broadcast path is wired.

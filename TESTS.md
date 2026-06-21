@@ -97,6 +97,8 @@ Coverage added:
 - Tool registry alias resolution and unknown-tool fail-closed behavior.
 - MCP stdio server initialize, tools/list, tools/call and notification tests.
 - CLI stdio smoke for initialize + tools/list.
+- Hermes MCP registration smoke with `hermes mcp test vassago_contract_runtime`.
+- Hermes skill visibility smoke with `hermes skills list`.
 
 Smoke:
 
@@ -144,6 +146,20 @@ Result:
 initialize returned tools capability.
 tools/list returned vassago_design_run, vassago_design_resume and vassago_artifact_read.
 stdout contained only JSON-RPC responses.
+```
+
+Hermes integration smoke:
+
+```powershell
+hermes mcp test vassago_contract_runtime
+hermes skills list
+```
+
+Result:
+
+```text
+vassago_contract_runtime connected in stdio mode and discovered 3 tools.
+vassago-sc01-design is enabled as a local domain skill.
 ```
 
 ## Not Allowed As Test Evidence

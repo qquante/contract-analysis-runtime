@@ -674,7 +674,7 @@ Current behavior:
 
 ## PT-026.T03 - Hermes Skill
 
-Status: pending.
+Status: done 2026-06-21.
 
 Skill:
 
@@ -686,6 +686,21 @@ Prompt behavior:
 - read report;
 - only request subagent when a phase is blocked;
 - never call fine-grained tools first.
+
+Implemented:
+
+- installed local Hermes skill at:
+  `C:\Users\PC\AppData\Local\hermes\skills\domain\vassago-sc01-design\SKILL.md`;
+- versioned prompt source at
+  `designs/sc01-access/prompts/vassago-sc01-design.md`;
+- configured Hermes MCP server `vassago_contract_runtime`;
+- wrapper command:
+  `scripts/hermes-vassago-contract-runtime-mcp.cmd`.
+
+Validation:
+
+- `hermes skills list` shows `vassago-sc01-design` enabled;
+- `hermes mcp test vassago_contract_runtime` connects and discovers 3 tools.
 
 ---
 
@@ -805,8 +820,9 @@ Current behavior:
 
 # RESUME FROM HERE
 
-Start with `PT-026.T03` Hermes skill `vassago-sc01-design`, pointing it at
-`python -m vassago_contract_runtime.cli mcp --stdio`. Current bootstrap runs
-real local phases 00 through 08 and phase 10. Phase 09 remains dry-run unless a
-runtime-ready report and explicit local authorization exist. Keep Foundry
-runtime local-only and no-broadcast.
+Start with a Hermes smoke using
+`hermes --skills vassago-sc01-design ...` on the fixture target, or move to
+`PT-026.T04` A2A card if the skill behavior is acceptable. Current bootstrap
+runs real local phases 00 through 08 and phase 10. Phase 09 remains dry-run
+unless a runtime-ready report and explicit local authorization exist. Keep
+Foundry runtime local-only and no-broadcast.
