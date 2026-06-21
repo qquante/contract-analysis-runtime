@@ -2,16 +2,17 @@
 
 ## G-001 - Contract-first campaign runtime
 
-Status: active.
+Status: active; runtime foundation partially implemented.
 
 Build a resumable Design runtime around `ContractTarget(chain, address)`.
 
 Acceptance:
 
-- `run-manifest.json` exists.
-- each target has phase status.
-- resume does not recompute completed phases.
-- all artifacts are indexed.
+- `run-manifest.json` exists. Done.
+- each target has phase status. Done.
+- resume does not recompute completed phases. Done in unit tests.
+- all artifacts are indexed. Initial ArtifactStore done.
+- CLI can run/resume a design. Pending.
 
 ## G-002 - SC01 Access Control v1 design
 

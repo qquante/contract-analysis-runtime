@@ -7,14 +7,14 @@ here without reading the old Vassago conversation.
 
 Repository bootstrap complete.
 
-No runtime implementation exists yet.
+PT-023.T01-T03 are implemented and covered by unit tests.
 
 ## NEXT UP
 
-1. `PT-023.T01` - implement core models.
-2. `PT-023.T02` - implement run manifest and artifact index.
-3. `PT-023.T03` - implement phase runner with resume.
-4. `PT-024.T01` - validate `designs/sc01-access/design.yaml`.
+1. `PT-023.T04` - implement CLI skeleton.
+2. `PT-023.T05` - implement strict check.
+3. `PT-024.T01` - validate `designs/sc01-access/design.yaml`.
+4. `PT-024.T02` - implement phase 00 intake.
 
 ---
 
@@ -26,7 +26,7 @@ Create the generic runtime that runs Designs against ContractTargets.
 
 ## PT-023.T01 - Core Models
 
-Status: pending.
+Status: done, 2026-06-21.
 
 Files:
 
@@ -59,9 +59,16 @@ Acceptance:
 - JSON roundtrip works;
 - unit tests pass.
 
+Result:
+
+- Added `src/vassago_contract_runtime/design_runtime/models.py`.
+- Added `tests/design_runtime/test_models.py`.
+- Stable validation codes implemented.
+- `ContractTarget.target_id` uses `CT-<hash(chain|address)>`.
+
 ## PT-023.T02 - Run Manifest And Artifact Index
 
-Status: pending.
+Status: done, 2026-06-21.
 
 Files:
 
@@ -93,9 +100,17 @@ Acceptance:
 - artifact hash is stable;
 - path traversal test fails closed.
 
+Result:
+
+- Added `src/vassago_contract_runtime/design_runtime/manifest.py`.
+- Added `src/vassago_contract_runtime/artifacts/store.py`.
+- Added `tests/design_runtime/test_manifest.py`.
+- Artifact URI format implemented:
+  `vassago://runs/{run_id}/targets/{target_id}/phases/{phase_id}/{artifact}`.
+
 ## PT-023.T03 - Phase Runner With Resume
 
-Status: pending.
+Status: done, 2026-06-21.
 
 Files:
 
@@ -124,6 +139,12 @@ Acceptance:
 - fake design with 3 phases runs;
 - resume skips phase 1 and runs phase 2;
 - failed phase writes error status.
+
+Result:
+
+- Added `src/vassago_contract_runtime/design_runtime/runner.py`.
+- Added `tests/design_runtime/test_runner.py`.
+- Runner supports required failure stop, optional failure continuation and resume skip.
 
 ## PT-023.T04 - CLI Skeleton
 

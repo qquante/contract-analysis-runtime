@@ -3,11 +3,11 @@
 ## Lane A - Runtime Foundation
 
 ```text
-PT-023.T01 DesignSpec / PhaseSpec / GateSpec
-PT-023.T02 RunManifest / TargetManifest / ArtifactIndex
-PT-023.T03 PhaseRunner with resume
-PT-023.T04 CLI skeleton
-PT-023.T05 check command
+PT-023.T01 DesignSpec / PhaseSpec / GateSpec - done 2026-06-21
+PT-023.T02 RunManifest / TargetManifest / ArtifactIndex - done 2026-06-21
+PT-023.T03 PhaseRunner with resume - done 2026-06-21
+PT-023.T04 CLI skeleton - next
+PT-023.T05 check command - next
 ```
 
 ## Lane B - SC01 Design
@@ -60,6 +60,7 @@ PT-027.T06 only then larger batch
 
 ## Current Next Up
 
-1. Implement PT-023.T01-T03.
-2. Keep SC01 logic as design phases, not as top-level tool sprawl.
-3. Do not start SC02 before this runtime skeleton passes smoke.
+1. Implement PT-023.T04-T05.
+2. Validate `designs/sc01-access/design.yaml` through PT-024.T01.
+3. Keep SC01 logic as design phases, not as top-level tool sprawl.
+4. Do not start SC02 before this runtime skeleton passes smoke.
