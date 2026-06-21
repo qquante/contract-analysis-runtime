@@ -83,3 +83,47 @@ Next:
 - Implement `PT-023.T04` CLI skeleton.
 - Implement `PT-023.T05` strict check.
 - Implement `PT-024.T01` design spec validation.
+
+## S-20260621-003 - CLI, check and SC01 design validation
+
+Goal:
+
+- Implement `PT-023.T04`, `PT-023.T05` and `PT-024.T01`.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/design_runtime/design_loader.py`.
+- Added `src/vassago_contract_runtime/design_runtime/adapters.py`.
+- Added `src/vassago_contract_runtime/cli.py`.
+- Added `src/vassago_contract_runtime/quality.py`.
+- Added `tests/design_runtime/test_design_loader.py`.
+- Added `tests/design_runtime/test_cli.py`.
+- Added `tests/fixtures/targets.json`.
+
+Decisions:
+
+- Use a controlled simple YAML parser for the current `design.yaml` subset
+  instead of adding PyYAML immediately.
+- Keep `run-design` limited to `--dry-run` until real phase adapters exist.
+- `check` validates design load, line limit, evidence string placement, secret
+  patterns and artifact path traversal behavior.
+- Dry-run adapters write explicit `status=dry_run` artifacts, never evidence.
+
+Validation:
+
+- `$env:PYTHONPATH='src'; python -m unittest discover -s tests` passed:
+  21 tests.
+- `python -m vassago_contract_runtime.cli check` passed.
+- `python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets.json --output <temp> --dry-run` passed.
+- `python -m vassago_contract_runtime.cli resume --run <temp> --dry-run` passed and skipped completed phases.
+- `python -m vassago_contract_runtime.cli artifact-read --run <temp> --uri <artifact-uri>` passed.
+
+Blockers:
+
+- No real phase adapters yet.
+- No SourceResolver/Explorer/Slither/Foundry adapters yet.
+
+Next:
+
+- Implement `PT-024.T02` phase 00 intake as a real adapter.
+- Implement `PT-024.T03` phase 01 dossier skeleton.

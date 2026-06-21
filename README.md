@@ -63,15 +63,15 @@ It implements OWASP SC01 Access Control as a contract-first campaign:
 
 ## Expected Commands
 
-Initial commands once implementation starts:
+Current working commands:
 
 ```powershell
 $env:PYTHONPATH='src'
 python -m unittest discover -s tests
 python -m vassago_contract_runtime.cli check
-python -m vassago_contract_runtime.cli run-design --design sc01-access --targets examples/targets.json --output runs/sc01-smoke
-python -m vassago_contract_runtime.cli resume --run runs/sc01-smoke
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets.json --output runs/sc01-smoke --dry-run
+python -m vassago_contract_runtime.cli resume --run runs/sc01-smoke --dry-run
 ```
 
-These commands do not exist yet. They are acceptance targets tracked in
+Only dry-run execution exists right now. Real phase adapters are tracked in
 `TASKS.md`.

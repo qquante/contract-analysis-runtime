@@ -6,16 +6,16 @@
 PT-023.T01 DesignSpec / PhaseSpec / GateSpec - done 2026-06-21
 PT-023.T02 RunManifest / TargetManifest / ArtifactIndex - done 2026-06-21
 PT-023.T03 PhaseRunner with resume - done 2026-06-21
-PT-023.T04 CLI skeleton - next
-PT-023.T05 check command - next
+PT-023.T04 CLI skeleton - done 2026-06-21
+PT-023.T05 check command - done 2026-06-21
 ```
 
 ## Lane B - SC01 Design
 
 ```text
-PT-024.T01 designs/sc01-access/design.yaml
-PT-024.T02 phase 00 intake
-PT-024.T03 phase 01 dossier
+PT-024.T01 designs/sc01-access/design.yaml - done 2026-06-21
+PT-024.T02 phase 00 intake - next
+PT-024.T03 phase 01 dossier - next
 PT-024.T04 phase 02 semantic surface
 PT-024.T05 phase 03 corpus motifs
 PT-024.T06 phase 04 thesis acquisition
@@ -60,7 +60,7 @@ PT-027.T06 only then larger batch
 
 ## Current Next Up
 
-1. Implement PT-023.T04-T05.
-2. Validate `designs/sc01-access/design.yaml` through PT-024.T01.
+1. Implement PT-024.T02 as a real intake phase adapter.
+2. Implement PT-024.T03 dossier skeleton with local/dry adapters first.
 3. Keep SC01 logic as design phases, not as top-level tool sprawl.
 4. Do not start SC02 before this runtime skeleton passes smoke.

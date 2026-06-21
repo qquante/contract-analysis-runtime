@@ -1,0 +1,135 @@
+"""Command line interface for the contract runtime."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import sys
+from typing import Any
+
+from .design_runtime.adapters import dry_run_adapters
+from .design_runtime.design_loader import DesignLoadError, load_design
+from .design_runtime.manifest import load_run_manifest
+from .design_runtime.models import ContractTarget, ModelValidationError, RunOptions
+from .design_runtime.runner import resume_design, run_design
+from .artifacts.store import ArtifactStore
+from .quality import run_checks
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="vassago-contract-runtime")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    check = sub.add_parser("check", help="Validate repository runtime metadata.")
+    check.add_argument("--root", default=".", help="Repository root.")
+
+    run = sub.add_parser("run-design", help="Run a design against target contracts.")
+    run.add_argument("--design", required=True, help="Design id or path to design.yaml.")
+    run.add_argument("--targets", required=True, help="JSON target list.")
+    run.add_argument("--output", required=True, help="Run output directory.")
+    run.add_argument("--dry-run", action="store_true", help="Write manifests and dry-run artifacts only.")
+    run.add_argument("--no-resume", action="store_true", help="Do not resume an existing run directory.")
+
+    resume = sub.add_parser("resume", help="Resume an existing run.")
+    resume.add_argument("--run", required=True, help="Run directory.")
+    resume.add_argument("--dry-run", action="store_true", help="Use dry-run adapters.")
+
+    artifact_read = sub.add_parser("artifact-read", help="Read an artifact by vassago:// URI.")
+    artifact_read.add_argument("--run", required=True, help="Run directory.")
+    artifact_read.add_argument("--uri", required=True, help="Artifact URI.")
+
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "check":
+            result = run_checks(Path(args.root))
+            print(json.dumps(result, indent=2, sort_keys=True))
+            return 0 if result["status"] == "passed" else 1
+        if args.command == "run-design":
+            return _run_design_command(args)
+        if args.command == "resume":
+            return _resume_command(args)
+        if args.command == "artifact-read":
+            return _artifact_read_command(args)
+    except (DesignLoadError, ModelValidationError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    return 2
+
+
+def _run_design_command(args: argparse.Namespace) -> int:
+    design = load_design(_design_path(args.design))
+    targets = _load_targets(Path(args.targets))
+    if not args.dry_run:
+        raise ValueError("Only --dry-run is implemented until real phase adapters exist.")
+    adapters = dry_run_adapters([phase.phase_id for phase in design.phases])
+    result = run_design(
+        design,
+        targets,
+        args.output,
+        adapters,
+        RunOptions(resume=not args.no_resume, dry_run=args.dry_run),
+    )
+    print(json.dumps(_result_payload(result), indent=2, sort_keys=True))
+    return 0 if result.failed_count == 0 else 1
+
+
+def _resume_command(args: argparse.Namespace) -> int:
+    if not args.dry_run:
+        raise ValueError("Only --dry-run resume is implemented until real phase adapters exist.")
+    manifest = load_run_manifest(args.run)
+    phase_ids = [phase["id"] for phase in manifest["design"]["phases"]]
+    result = resume_design(args.run, dry_run_adapters(phase_ids), RunOptions(resume=True, dry_run=True))
+    print(json.dumps(_result_payload(result), indent=2, sort_keys=True))
+    return 0 if result.failed_count == 0 else 1
+
+
+def _artifact_read_command(args: argparse.Namespace) -> int:
+    manifest = load_run_manifest(args.run)
+    store = ArtifactStore(args.run, manifest["run_id"])
+    payload = store.read_artifact(args.uri)
+    if isinstance(payload, str):
+        print(payload)
+    else:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
+def _design_path(value: str) -> Path:
+    path = Path(value)
+    if path.is_file():
+        return path
+    return Path("designs") / value / "design.yaml"
+
+
+def _load_targets(path: Path) -> list[ContractTarget]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, dict):
+        records = payload.get("targets", [])
+    else:
+        records = payload
+    if not isinstance(records, list) or not records:
+        raise ValueError("Targets file must contain a non-empty list or {'targets': [...]}.")
+    return [ContractTarget.from_json(_target_payload(item)) for item in records]
+
+
+def _target_payload(item: Any) -> dict[str, Any]:
+    if not isinstance(item, dict):
+        raise ValueError("Each target must be an object.")
+    return item
+
+
+def _result_payload(result: Any) -> dict[str, Any]:
+    return {
+        "run_dir": str(result.run_dir),
+        "run_id": result.run_id,
+        "status": result.status,
+        "executed_count": result.executed_count,
+        "skipped_count": result.skipped_count,
+        "failed_count": result.failed_count,
+        "stop_reason": result.stop_reason,
+    }
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

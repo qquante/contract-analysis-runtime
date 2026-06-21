@@ -7,14 +7,14 @@ here without reading the old Vassago conversation.
 
 Repository bootstrap complete.
 
-PT-023.T01-T03 are implemented and covered by unit tests.
+PT-023.T01-T05 and PT-024.T01 are implemented and covered by unit tests.
 
 ## NEXT UP
 
-1. `PT-023.T04` - implement CLI skeleton.
-2. `PT-023.T05` - implement strict check.
-3. `PT-024.T01` - validate `designs/sc01-access/design.yaml`.
-4. `PT-024.T02` - implement phase 00 intake.
+1. `PT-024.T02` - implement phase 00 intake as a real adapter.
+2. `PT-024.T03` - implement phase 01 dossier as a local/dry adapter first.
+3. `PT-025.T01` - define SourceResolver Adapter interface.
+4. `PT-025.T05` - define Corpus Adapter interface.
 
 ---
 
@@ -148,7 +148,7 @@ Result:
 
 ## PT-023.T04 - CLI Skeleton
 
-Status: pending.
+Status: done, 2026-06-21.
 
 Files:
 
@@ -167,9 +167,16 @@ Acceptance:
 - `python -m vassago_contract_runtime.cli check` exits 0.
 - `run-design --dry-run` writes manifest.
 
+Result:
+
+- Added `src/vassago_contract_runtime/cli.py`.
+- Implemented `check`, `run-design`, `resume`, and `artifact-read`.
+- `run-design` and `resume` currently require `--dry-run` until real phase
+  adapters exist.
+
 ## PT-023.T05 - Strict Check
 
-Status: pending.
+Status: done, 2026-06-21.
 
 Implement checks:
 
@@ -178,6 +185,12 @@ Implement checks:
 - no forbidden evidence promotion strings outside gate module;
 - no secrets in tracked docs;
 - no artifact path traversal.
+
+Result:
+
+- Added `src/vassago_contract_runtime/quality.py`.
+- `check` validates SC01 design YAML, Python line limit, evidence string
+  placement, basic secret patterns and artifact path traversal behavior.
 
 ---
 
@@ -189,7 +202,7 @@ Implement the first contract-first Design.
 
 ## PT-024.T01 - Design Spec
 
-Status: pending.
+Status: done, 2026-06-21.
 
 Files:
 
@@ -201,6 +214,12 @@ Acceptance:
 - design loads;
 - phase graph is ordered;
 - required artifacts are declared.
+
+Result:
+
+- Added `src/vassago_contract_runtime/design_runtime/design_loader.py`.
+- `designs/sc01-access/design.yaml` loads into `DesignSpec`.
+- Current phase count: 11.
 
 ## PT-024.T02 - Phase 00 Intake
 

@@ -12,7 +12,7 @@ Acceptance:
 - each target has phase status. Done.
 - resume does not recompute completed phases. Done in unit tests.
 - all artifacts are indexed. Initial ArtifactStore done.
-- CLI can run/resume a design. Pending.
+- CLI can run/resume a design. Done for dry-run.
 
 ## G-002 - SC01 Access Control v1 design
 
