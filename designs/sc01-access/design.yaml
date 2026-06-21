@@ -21,6 +21,7 @@ phases:
       - function-index.json
       - source-manifest.json
       - compile-context.json
+      - protocol-fingerprint.json
   - id: "02_semantic_surface"
     name: Semantic Surface
     required: true

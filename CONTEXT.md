@@ -93,9 +93,20 @@ The old Vassago repo contains many working adapters and tools. This repo should
 not copy the entire tool surface. It should import or reimplement only behind
 deep Interfaces:
 
-- SourceResolver Adapter;
-- Explorer Adapter;
+- SourceResolver Adapter. Interface done; null and local fixture resolver done.
+- Explorer Adapter. Interface done; real provider/cache still pending.
 - Slither Adapter;
 - Foundry Adapter;
 - ArtifactStore Adapter;
-- Corpus Adapter.
+- Corpus Adapter. Interface and local design corpus adapter done.
+
+## Current Runtime State
+
+As of 2026-06-21:
+
+- phase 00 intake is a real local adapter;
+- phase 01 dossier is a real local skeleton adapter;
+- phase 01 can consume ABI/source through `--source-fixture`;
+- phase 03 corpus motifs is a real local skeleton adapter;
+- phase 02 and phase 04+ are still dry-run in bootstrap mode;
+- no network provider, RPC, Slither, Foundry or broadcast path is wired.

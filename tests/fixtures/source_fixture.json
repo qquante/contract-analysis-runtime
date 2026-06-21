@@ -1,0 +1,52 @@
+{
+  "targets": [
+    {
+      "chain": "eth",
+      "address": "0x1111111111111111111111111111111111111111",
+      "status": "resolved",
+      "provider": "fixture",
+      "abi": [
+        {
+          "type": "function",
+          "name": "initialize",
+          "stateMutability": "nonpayable",
+          "inputs": [],
+          "outputs": []
+        },
+        {
+          "type": "function",
+          "name": "upgradeTo",
+          "stateMutability": "nonpayable",
+          "inputs": [
+            {
+              "name": "newImplementation",
+              "type": "address"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "type": "event",
+          "name": "Upgraded",
+          "inputs": [
+            {
+              "name": "implementation",
+              "type": "address",
+              "indexed": true
+            }
+          ]
+        }
+      ],
+      "source_files": {
+        "FixtureUUPS.sol": "contract FixtureUUPS { address public owner; function initialize() external { owner = msg.sender; } function upgradeTo(address newImplementation) external { _authorizeUpgrade(newImplementation); } function _authorizeUpgrade(address) internal view { require(msg.sender == owner, \"owner\"); } }"
+      },
+      "compiler": {
+        "language": "Solidity",
+        "version": "0.8.24"
+      },
+      "metadata": {
+        "fixture_id": "fixture-uups"
+      }
+    }
+  ]
+}

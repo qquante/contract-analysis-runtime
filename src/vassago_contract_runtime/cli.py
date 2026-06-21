@@ -14,6 +14,8 @@ from .design_runtime.manifest import load_run_manifest
 from .design_runtime.models import ContractTarget, ModelValidationError, RunOptions
 from .design_runtime.runner import resume_design, run_design
 from .artifacts.store import ArtifactStore
+from .contracts import FixtureSourceResolver
+from .phases.corpus_motifs import CorpusMotifsAdapter
 from .phases.dossier import DossierAdapter
 from .phases.intake import IntakeAdapter
 from .quality import run_checks
@@ -31,6 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--targets", required=True, help="JSON target list.")
     run.add_argument("--output", required=True, help="Run output directory.")
     run.add_argument("--dry-run", action="store_true", help="Write manifests and dry-run artifacts only.")
+    run.add_argument("--source-fixture", help="Local JSON source fixture for phase 01 dossier.")
     run.add_argument(
         "--bootstrap-adapters",
         action="store_true",
@@ -41,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     resume = sub.add_parser("resume", help="Resume an existing run.")
     resume.add_argument("--run", required=True, help="Run directory.")
     resume.add_argument("--dry-run", action="store_true", help="Use dry-run adapters.")
+    resume.add_argument("--source-fixture", help="Local JSON source fixture for phase 01 dossier.")
     resume.add_argument(
         "--bootstrap-adapters",
         action="store_true",
@@ -70,11 +74,18 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_design_command(args: argparse.Namespace) -> int:
-    design = load_design(_design_path(args.design))
+    design_path = _design_path(args.design)
+    design = load_design(design_path)
     targets = _load_targets(Path(args.targets))
     if not args.dry_run and not args.bootstrap_adapters:
         raise ValueError("Use --dry-run or --bootstrap-adapters until all real phase adapters exist.")
-    adapters = _adapters_for(design, dry_run=args.dry_run, bootstrap=args.bootstrap_adapters)
+    adapters = _adapters_for(
+        design,
+        dry_run=args.dry_run,
+        bootstrap=args.bootstrap_adapters,
+        source_fixture=args.source_fixture,
+        design_dir=design_path.parent,
+    )
     result = run_design(
         design,
         targets,
@@ -93,7 +104,13 @@ def _resume_command(args: argparse.Namespace) -> int:
         raise ValueError("Use --dry-run or --bootstrap-adapters until all real phase adapters exist.")
     result = resume_design(
         args.run,
-        _adapters_for(design, dry_run=args.dry_run, bootstrap=args.bootstrap_adapters),
+        _adapters_for(
+            design,
+            dry_run=args.dry_run,
+            bootstrap=args.bootstrap_adapters,
+            source_fixture=args.source_fixture,
+            design_dir=Path("designs") / design.design_id,
+        ),
         RunOptions(resume=True, dry_run=args.dry_run),
     )
     print(json.dumps(_result_payload(result), indent=2, sort_keys=True))
@@ -124,11 +141,20 @@ def load_design_from_manifest(manifest: dict[str, Any]) -> Any:
     return DesignSpec.from_json(manifest["design"])
 
 
-def _adapters_for(design: Any, *, dry_run: bool, bootstrap: bool) -> dict[str, Any]:
+def _adapters_for(
+    design: Any,
+    *,
+    dry_run: bool,
+    bootstrap: bool,
+    source_fixture: str | None = None,
+    design_dir: Path | None = None,
+) -> dict[str, Any]:
     adapters = dry_run_adapters([phase.phase_id for phase in design.phases])
     if bootstrap and not dry_run:
+        source_resolver = FixtureSourceResolver.from_file(source_fixture) if source_fixture else None
         adapters["00_intake"] = IntakeAdapter()
-        adapters["01_dossier"] = DossierAdapter()
+        adapters["01_dossier"] = DossierAdapter(source_resolver)
+        adapters["03_corpus_motifs"] = CorpusMotifsAdapter.from_design_dir(str(design_dir or Path("designs") / design.design_id))
     return adapters
 
 

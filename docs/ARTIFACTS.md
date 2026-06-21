@@ -25,3 +25,26 @@ Rules:
 - artifacts must include created timestamp;
 - stale artifacts cannot drive Foundry;
 - secret redaction is mandatory for RPC URLs and API keys.
+
+## Current SC01 Bootstrap Artifacts
+
+Phase `00_intake`:
+
+- `target-manifest.json`
+- `scope-policy.json`
+
+Phase `01_dossier`:
+
+- `scan-dossier.json`
+- `function-index.json`
+- `source-manifest.json`
+- `compile-context.json`
+- `protocol-fingerprint.json`
+
+Phase `03_corpus_motifs`:
+
+- `sc01-corpus-matches.json`
+- `sc01-thesis-candidates.json`
+
+`sc01-thesis-candidates.json` is candidate-only routing context. It is never
+runtime evidence and cannot enable Foundry by itself.

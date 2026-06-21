@@ -15,9 +15,9 @@ PT-023.T05 check command - done 2026-06-21
 ```text
 PT-024.T01 designs/sc01-access/design.yaml - done 2026-06-21
 PT-024.T02 phase 00 intake - done 2026-06-21
-PT-024.T03 phase 01 dossier - done 2026-06-21 skeleton only
+PT-024.T03 phase 01 dossier - done 2026-06-21 skeleton with fixture source support
 PT-024.T04 phase 02 semantic surface
-PT-024.T05 phase 03 corpus motifs
+PT-024.T05 phase 03 corpus motifs - done 2026-06-21 skeleton
 PT-024.T06 phase 04 thesis acquisition
 PT-024.T07 phase 05 source truth
 PT-024.T08 phase 06 on-chain state
@@ -30,12 +30,11 @@ PT-024.T12 phase 10 final report
 ## Lane C - Adapters
 
 ```text
-PT-025.T01 SourceResolver interface - done 2026-06-21 interface plus null adapter
-PT-025.T02 Explorer interface
+PT-025.T01 SourceResolver interface - done 2026-06-21 interface plus null and fixture adapters
+PT-025.T02 Explorer interface - done 2026-06-21 interface plus null adapter
 PT-025.T03 Slither interface
 PT-025.T04 Foundry interface
-PT-025.T05 ArtifactStore interface
-PT-025.T06 Corpus interface
+PT-025.T05 Corpus interface - done 2026-06-21 interface plus local design corpus adapter
 ```
 
 ## Lane D - Agent/MCP
@@ -60,8 +59,8 @@ PT-027.T06 only then larger batch
 
 ## Current Next Up
 
-1. Implement PT-025.T05 Corpus Adapter interface.
-2. Implement PT-024.T05 corpus motifs skeleton.
-3. Implement PT-025.T02 Explorer Adapter interface.
-4. Add a fixture/local SourceResolver adapter before network providers.
+1. Implement PT-024.T04 semantic surface skeleton.
+2. Implement PT-024.T06 thesis acquisition skeleton.
+3. Implement PT-025.T02B read-only Explorer provider/cache adapter.
+4. Implement PT-025.T03 Slither Adapter interface.
 5. Keep SC01 logic as design phases, not as top-level tool sprawl.

@@ -168,3 +168,60 @@ Next:
 - Implement `PT-025.T05` Corpus Adapter interface.
 - Implement `PT-024.T05` corpus motifs skeleton.
 - Implement local fixture SourceResolver before network providers.
+
+## S-20260621-005 - Corpus motifs, Explorer interface and fixture source
+
+Goal:
+
+- Implement `PT-025.T05`, `PT-024.T05`, `PT-025.T02` and fixture/local
+  SourceResolver support for `PT-024.T03B`.
+
+What was done:
+
+- Added `FixtureSourceResolver` to
+  `src/vassago_contract_runtime/contracts/source_resolver.py`.
+- Added `src/vassago_contract_runtime/explorer/adapter.py` with
+  `ExplorerAdapter`, `ExplorerContractContext` and `NullExplorerAdapter`.
+- Added `src/vassago_contract_runtime/corpus/adapter.py` with
+  `CorpusAdapter`, `CorpusScanContext`, `CorpusScanResult`,
+  `DesignCorpusAdapter` and `NullCorpusAdapter`.
+- Added `src/vassago_contract_runtime/phases/corpus_motifs.py`.
+- Updated `src/vassago_contract_runtime/cli.py`:
+  - `run-design --source-fixture <json>`;
+  - `resume --source-fixture <json>`;
+  - `--bootstrap-adapters` now runs real local phases 00, 01 and 03.
+- Added `tests/fixtures/source_fixture.json`.
+- Updated `designs/sc01-access/design.yaml` so phase 01 declares
+  `protocol-fingerprint.json`.
+
+Decisions:
+
+- `FixtureSourceResolver` is filesystem-only and local. It does not call
+  Etherscan, Sourcify, RPC or any network provider.
+- Corpus motif hits are thesis routing hints only. They write
+  `candidate_only`/`no_matches`, never proof or reproduced evidence.
+- Explorer is only an interface in this slice. Real provider/cache/rate-limit
+  implementation is future `PT-025.T02B`.
+- Phase 02 remains dry-run in bootstrap mode; phase 03 can still use phase 01
+  ABI/source to create local corpus candidates.
+
+Validation:
+
+- `$env:PYTHONPATH='src'; python -m unittest tests.design_runtime.test_phases`
+  passed: 5 tests.
+- `$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check`
+  passed.
+
+Blockers:
+
+- No real Explorer provider/cache adapter yet.
+- No phase 02 semantic surface adapter yet.
+- No Slither adapter yet.
+- No thesis acquisition/source-truth/proof-piece adapters yet.
+
+Next:
+
+- Implement `PT-024.T04` semantic surface skeleton.
+- Implement `PT-024.T06` thesis acquisition skeleton.
+- Implement `PT-025.T02B` read-only Explorer provider/cache adapter.
+- Implement `PT-025.T03` Slither Adapter interface.

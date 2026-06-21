@@ -2,7 +2,7 @@
 
 ## G-001 - Contract-first campaign runtime
 
-Status: active; runtime foundation partially implemented.
+Status: active; runtime foundation and bootstrap adapters partially implemented.
 
 Build a resumable Design runtime around `ContractTarget(chain, address)`.
 
@@ -12,17 +12,19 @@ Acceptance:
 - each target has phase status. Done.
 - resume does not recompute completed phases. Done in unit tests.
 - all artifacts are indexed. Initial ArtifactStore done.
-- CLI can run/resume a design. Done for dry-run.
+- CLI can run/resume a design. Done for dry-run and bootstrap local phases
+  00/01/03.
 
 ## G-002 - SC01 Access Control v1 design
 
-Status: planned.
+Status: active.
 
 Implement the first Design: `sc01-access`.
 
 Acceptance:
 
 - it runs through all planned phases;
+- phases 00, 01 and 03 have local skeleton adapters;
 - it can stop safely when proof pieces are missing;
 - it can run compile-only harness when ready;
 - it can run Foundry local only when runtime gate is satisfied.
@@ -41,7 +43,7 @@ Acceptance:
 
 ## G-004 - Small top-level agent Interface
 
-Status: planned.
+Status: active.
 
 The top-level VASSAGO/Hermes agent should call campaign-level tools, not dozens
 of fine-grained builders.
@@ -61,4 +63,4 @@ Acceptance:
 
 - YAML records exist under `designs/sc01-access/corpus/`;
 - each record has motifs, negative signals, required evidence and runtime runner;
-- corpus matches are hypotheses only.
+- corpus matches are hypotheses only. Done for phase 03 skeleton.

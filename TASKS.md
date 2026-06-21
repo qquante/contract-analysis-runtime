@@ -7,14 +7,14 @@ here without reading the old Vassago conversation.
 
 Repository bootstrap complete.
 
-PT-023.T01-T05, PT-024.T01-T03 and PT-025.T01 are implemented and covered by unit tests.
+PT-023.T01-T05, PT-024.T01-T03, PT-024.T05, PT-025.T01, PT-025.T02 and PT-025.T05 are implemented and covered by unit tests.
 
 ## NEXT UP
 
-1. `PT-025.T05` - define Corpus Adapter interface.
-2. `PT-024.T05` - implement phase 03 corpus motifs skeleton.
-3. `PT-025.T02` - define Explorer Adapter interface.
-4. `PT-024.T03B` - add fixture/local SourceResolver adapter with ABI/source input.
+1. `PT-024.T04` - implement phase 02 semantic surface skeleton.
+2. `PT-024.T06` - implement phase 04 thesis acquisition skeleton.
+3. `PT-025.T02B` - implement read-only Explorer provider/cache adapter.
+4. `PT-025.T03` - define Slither Adapter interface.
 
 ---
 
@@ -249,7 +249,7 @@ Result:
 
 ## PT-024.T03 - Phase 01 Dossier
 
-Status: done, 2026-06-21, skeleton only.
+Status: done, 2026-06-21, skeleton with fixture source support.
 
 Purpose:
 
@@ -273,7 +273,8 @@ Result:
 
 - Added `src/vassago_contract_runtime/phases/dossier.py`.
 - Added `NullSourceResolver` skeleton through PT-025.T01.
-- Dossier status is `skeleton` until a provider/local fixture resolver exists.
+- Dossier status remains `skeleton`; with `--source-fixture` it indexes local
+  ABI/source, but still does not run Explorer, Slither or source-truth.
 - No network/RPC/Explorer/Slither/Foundry is used.
 
 ## PT-024.T04 - Phase 02 Semantic Surface
@@ -300,7 +301,7 @@ Rules:
 
 ## PT-024.T05 - Phase 03 Corpus Motifs
 
-Status: pending.
+Status: done, 2026-06-21, skeleton adapter.
 
 Purpose:
 
@@ -315,6 +316,15 @@ Rules:
 
 - corpus match is not evidence;
 - each match must list negative signals.
+
+Result:
+
+- Added `src/vassago_contract_runtime/phases/corpus_motifs.py`.
+- Reads phase 01 `function-index.json`, `source-manifest.json` and
+  `protocol-fingerprint.json`.
+- Writes `sc01-corpus-matches.json`.
+- Writes `sc01-thesis-candidates.json`.
+- Status is `candidate_only` or `no_matches`; no source-truth, RPC or Foundry.
 
 ## PT-024.T06 - Phase 04 Thesis Acquisition
 
@@ -485,11 +495,11 @@ Report must include:
 
 ## PT-025.T01 - SourceResolver Adapter
 
-Status: done, 2026-06-21, interface plus null adapter.
+Status: done, 2026-06-21, interface plus null and local fixture adapters.
 
 Interface:
 
-- `resolve_source(chain, address)`.
+- `resolve(target)`.
 
 Must support:
 
@@ -501,22 +511,25 @@ Result:
 
 - Added `src/vassago_contract_runtime/contracts/source_resolver.py`.
 - Added `src/vassago_contract_runtime/contracts/target.py`.
-- Implemented `SourceResolver` protocol, `SourceResolution` and `NullSourceResolver`.
-- Etherscan/Sourcify/local fixture adapters are still future work.
+- Implemented `SourceResolver` protocol, `SourceResolution`, `NullSourceResolver`
+  and `FixtureSourceResolver`.
+- Local fixture source input is supported through `--source-fixture`.
+- Etherscan/Sourcify provider adapters are still future work.
 
 ## PT-025.T02 - Explorer Adapter
 
-Status: pending.
+Status: done, 2026-06-21, interface plus null adapter.
 
 Interface:
 
-- `get_logs`;
-- `get_contract_creation`;
-- `get_token_holdings`;
-- `get_transactions`;
-- `get_proxy_context`.
+- `get_contract_context(target)`.
 
-Must include cache and rate limit.
+Result:
+
+- Added `src/vassago_contract_runtime/explorer/adapter.py`.
+- Implemented `ExplorerAdapter`, `ExplorerContractContext` and
+  `NullExplorerAdapter`.
+- Real Explorer provider, cache and rate limit are still future work.
 
 ## PT-025.T03 - Slither Adapter
 
@@ -543,14 +556,19 @@ Must enforce no broadcast.
 
 ## PT-025.T05 - Corpus Adapter
 
-Status: pending.
+Status: done, 2026-06-21, interface plus local design corpus adapter.
 
 Interface:
 
-- `search_corpus(query, family)`;
-- `load_record(record_id)`.
+- `scan(context)`.
 
----
+Result:
+
+- Added `src/vassago_contract_runtime/corpus/adapter.py`.
+- Implemented `CorpusAdapter`, `CorpusScanContext`, `CorpusScanResult`,
+  `NullCorpusAdapter` and `DesignCorpusAdapter`.
+- Reads local `designs/<design>/corpus/*.yaml`.
+- Produces candidate-only routing hints, never evidence.
 
 # PT-026 - Agent And MCP
 
@@ -638,8 +656,11 @@ Only after PT-027.T03.
 
 # RESUME FROM HERE
 
-Start with `PT-023.T01`.
+Start with `PT-024.T04` semantic surface skeleton or `PT-025.T02B` real
+Explorer provider planning.
 
-Do not port old Vassago modules yet. Build the runtime skeleton first with fake
-adapters and fixtures. Once the runner, manifest, resume and artifact index are
-tested, adapt the old SC01 campaign into `designs/sc01-access` phase by phase.
+Current bootstrap runs real local phases 00, 01 and 03 when
+`--bootstrap-adapters` is used. Phase 02 and 04+ remain dry-run. Next concrete
+work is to add semantic surface as a real static adapter, then thesis
+acquisition/source-truth. Keep providers behind interfaces and keep evidence
+statuses separated.

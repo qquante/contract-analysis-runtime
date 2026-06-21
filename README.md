@@ -72,7 +72,10 @@ python -m vassago_contract_runtime.cli check
 python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets.json --output runs/sc01-smoke --dry-run
 python -m vassago_contract_runtime.cli resume --run runs/sc01-smoke --dry-run
 python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets.json --output runs/sc01-bootstrap --bootstrap-adapters
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets.json --source-fixture tests/fixtures/source_fixture.json --output runs/sc01-fixture-bootstrap --bootstrap-adapters
 ```
 
-Bootstrap execution exists for phase 00 intake and phase 01 dossier skeleton.
-The remaining phases are dry-run until their adapters are implemented.
+Bootstrap execution exists for phase 00 intake, phase 01 dossier skeleton and
+phase 03 corpus motifs. With `--source-fixture`, phase 01 indexes local
+ABI/source and phase 03 can produce `candidate_only` corpus thesis candidates.
+Phase 02 and phase 04+ remain dry-run until their adapters are implemented.
