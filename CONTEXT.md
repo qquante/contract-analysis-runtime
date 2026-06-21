@@ -95,8 +95,8 @@ deep Interfaces:
 
 - SourceResolver Adapter. Interface done; null and local fixture resolver done.
 - Explorer Adapter. Interface plus Etherscan V2 read-only cache adapter done.
-- Slither Adapter. Interface plus null adapter done.
-- Foundry Adapter;
+- Slither Adapter. Interface plus null and subprocess adapter done.
+- Foundry Adapter. Interface plus null adapter done.
 - ArtifactStore Adapter;
 - Corpus Adapter. Interface and local design corpus adapter done.
 
@@ -110,7 +110,11 @@ As of 2026-06-21:
 - phase 02 semantic surface is a real local skeleton adapter;
 - phase 03 corpus motifs is a real local skeleton adapter;
 - phase 04 thesis acquisition is a real local skeleton adapter;
-- phase 05+ are still dry-run in bootstrap mode;
+- phase 05 source truth is a real local skeleton adapter;
+- phase 06 on-chain state is a real local skeleton adapter;
+- phase 07+ are still dry-run in bootstrap mode;
 - Etherscan V2 provider exists behind the Explorer interface but is not called
   by default;
-- no RPC, Slither execution, Foundry or broadcast path is wired.
+- Slither subprocess adapter exists but is not called by bootstrap mode;
+- Foundry interface exists but no real `forge` subprocess is wired;
+- no RPC or broadcast path is wired.

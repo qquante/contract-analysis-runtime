@@ -76,8 +76,10 @@ python -m vassago_contract_runtime.cli run-design --design sc01-access --targets
 ```
 
 Bootstrap execution exists for phase 00 intake, phase 01 dossier skeleton,
-phase 02 semantic surface, phase 03 corpus motifs and phase 04 thesis
-acquisition. With `--source-fixture`, phase 01 indexes local ABI/source, phase
-02 writes static semantic sidecars, phase 03 produces `candidate_only` corpus
-thesis candidates, and phase 04 queues them for source truth. Phase 05+ remains
-dry-run until those adapters are implemented.
+phase 02 semantic surface, phase 03 corpus motifs, phase 04 thesis acquisition,
+phase 05 source truth skeleton and phase 06 on-chain state skeleton. With
+`--source-fixture`, phase 01 indexes local ABI/source, phase 02 writes static
+semantic sidecars, phase 03 produces `candidate_only` corpus thesis candidates,
+phase 04 queues them for source truth, phase 05 blocks until stronger source
+truth exists, and phase 06 writes provider-required state sidecars. Phase 07+
+remains dry-run until those adapters are implemented.

@@ -292,3 +292,56 @@ Next:
 - Implement `PT-024.T08` on-chain state skeleton.
 - Implement `PT-025.T04` Foundry Adapter interface.
 - Implement `PT-025.T03B` real Slither subprocess/Python API adapter.
+
+## S-20260621-007 - Source truth, on-chain state, Foundry interface and Slither subprocess
+
+Goal:
+
+- Implement `PT-024.T07`, `PT-024.T08`, `PT-025.T04` and `PT-025.T03B`.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/phases/source_truth.py`.
+- Added `src/vassago_contract_runtime/phases/onchain_state.py`.
+- Added `src/vassago_contract_runtime/foundry/adapter.py`.
+- Extended `src/vassago_contract_runtime/slither/adapter.py` with
+  `SubprocessSlitherAdapter`.
+- Updated `src/vassago_contract_runtime/cli.py` so `--bootstrap-adapters`
+  runs real local phases 00 through 06.
+- Updated `tests/design_runtime/test_phases.py`.
+- Updated `tests/design_runtime/test_provider_adapters.py`.
+
+Decisions:
+
+- Source truth skeleton writes `source_truth_verified=false` for every queued
+  candidate. It is a blocking review sidecar, not a proof engine.
+- On-chain state skeleton writes `needs_provider` sidecars and makes no RPC
+  calls in bootstrap mode.
+- Foundry now has an interface/null adapter only. Real `forge` execution remains
+  future work.
+- Slither subprocess adapter is real but opt-in. Bootstrap mode does not call
+  Slither automatically.
+- Slither subprocess uses the documented CLI JSON path:
+  `slither <source> --json <file>`.
+
+Validation:
+
+- `$env:PYTHONPATH='src'; python -m unittest tests.design_runtime.test_phases tests.design_runtime.test_provider_adapters`
+  passed: 12 tests.
+- `$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check`
+  passed.
+
+Blockers:
+
+- Phase 07 proof pieces does not exist yet.
+- Phase 08 compile-only skeleton does not exist yet.
+- Phase 10 final report skeleton does not exist yet.
+- Real Foundry subprocess adapter is still pending.
+- Real RPC state reader is still pending.
+
+Next:
+
+- Implement `PT-024.T09` proof pieces skeleton.
+- Implement `PT-024.T10` compile-only skeleton.
+- Implement `PT-024.T12` final report skeleton.
+- Implement `PT-025.T04B` real Foundry subprocess adapter.

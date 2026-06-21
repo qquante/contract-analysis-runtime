@@ -24,7 +24,7 @@ Implement the first Design: `sc01-access`.
 Acceptance:
 
 - it runs through all planned phases;
-- phases 00, 01, 02, 03 and 04 have local skeleton adapters;
+- phases 00 through 06 have local skeleton adapters;
 - it can stop safely when proof pieces are missing;
 - it can run compile-only harness when ready;
 - it can run Foundry local only when runtime gate is satisfied.

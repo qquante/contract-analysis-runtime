@@ -15,7 +15,9 @@ from vassago_contract_runtime.design_runtime.runner import run_design
 from vassago_contract_runtime.phases.corpus_motifs import CorpusMotifsAdapter
 from vassago_contract_runtime.phases.dossier import DossierAdapter
 from vassago_contract_runtime.phases.intake import IntakeAdapter
+from vassago_contract_runtime.phases.onchain_state import OnChainStateAdapter
 from vassago_contract_runtime.phases.semantic_surface import SemanticSurfaceAdapter
+from vassago_contract_runtime.phases.source_truth import SourceTruthAdapter
 from vassago_contract_runtime.phases.thesis_acquisition import ThesisAcquisitionAdapter
 
 
@@ -68,6 +70,8 @@ class BootstrapPhaseTests(unittest.TestCase):
                 "02_semantic_surface": SemanticSurfaceAdapter(),
                 "03_corpus_motifs": CorpusMotifsAdapter.from_design_dir("designs/sc01-access"),
                 "04_thesis_acquisition": ThesisAcquisitionAdapter(),
+                "05_source_truth": SourceTruthAdapter(),
+                "06_onchain_state": OnChainStateAdapter(),
             }
 
             result = run_design(design, [target], Path(tmp) / "run", adapters, RunOptions(resume=True))
@@ -78,11 +82,15 @@ class BootstrapPhaseTests(unittest.TestCase):
             surface = json.loads((target_dir / "02_semantic_surface" / "access-surface.json").read_text())
             candidates = json.loads((target_dir / "03_corpus_motifs" / "sc01-thesis-candidates.json").read_text())
             queue = json.loads((target_dir / "04_thesis_acquisition" / "sc01-thesis-queue.json").read_text())
+            source_truth = json.loads((target_dir / "05_source_truth" / "sc01-source-truth.json").read_text())
+            admin_state = json.loads((target_dir / "06_onchain_state" / "admin-state.json").read_text())
             self.assertEqual(function_index["function_count"], 2)
             self.assertEqual(surface["status"], "completed")
             self.assertGreaterEqual(candidates["candidate_count"], 1)
             self.assertIn("uups_weak_auth", {item["thesis_id"] for item in candidates["candidates"]})
             self.assertGreaterEqual(queue["queue_count"], 1)
+            self.assertEqual(source_truth["source_truth_verified_count"], 0)
+            self.assertEqual(admin_state["status"], "needs_provider")
 
     def test_cli_bootstrap_adapters_run_bootstrap_phases_and_dry_run_rest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -117,12 +125,16 @@ class BootstrapPhaseTests(unittest.TestCase):
                 (run_dir / "targets" / target_id / "phases" / "04_thesis_acquisition" / "sc01-thesis-queue.json").read_text()
             )
             dry_later = json.loads(
+                (run_dir / "targets" / target_id / "phases" / "07_proof_pieces" / "sc01-runtime-ready.json").read_text()
+            )
+            source_truth = json.loads(
                 (run_dir / "targets" / target_id / "phases" / "05_source_truth" / "sc01-source-truth.json").read_text()
             )
             self.assertEqual(dossier["status"], "skeleton")
             self.assertGreaterEqual(corpus["candidate_count"], 1)
             self.assertEqual(later["status"], "completed")
             self.assertGreaterEqual(queue["queue_count"], 1)
+            self.assertEqual(source_truth["status"], "blocked")
             self.assertEqual(dry_later["status"], "dry_run")
 
 

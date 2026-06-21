@@ -59,5 +59,15 @@ Phase `04_thesis_acquisition`:
 - `sc01-thesis-queue.json`
 - `sc01-acquisition-report.json`
 
+Phase `05_source_truth`:
+
+- `sc01-source-truth.json`
+
+Phase `06_onchain_state`:
+
+- `admin-state.json`
+- `proxy-state.json`
+- `role-state.json`
+
 `sc01-thesis-candidates.json` is candidate-only routing context. It is never
 runtime evidence and cannot enable Foundry by itself.

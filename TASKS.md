@@ -7,14 +7,14 @@ here without reading the old Vassago conversation.
 
 Repository bootstrap complete.
 
-PT-023.T01-T05, PT-024.T01-T06, PT-025.T01-T03 and PT-025.T05 are implemented and covered by unit tests.
+PT-023.T01-T05, PT-024.T01-T08, PT-025.T01-T05 and PT-025.T03B are implemented and covered by unit tests.
 
 ## NEXT UP
 
-1. `PT-024.T07` - implement phase 05 source truth skeleton.
-2. `PT-024.T08` - implement phase 06 on-chain state skeleton.
-3. `PT-025.T03B` - implement real Slither subprocess adapter.
-4. `PT-025.T04` - define Foundry Adapter interface.
+1. `PT-024.T09` - implement phase 07 proof pieces skeleton.
+2. `PT-024.T10` - implement phase 08 compile-only skeleton.
+3. `PT-024.T12` - implement phase 10 final report skeleton.
+4. `PT-025.T04B` - implement real Foundry subprocess adapter.
 
 ---
 
@@ -367,7 +367,7 @@ Result:
 
 ## PT-024.T07 - Phase 05 Source Truth
 
-Status: pending.
+Status: done, 2026-06-21, skeleton adapter.
 
 Purpose:
 
@@ -385,6 +385,13 @@ Outputs:
 
 - `sc01-source-truth.json`.
 
+Result:
+
+- Added `src/vassago_contract_runtime/phases/source_truth.py`.
+- Reads thesis queue, access surface, guard map and state-write map.
+- Writes source-truth review records with `source_truth_verified=false`.
+- Keeps status `blocked`; no runtime gate is opened.
+
 Statuses:
 
 - `source_truth_verified`;
@@ -393,7 +400,7 @@ Statuses:
 
 ## PT-024.T08 - Phase 06 On-Chain State
 
-Status: pending.
+Status: done, 2026-06-21, skeleton adapter.
 
 Purpose:
 
@@ -414,6 +421,12 @@ Rules:
 - chunk logs;
 - redact RPC URLs;
 - persist block window.
+
+Result:
+
+- Added `src/vassago_contract_runtime/phases/onchain_state.py`.
+- Writes `admin-state.json`, `proxy-state.json` and `role-state.json`.
+- Bootstrap mode does not call RPC; status stays `needs_provider`.
 
 ## PT-024.T09 - Phase 07 Proof Pieces
 
@@ -552,7 +565,7 @@ Result:
 
 ## PT-025.T03 - Slither Adapter
 
-Status: done, 2026-06-21, interface plus null adapter.
+Status: done, 2026-06-21, interface plus null and subprocess adapter.
 
 Interface:
 
@@ -563,11 +576,12 @@ Result:
 - Added `src/vassago_contract_runtime/slither/adapter.py`.
 - Implemented `SlitherAdapter`, `SlitherInput`, `SlitherAnalysisResult` and
   `NullSlitherAdapter`.
-- Real subprocess/Python API integration is future `PT-025.T03B`.
+- Implemented `SubprocessSlitherAdapter` using `slither <source> --json <file>`.
+- Python API integration is still future work.
 
 ## PT-025.T04 - Foundry Adapter
 
-Status: pending.
+Status: done, 2026-06-21, interface plus null adapter.
 
 Interface:
 
@@ -575,6 +589,13 @@ Interface:
 - `run_local_fork`.
 
 Must enforce no broadcast.
+
+Result:
+
+- Added `src/vassago_contract_runtime/foundry/adapter.py`.
+- Implemented `FoundryAdapter`, `FoundryHarnessInput`,
+  `FoundryRunResult` and `NullFoundryAdapter`.
+- Real `forge` subprocess execution is future `PT-025.T04B`.
 
 ## PT-025.T05 - Corpus Adapter
 
@@ -678,10 +699,9 @@ Only after PT-027.T03.
 
 # RESUME FROM HERE
 
-Start with `PT-024.T07` source truth skeleton or `PT-024.T08` on-chain state
-skeleton.
+Start with `PT-024.T09` proof pieces skeleton.
 
-Current bootstrap runs real local phases 00, 01, 02, 03 and 04 when
-`--bootstrap-adapters` is used. Phase 05+ remains dry-run. Next concrete work
-is to add source-truth and on-chain state skeletons, then proof-piece gates.
-Keep providers behind interfaces and keep evidence statuses separated.
+Current bootstrap runs real local phases 00 through 06 when
+`--bootstrap-adapters` is used. Phase 07+ remains dry-run. Next concrete work
+is proof-piece state, compile-only skeleton and final report skeleton. Keep
+providers behind interfaces and keep evidence statuses separated.

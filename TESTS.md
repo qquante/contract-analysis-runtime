@@ -17,7 +17,7 @@ Status labels:
 
 | Area | Command | Expected |
 | --- | --- | --- |
-| Unit | `python -m unittest discover -s tests` | all pass; current: 30 expected after semantic/acquisition/provider slice |
+| Unit | `python -m unittest discover -s tests` | all pass; current: 33 expected after source-truth/state/tooling slice |
 | Check | `python -m vassago_contract_runtime.cli check` | passes; validates SC01 design and safety checks |
 | Design dry run | `python -m vassago_contract_runtime.cli run-design --dry-run ...` | passes; manifests + dry-run artifacts |
 | Resume | `python -m vassago_contract_runtime.cli resume --run ... --dry-run` | passes; skips completed phases |
@@ -50,7 +50,7 @@ python -m unittest discover -s tests
 Result:
 
 ```text
-Ran 30 tests
+Ran 33 tests
 OK
 ```
 
@@ -84,6 +84,10 @@ Coverage added:
 - phase 04 thesis acquisition skeleton.
 - Etherscan V2 Explorer read-only adapter with fake transport/cache test.
 - Slither adapter interface and NullSlitherAdapter.
+- phase 05 source truth skeleton.
+- phase 06 on-chain state skeleton.
+- Foundry adapter interface and NullFoundryAdapter.
+- SubprocessSlitherAdapter with fake-runner JSON parsing.
 
 Smoke:
 
@@ -104,7 +108,10 @@ CandidateStatus=candidate_only
 CandidateCount=2
 QueueStatus=candidate_only
 QueueCount=2
-DryRunFromPhase05=dry_run
+SourceTruthStatus=blocked
+SourceTruthVerifiedCount=0
+AdminStateStatus=needs_provider
+DryRunFromPhase07=dry_run
 ThesisIds=uninitialized_implementation_proxy,uups_weak_auth
 ```
 

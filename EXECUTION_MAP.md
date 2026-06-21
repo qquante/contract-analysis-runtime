@@ -19,8 +19,8 @@ PT-024.T03 phase 01 dossier - done 2026-06-21 skeleton with fixture source suppo
 PT-024.T04 phase 02 semantic surface - done 2026-06-21 skeleton
 PT-024.T05 phase 03 corpus motifs - done 2026-06-21 skeleton
 PT-024.T06 phase 04 thesis acquisition - done 2026-06-21 skeleton
-PT-024.T07 phase 05 source truth
-PT-024.T08 phase 06 on-chain state
+PT-024.T07 phase 05 source truth - done 2026-06-21 skeleton
+PT-024.T08 phase 06 on-chain state - done 2026-06-21 skeleton
 PT-024.T09 phase 07 proof pieces
 PT-024.T10 phase 08 compile-only
 PT-024.T11 phase 09 runtime Foundry local
@@ -32,8 +32,8 @@ PT-024.T12 phase 10 final report
 ```text
 PT-025.T01 SourceResolver interface - done 2026-06-21 interface plus null and fixture adapters
 PT-025.T02 Explorer interface - done 2026-06-21 interface plus Etherscan V2 cache adapter
-PT-025.T03 Slither interface - done 2026-06-21 interface plus null adapter
-PT-025.T04 Foundry interface
+PT-025.T03 Slither interface - done 2026-06-21 interface plus subprocess adapter
+PT-025.T04 Foundry interface - done 2026-06-21 interface plus null adapter
 PT-025.T05 Corpus interface - done 2026-06-21 interface plus local design corpus adapter
 ```
 
@@ -59,8 +59,8 @@ PT-027.T06 only then larger batch
 
 ## Current Next Up
 
-1. Implement PT-024.T07 source truth skeleton.
-2. Implement PT-024.T08 on-chain state skeleton.
-3. Implement PT-025.T04 Foundry Adapter interface.
-4. Implement PT-025.T03B real Slither subprocess/Python API adapter.
+1. Implement PT-024.T09 proof pieces skeleton.
+2. Implement PT-024.T10 compile-only skeleton.
+3. Implement PT-024.T12 final report skeleton.
+4. Implement PT-025.T04B real Foundry subprocess adapter.
 5. Keep SC01 logic as design phases, not as top-level tool sprawl.

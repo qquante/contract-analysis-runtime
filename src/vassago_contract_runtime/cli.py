@@ -18,7 +18,9 @@ from .contracts import FixtureSourceResolver
 from .phases.corpus_motifs import CorpusMotifsAdapter
 from .phases.dossier import DossierAdapter
 from .phases.intake import IntakeAdapter
+from .phases.onchain_state import OnChainStateAdapter
 from .phases.semantic_surface import SemanticSurfaceAdapter
+from .phases.source_truth import SourceTruthAdapter
 from .phases.thesis_acquisition import ThesisAcquisitionAdapter
 from .quality import run_checks
 
@@ -159,6 +161,8 @@ def _adapters_for(
         adapters["02_semantic_surface"] = SemanticSurfaceAdapter()
         adapters["03_corpus_motifs"] = CorpusMotifsAdapter.from_design_dir(str(design_dir or Path("designs") / design.design_id))
         adapters["04_thesis_acquisition"] = ThesisAcquisitionAdapter()
+        adapters["05_source_truth"] = SourceTruthAdapter()
+        adapters["06_onchain_state"] = OnChainStateAdapter()
     return adapters
 
 
