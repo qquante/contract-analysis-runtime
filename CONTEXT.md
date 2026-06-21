@@ -112,9 +112,15 @@ As of 2026-06-21:
 - phase 04 thesis acquisition is a real local skeleton adapter;
 - phase 05 source truth is a real local skeleton adapter;
 - phase 06 on-chain state is a real local skeleton adapter;
-- phase 07+ are still dry-run in bootstrap mode;
+- phase 07 proof pieces is a real local skeleton adapter;
+- phase 08 compile-only is a real local skeleton adapter;
+- phase 09 runtime Foundry remains dry-run in bootstrap mode;
+- phase 10 final report is a real local skeleton adapter;
 - Etherscan V2 provider exists behind the Explorer interface but is not called
   by default;
 - Slither subprocess adapter exists but is not called by bootstrap mode;
-- Foundry interface exists but no real `forge` subprocess is wired;
+- Foundry interface exists with null and subprocess adapters;
+- `SubprocessFoundryAdapter.compile_harness()` can run local `forge build`;
+- `SubprocessFoundryAdapter.run_local_fork()` is gated by explicit
+  `runtime_ready=true` and `runtime_authorized=true`;
 - no RPC or broadcast path is wired.

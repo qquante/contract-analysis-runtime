@@ -2,7 +2,7 @@
 
 ## G-001 - Contract-first campaign runtime
 
-Status: active; runtime foundation and bootstrap adapters partially implemented.
+Status: active; runtime foundation and bootstrap adapters implemented through phase 08 plus final report.
 
 Build a resumable Design runtime around `ContractTarget(chain, address)`.
 
@@ -24,9 +24,9 @@ Implement the first Design: `sc01-access`.
 Acceptance:
 
 - it runs through all planned phases;
-- phases 00 through 06 have local skeleton adapters;
+- phases 00 through 08 and 10 have local skeleton adapters;
 - it can stop safely when proof pieces are missing;
-- it can run compile-only harness when ready;
+- it can run compile-only harness when ready through a Foundry adapter;
 - it can run Foundry local only when runtime gate is satisfied.
 
 ## G-003 - Evidence integrity

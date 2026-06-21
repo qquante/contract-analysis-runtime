@@ -50,7 +50,7 @@ python -m unittest discover -s tests
 Result:
 
 ```text
-Ran 33 tests
+Ran 36 tests
 OK
 ```
 
@@ -88,6 +88,10 @@ Coverage added:
 - phase 06 on-chain state skeleton.
 - Foundry adapter interface and NullFoundryAdapter.
 - SubprocessSlitherAdapter with fake-runner JSON parsing.
+- phase 07 proof pieces skeleton.
+- phase 08 compile-only skeleton.
+- phase 10 final report skeleton.
+- SubprocessFoundryAdapter compile and runtime gate tests with fake runner.
 
 Smoke:
 
@@ -100,18 +104,20 @@ Result:
 
 ```text
 RunStatus=completed
+FailedCount=0
 SourceStatus=resolved
 FunctionCount=2
 SurfaceStatus=completed
-SurfaceFunctionCount=2
-CandidateStatus=candidate_only
 CandidateCount=2
-QueueStatus=candidate_only
 QueueCount=2
 SourceTruthStatus=blocked
 SourceTruthVerifiedCount=0
 AdminStateStatus=needs_provider
-DryRunFromPhase07=dry_run
+RuntimeReadyCount=0
+FoundryAllowed=false
+CompileStatus=compile_skipped_not_ready
+FoundryCalled=false
+FinalStatus=blocked_no_runtime_ready
 ThesisIds=uninitialized_implementation_proxy,uups_weak_auth
 ```
 

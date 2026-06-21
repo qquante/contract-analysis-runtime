@@ -69,5 +69,21 @@ Phase `06_onchain_state`:
 - `proxy-state.json`
 - `role-state.json`
 
+Phase `07_proof_pieces`:
+
+- `sc01-proof-piece-state.json`
+- `sc01-exploit-hypotheses.json`
+- `sc01-runtime-ready.json`
+
+Phase `08_compile_only`:
+
+- `VassagoSC01Harness.t.sol`
+- `compile-result.json`
+
+Phase `10_final_report`:
+
+- `sc01-final-report.json`
+- `sc01-final-report.md`
+
 `sc01-thesis-candidates.json` is candidate-only routing context. It is never
 runtime evidence and cannot enable Foundry by itself.

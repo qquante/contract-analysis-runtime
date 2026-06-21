@@ -9,13 +9,17 @@ from io import StringIO
 
 from vassago_contract_runtime.cli import main
 from vassago_contract_runtime.contracts import ContractTargetRef, FixtureSourceResolver, NullSourceResolver
+from vassago_contract_runtime.design_runtime.adapters import DryRunPhaseAdapter
 from vassago_contract_runtime.design_runtime.design_loader import load_design
 from vassago_contract_runtime.design_runtime.models import ContractTarget, RunOptions
 from vassago_contract_runtime.design_runtime.runner import run_design
 from vassago_contract_runtime.phases.corpus_motifs import CorpusMotifsAdapter
+from vassago_contract_runtime.phases.compile_only import CompileOnlyAdapter
 from vassago_contract_runtime.phases.dossier import DossierAdapter
+from vassago_contract_runtime.phases.final_report import FinalReportAdapter
 from vassago_contract_runtime.phases.intake import IntakeAdapter
 from vassago_contract_runtime.phases.onchain_state import OnChainStateAdapter
+from vassago_contract_runtime.phases.proof_pieces import ProofPiecesAdapter
 from vassago_contract_runtime.phases.semantic_surface import SemanticSurfaceAdapter
 from vassago_contract_runtime.phases.source_truth import SourceTruthAdapter
 from vassago_contract_runtime.phases.thesis_acquisition import ThesisAcquisitionAdapter
@@ -72,11 +76,15 @@ class BootstrapPhaseTests(unittest.TestCase):
                 "04_thesis_acquisition": ThesisAcquisitionAdapter(),
                 "05_source_truth": SourceTruthAdapter(),
                 "06_onchain_state": OnChainStateAdapter(),
+                "07_proof_pieces": ProofPiecesAdapter(),
+                "08_compile_only": CompileOnlyAdapter(),
+                "09_runtime_foundry": DryRunPhaseAdapter(),
+                "10_final_report": FinalReportAdapter(),
             }
 
             result = run_design(design, [target], Path(tmp) / "run", adapters, RunOptions(resume=True))
 
-            self.assertEqual(result.status, "stopped")
+            self.assertEqual(result.status, "completed")
             target_dir = Path(tmp) / "run" / "targets" / target.target_id / "phases"
             function_index = json.loads((target_dir / "01_dossier" / "function-index.json").read_text())
             surface = json.loads((target_dir / "02_semantic_surface" / "access-surface.json").read_text())
@@ -84,6 +92,9 @@ class BootstrapPhaseTests(unittest.TestCase):
             queue = json.loads((target_dir / "04_thesis_acquisition" / "sc01-thesis-queue.json").read_text())
             source_truth = json.loads((target_dir / "05_source_truth" / "sc01-source-truth.json").read_text())
             admin_state = json.loads((target_dir / "06_onchain_state" / "admin-state.json").read_text())
+            runtime_ready = json.loads((target_dir / "07_proof_pieces" / "sc01-runtime-ready.json").read_text())
+            compile_result = json.loads((target_dir / "08_compile_only" / "compile-result.json").read_text())
+            final_report = json.loads((target_dir / "10_final_report" / "sc01-final-report.json").read_text())
             self.assertEqual(function_index["function_count"], 2)
             self.assertEqual(surface["status"], "completed")
             self.assertGreaterEqual(candidates["candidate_count"], 1)
@@ -91,6 +102,10 @@ class BootstrapPhaseTests(unittest.TestCase):
             self.assertGreaterEqual(queue["queue_count"], 1)
             self.assertEqual(source_truth["source_truth_verified_count"], 0)
             self.assertEqual(admin_state["status"], "needs_provider")
+            self.assertEqual(runtime_ready["runtime_ready_count"], 0)
+            self.assertEqual(runtime_ready["foundry_allowed"], False)
+            self.assertEqual(compile_result["status"], "compile_skipped_not_ready")
+            self.assertEqual(final_report["final_status"], "blocked_no_runtime_ready")
 
     def test_cli_bootstrap_adapters_run_bootstrap_phases_and_dry_run_rest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -124,8 +139,14 @@ class BootstrapPhaseTests(unittest.TestCase):
             queue = json.loads(
                 (run_dir / "targets" / target_id / "phases" / "04_thesis_acquisition" / "sc01-thesis-queue.json").read_text()
             )
-            dry_later = json.loads(
+            runtime_ready = json.loads(
                 (run_dir / "targets" / target_id / "phases" / "07_proof_pieces" / "sc01-runtime-ready.json").read_text()
+            )
+            compile_result = json.loads(
+                (run_dir / "targets" / target_id / "phases" / "08_compile_only" / "compile-result.json").read_text()
+            )
+            final_report = json.loads(
+                (run_dir / "targets" / target_id / "phases" / "10_final_report" / "sc01-final-report.json").read_text()
             )
             source_truth = json.loads(
                 (run_dir / "targets" / target_id / "phases" / "05_source_truth" / "sc01-source-truth.json").read_text()
@@ -135,7 +156,10 @@ class BootstrapPhaseTests(unittest.TestCase):
             self.assertEqual(later["status"], "completed")
             self.assertGreaterEqual(queue["queue_count"], 1)
             self.assertEqual(source_truth["status"], "blocked")
-            self.assertEqual(dry_later["status"], "dry_run")
+            self.assertEqual(runtime_ready["status"], "blocked")
+            self.assertEqual(runtime_ready["runtime_ready_count"], 0)
+            self.assertEqual(compile_result["status"], "compile_skipped_not_ready")
+            self.assertEqual(final_report["final_status"], "blocked_no_runtime_ready")
 
 
 if __name__ == "__main__":

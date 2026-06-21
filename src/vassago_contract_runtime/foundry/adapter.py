@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
+import subprocess
+import tempfile
 from typing import Any, Protocol
 
 
@@ -81,3 +84,157 @@ class NullFoundryAdapter:
             },
             error={"code": "foundry_runtime_not_configured", "message": "No Foundry runtime adapter is configured."},
         )
+
+
+class SubprocessFoundryAdapter:
+    """Run Foundry locally through `forge`.
+
+    `compile_harness` uses `forge build` and never runs tests.
+    `run_local_fork` uses `forge test`, but only when the caller passes an
+    explicit runtime-ready authorization in metadata.
+    """
+
+    def __init__(self, executable: str = "forge", *, timeout_seconds: int = 180, runner: Any | None = None) -> None:
+        self.executable = executable
+        self.timeout_seconds = timeout_seconds
+        self.runner = runner or _run_subprocess
+
+    def compile_harness(self, item: FoundryHarnessInput) -> FoundryRunResult:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            _write_workspace(workspace, item)
+            command = [self.executable, "build"]
+            return _run_foundry(
+                item,
+                provider="foundry_subprocess",
+                command=command,
+                workspace=workspace,
+                runner=self.runner,
+                timeout_seconds=self.timeout_seconds,
+                success_status="compile_only_passed",
+                failure_status="compile_failed",
+            )
+
+    def run_local_fork(self, item: FoundryHarnessInput) -> FoundryRunResult:
+        if item.metadata.get("runtime_ready") is not True or item.metadata.get("runtime_authorized") is not True:
+            return FoundryRunResult(
+                status="blocked",
+                provider="foundry_subprocess",
+                target_id=item.target_id,
+                metadata={
+                    "evidence_status": "static_only",
+                    "runtime_ready": bool(item.metadata.get("runtime_ready")),
+                    "runtime_authorized": bool(item.metadata.get("runtime_authorized")),
+                    "note": "Runtime Foundry requires explicit runtime_ready and runtime_authorized metadata.",
+                },
+                error={"code": "foundry_runtime_gate_not_satisfied", "message": "Runtime gate is not satisfied."},
+            )
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            _write_workspace(workspace, item)
+            command = [self.executable, "test", "--match-contract", item.harness_name]
+            fork_url = item.fork.get("rpc_url")
+            fork_block = item.fork.get("block_number")
+            if fork_url:
+                command.extend(["--fork-url", str(fork_url)])
+            if fork_block:
+                command.extend(["--fork-block-number", str(fork_block)])
+            return _run_foundry(
+                item,
+                provider="foundry_subprocess",
+                command=command,
+                workspace=workspace,
+                runner=self.runner,
+                timeout_seconds=self.timeout_seconds,
+                success_status="runtime_completed",
+                failure_status="runtime_failed",
+            )
+
+
+def _run_subprocess(command: list[str], cwd: Path, timeout_seconds: int) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        command,
+        cwd=cwd,
+        timeout=timeout_seconds,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+
+def _run_foundry(
+    item: FoundryHarnessInput,
+    *,
+    provider: str,
+    command: list[str],
+    workspace: Path,
+    runner: Any,
+    timeout_seconds: int,
+    success_status: str,
+    failure_status: str,
+) -> FoundryRunResult:
+    try:
+        completed = runner(command, workspace, timeout_seconds)
+    except FileNotFoundError:
+        return FoundryRunResult(
+            status="unavailable",
+            provider=provider,
+            target_id=item.target_id,
+            command=command,
+            error={"code": "forge_executable_not_found", "message": f"Executable not found: {command[0]}"},
+        )
+    except subprocess.TimeoutExpired:
+        return FoundryRunResult(
+            status=failure_status,
+            provider=provider,
+            target_id=item.target_id,
+            command=command,
+            error={"code": "forge_timeout", "message": f"Timed out after {timeout_seconds}s."},
+        )
+    status = success_status if completed.returncode == 0 else failure_status
+    return FoundryRunResult(
+        status=status,
+        provider=provider,
+        target_id=item.target_id,
+        command=command,
+        stdout=completed.stdout if isinstance(completed.stdout, str) else "",
+        stderr=completed.stderr if isinstance(completed.stderr, str) else "",
+        metadata={
+            "evidence_status": "compile_only" if success_status == "compile_only_passed" else "runtime_local",
+            "returncode": completed.returncode,
+            "workspace_ephemeral": True,
+            "no_broadcast_command": "--broadcast" not in command,
+        },
+        error=None if completed.returncode == 0 else {"code": "forge_failed", "message": completed.stderr},
+    )
+
+
+def _write_workspace(workspace: Path, item: FoundryHarnessInput) -> None:
+    (workspace / "src").mkdir(parents=True, exist_ok=True)
+    (workspace / "test").mkdir(parents=True, exist_ok=True)
+    (workspace / "foundry.toml").write_text(item.foundry_toml or _default_foundry_toml(), encoding="utf-8")
+    for name, content in item.source_files.items():
+        _write_local_file(workspace / "src", name, content)
+    for name, content in item.test_files.items():
+        _write_local_file(workspace / "test", name, content)
+
+
+def _write_local_file(root: Path, name: str, content: str) -> None:
+    parts = [part for part in Path(name).parts if part not in {"", ".", ".."}]
+    path = root / (Path(*parts) if parts else Path("Contract.sol"))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def _default_foundry_toml() -> str:
+    return "\n".join(
+        [
+            "[profile.default]",
+            'src = "src"',
+            'test = "test"',
+            'out = "out"',
+            'libs = ["lib"]',
+            "auto_detect_solc = true",
+            "",
+        ]
+    )

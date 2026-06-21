@@ -697,11 +697,75 @@ Only after PT-027.T03.
 
 ---
 
+---
+
+# PT-024.T09 - Proof pieces skeleton
+
+Status: done 2026-06-21.
+
+Implemented:
+
+- `src/vassago_contract_runtime/phases/proof_pieces.py`;
+- `sc01-proof-piece-state.json`;
+- `sc01-exploit-hypotheses.json`;
+- `sc01-runtime-ready.json`.
+
+Current behavior:
+
+- consolidates source-truth and on-chain state blockers;
+- sets `foundry_allowed=false` when proof pieces are incomplete;
+- never calls Foundry and never promotes evidence.
+
+# PT-024.T10 - Compile-only skeleton
+
+Status: done 2026-06-21.
+
+Implemented:
+
+- `src/vassago_contract_runtime/phases/compile_only.py`;
+- `VassagoSC01Harness.t.sol`;
+- `compile-result.json`.
+
+Current behavior:
+
+- writes a harmless sentinel harness;
+- skips Foundry when `compile_ready_count=0`;
+- calls the Foundry adapter only when compile-ready hypotheses exist.
+
+# PT-024.T12 - Final report skeleton
+
+Status: done 2026-06-21.
+
+Implemented:
+
+- `src/vassago_contract_runtime/phases/final_report.py`;
+- `sc01-final-report.json`;
+- `sc01-final-report.md`.
+
+Current behavior:
+
+- reports `blocked_no_runtime_ready` for current fixture bootstrap;
+- records no-broadcast policy and next required proof pieces.
+
+# PT-025.T04B - Foundry subprocess adapter
+
+Status: done 2026-06-21.
+
+Implemented:
+
+- `SubprocessFoundryAdapter` in `src/vassago_contract_runtime/foundry/adapter.py`.
+
+Current behavior:
+
+- `compile_harness()` runs local `forge build` in an ephemeral workspace;
+- `run_local_fork()` runs local `forge test` only when
+  `runtime_ready=true` and `runtime_authorized=true`;
+- no broadcast command is generated.
+
 # RESUME FROM HERE
 
-Start with `PT-024.T09` proof pieces skeleton.
-
-Current bootstrap runs real local phases 00 through 06 when
-`--bootstrap-adapters` is used. Phase 07+ remains dry-run. Next concrete work
-is proof-piece state, compile-only skeleton and final report skeleton. Keep
-providers behind interfaces and keep evidence statuses separated.
+Start with `PT-024.T11` runtime Foundry local skeleton/gate if runtime execution
+is needed, or `PT-026.T01` tool contracts if exposing the design runner to
+agents. Current bootstrap runs real local phases 00 through 08 and phase 10.
+Phase 09 remains dry-run unless a runtime-ready report and explicit local
+authorization exist. Keep Foundry runtime local-only and no-broadcast.

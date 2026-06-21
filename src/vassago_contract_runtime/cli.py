@@ -16,9 +16,12 @@ from .design_runtime.runner import resume_design, run_design
 from .artifacts.store import ArtifactStore
 from .contracts import FixtureSourceResolver
 from .phases.corpus_motifs import CorpusMotifsAdapter
+from .phases.compile_only import CompileOnlyAdapter
 from .phases.dossier import DossierAdapter
+from .phases.final_report import FinalReportAdapter
 from .phases.intake import IntakeAdapter
 from .phases.onchain_state import OnChainStateAdapter
+from .phases.proof_pieces import ProofPiecesAdapter
 from .phases.semantic_surface import SemanticSurfaceAdapter
 from .phases.source_truth import SourceTruthAdapter
 from .phases.thesis_acquisition import ThesisAcquisitionAdapter
@@ -163,6 +166,9 @@ def _adapters_for(
         adapters["04_thesis_acquisition"] = ThesisAcquisitionAdapter()
         adapters["05_source_truth"] = SourceTruthAdapter()
         adapters["06_onchain_state"] = OnChainStateAdapter()
+        adapters["07_proof_pieces"] = ProofPiecesAdapter()
+        adapters["08_compile_only"] = CompileOnlyAdapter()
+        adapters["10_final_report"] = FinalReportAdapter()
     return adapters
 
 

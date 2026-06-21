@@ -21,10 +21,10 @@ PT-024.T05 phase 03 corpus motifs - done 2026-06-21 skeleton
 PT-024.T06 phase 04 thesis acquisition - done 2026-06-21 skeleton
 PT-024.T07 phase 05 source truth - done 2026-06-21 skeleton
 PT-024.T08 phase 06 on-chain state - done 2026-06-21 skeleton
-PT-024.T09 phase 07 proof pieces
-PT-024.T10 phase 08 compile-only
-PT-024.T11 phase 09 runtime Foundry local
-PT-024.T12 phase 10 final report
+PT-024.T09 phase 07 proof pieces - done 2026-06-21 skeleton
+PT-024.T10 phase 08 compile-only - done 2026-06-21 skeleton
+PT-024.T11 phase 09 runtime Foundry local - pending gated runtime adapter wiring
+PT-024.T12 phase 10 final report - done 2026-06-21 skeleton
 ```
 
 ## Lane C - Adapters
@@ -34,6 +34,7 @@ PT-025.T01 SourceResolver interface - done 2026-06-21 interface plus null and fi
 PT-025.T02 Explorer interface - done 2026-06-21 interface plus Etherscan V2 cache adapter
 PT-025.T03 Slither interface - done 2026-06-21 interface plus subprocess adapter
 PT-025.T04 Foundry interface - done 2026-06-21 interface plus null adapter
+PT-025.T04B Foundry subprocess adapter - done 2026-06-21 local-only compile/runtime gate
 PT-025.T05 Corpus interface - done 2026-06-21 interface plus local design corpus adapter
 ```
 
@@ -59,8 +60,7 @@ PT-027.T06 only then larger batch
 
 ## Current Next Up
 
-1. Implement PT-024.T09 proof pieces skeleton.
-2. Implement PT-024.T10 compile-only skeleton.
-3. Implement PT-024.T12 final report skeleton.
-4. Implement PT-025.T04B real Foundry subprocess adapter.
-5. Keep SC01 logic as design phases, not as top-level tool sprawl.
+1. Implement PT-024.T11 runtime Foundry local phase only behind `foundry_allowed=true`.
+2. Implement PT-026.T01 tool contracts for run/resume/artifact-read.
+3. Add fixture that produces a compile-ready hypothesis for phase 08 positive coverage.
+4. Keep SC01 logic as design phases, not as top-level tool sprawl.

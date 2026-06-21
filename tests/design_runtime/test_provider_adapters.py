@@ -9,7 +9,7 @@ import unittest
 from vassago_contract_runtime.contracts import ContractTargetRef
 from vassago_contract_runtime.design_runtime.models import ContractTarget
 from vassago_contract_runtime.explorer import EtherscanV2ExplorerAdapter, NullExplorerAdapter
-from vassago_contract_runtime.foundry import FoundryHarnessInput, NullFoundryAdapter
+from vassago_contract_runtime.foundry import FoundryHarnessInput, NullFoundryAdapter, SubprocessFoundryAdapter
 from vassago_contract_runtime.slither import NullSlitherAdapter, SlitherInput, SubprocessSlitherAdapter
 
 
@@ -139,6 +139,63 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertEqual(compile_result.status, "unavailable")
         self.assertEqual(runtime_result.status, "blocked")
         self.assertEqual(runtime_result.error["code"], "foundry_runtime_not_configured")
+
+    def test_subprocess_foundry_compile_uses_forge_build_with_ephemeral_workspace(self) -> None:
+        commands: list[list[str]] = []
+
+        def runner(command: list[str], cwd: Path, timeout_seconds: int) -> subprocess.CompletedProcess:
+            commands.append(command)
+            self.assertTrue((cwd / "foundry.toml").is_file())
+            self.assertTrue((cwd / "test" / "Harness.t.sol").is_file())
+            self.assertEqual(timeout_seconds, 33)
+            return subprocess.CompletedProcess(command, 0, stdout="compiled", stderr="")
+
+        item = FoundryHarnessInput(
+            target_id="CT-test",
+            harness_name="Harness",
+            source_files={"Target.sol": "contract Target {}"},
+            test_files={"Harness.t.sol": "contract Harness {}"},
+        )
+
+        result = SubprocessFoundryAdapter(timeout_seconds=33, runner=runner).compile_harness(item)
+
+        self.assertEqual(commands, [["forge", "build"]])
+        self.assertEqual(result.status, "compile_only_passed")
+        self.assertEqual(result.metadata["evidence_status"], "compile_only")
+        self.assertEqual(result.metadata["no_broadcast_command"], True)
+
+    def test_subprocess_foundry_runtime_requires_explicit_gate(self) -> None:
+        item = FoundryHarnessInput(target_id="CT-test", harness_name="Harness", source_files={}, test_files={})
+
+        result = SubprocessFoundryAdapter(runner=lambda *_: None).run_local_fork(item)
+
+        self.assertEqual(result.status, "blocked")
+        self.assertEqual(result.error["code"], "foundry_runtime_gate_not_satisfied")
+
+    def test_subprocess_foundry_runtime_uses_forge_test_when_authorized(self) -> None:
+        commands: list[list[str]] = []
+
+        def runner(command: list[str], cwd: Path, timeout_seconds: int) -> subprocess.CompletedProcess:
+            commands.append(command)
+            self.assertTrue((cwd / "test" / "Harness.t.sol").is_file())
+            return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+        item = FoundryHarnessInput(
+            target_id="CT-test",
+            harness_name="Harness",
+            source_files={},
+            test_files={"Harness.t.sol": "contract Harness {}"},
+            fork={"rpc_url": "http://127.0.0.1:8545", "block_number": 123},
+            metadata={"runtime_ready": True, "runtime_authorized": True},
+        )
+
+        result = SubprocessFoundryAdapter(runner=runner).run_local_fork(item)
+
+        self.assertEqual(result.status, "runtime_completed")
+        self.assertEqual(commands[0][:4], ["forge", "test", "--match-contract", "Harness"])
+        self.assertIn("--fork-url", commands[0])
+        self.assertIn("--fork-block-number", commands[0])
+        self.assertEqual(result.metadata["no_broadcast_command"], True)
 
 
 if __name__ == "__main__":

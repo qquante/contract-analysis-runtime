@@ -345,3 +345,53 @@ Next:
 - Implement `PT-024.T10` compile-only skeleton.
 - Implement `PT-024.T12` final report skeleton.
 - Implement `PT-025.T04B` real Foundry subprocess adapter.
+
+## S-20260621-008 - Proof pieces, compile-only, final report and Foundry subprocess
+
+Goal:
+
+- Implement `PT-024.T09`, `PT-024.T10`, `PT-024.T12` and `PT-025.T04B`.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/phases/proof_pieces.py`.
+- Added `src/vassago_contract_runtime/phases/compile_only.py`.
+- Added `src/vassago_contract_runtime/phases/final_report.py`.
+- Extended `src/vassago_contract_runtime/foundry/adapter.py` with `SubprocessFoundryAdapter`.
+- Exported `SubprocessFoundryAdapter` from `src/vassago_contract_runtime/foundry/__init__.py`.
+- Updated `src/vassago_contract_runtime/cli.py` so `--bootstrap-adapters` runs real local phases 00 through 08 and phase 10.
+- Updated provider and phase tests for Foundry compile/runtime gating.
+
+Decisions:
+
+- Phase 07 is the canonical proof-piece gate. It writes `foundry_allowed=false` until source truth, actor model, codable args, reader, delta and predicate are complete.
+- Phase 08 writes a harmless sentinel harness but skips Foundry when `compile_ready_count=0`.
+- `SubprocessFoundryAdapter.compile_harness()` runs `forge build` in an ephemeral workspace.
+- `SubprocessFoundryAdapter.run_local_fork()` can run `forge test`, but only with explicit `runtime_ready=true` and `runtime_authorized=true` metadata.
+- Phase 10 reports `blocked_no_runtime_ready` for the current fixture bootstrap. It does not promote evidence.
+
+Validation:
+
+- `$env:PYTHONPATH='src'; python -m unittest tests.design_runtime.test_phases tests.design_runtime.test_provider_adapters` passed: 15 tests.
+- `$env:PYTHONPATH='src'; python -m unittest discover -s tests` passed: 36 tests.
+- `$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check` passed.
+- `$env:PYTHONPATH='src'; python -m compileall -q src` passed.
+- Smoke command passed:
+  `python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets.json --source-fixture tests/fixtures/source_fixture.json --output <temp> --bootstrap-adapters`.
+- Smoke result: `status=completed`, `failed_count=0`, `runtime_ready_count=0`, `foundry_allowed=false`, `compile_status=compile_skipped_not_ready`, `foundry_called=false`, `final_status=blocked_no_runtime_ready`.
+
+Blockers:
+
+- Phase 09 runtime Foundry is still dry-run in bootstrap mode.
+- There is no positive fixture yet that produces `compile_ready_count>0`.
+- No RPC/provider state reader is wired into on-chain state.
+
+Next:
+
+- Implement `PT-024.T11` runtime Foundry local phase only behind `foundry_allowed=true`.
+- Implement `PT-026.T01` tool contracts for run/resume/artifact-read.
+- Add a fixture that intentionally reaches compile-ready for phase 08 positive coverage.
+
+RESUME FROM HERE:
+
+Start with `PT-024.T11` only if a runtime-ready gate exists, otherwise implement `PT-026.T01` tool contracts. Use `run-design --bootstrap-adapters` as the smoke command. Do not run Foundry runtime unless `sc01-runtime-ready.json` has `foundry_allowed=true` and the caller passes explicit local authorization. Current tests are 36 OK and `check` passes.
