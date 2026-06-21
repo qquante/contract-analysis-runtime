@@ -18,6 +18,8 @@ from .contracts import FixtureSourceResolver
 from .phases.corpus_motifs import CorpusMotifsAdapter
 from .phases.dossier import DossierAdapter
 from .phases.intake import IntakeAdapter
+from .phases.semantic_surface import SemanticSurfaceAdapter
+from .phases.thesis_acquisition import ThesisAcquisitionAdapter
 from .quality import run_checks
 
 
@@ -37,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument(
         "--bootstrap-adapters",
         action="store_true",
-        help="Run implemented bootstrap adapters for phases 00/01 and dry-run the rest.",
+        help="Run implemented bootstrap adapters and dry-run the rest.",
     )
     run.add_argument("--no-resume", action="store_true", help="Do not resume an existing run directory.")
 
@@ -48,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     resume.add_argument(
         "--bootstrap-adapters",
         action="store_true",
-        help="Use implemented bootstrap adapters for phases 00/01 and dry-run the rest.",
+        help="Use implemented bootstrap adapters and dry-run the rest.",
     )
 
     artifact_read = sub.add_parser("artifact-read", help="Read an artifact by vassago:// URI.")
@@ -154,7 +156,9 @@ def _adapters_for(
         source_resolver = FixtureSourceResolver.from_file(source_fixture) if source_fixture else None
         adapters["00_intake"] = IntakeAdapter()
         adapters["01_dossier"] = DossierAdapter(source_resolver)
+        adapters["02_semantic_surface"] = SemanticSurfaceAdapter()
         adapters["03_corpus_motifs"] = CorpusMotifsAdapter.from_design_dir(str(design_dir or Path("designs") / design.design_id))
+        adapters["04_thesis_acquisition"] = ThesisAcquisitionAdapter()
     return adapters
 
 

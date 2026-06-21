@@ -9,13 +9,14 @@ from io import StringIO
 
 from vassago_contract_runtime.cli import main
 from vassago_contract_runtime.contracts import ContractTargetRef, FixtureSourceResolver, NullSourceResolver
-from vassago_contract_runtime.design_runtime.adapters import DryRunPhaseAdapter
 from vassago_contract_runtime.design_runtime.design_loader import load_design
 from vassago_contract_runtime.design_runtime.models import ContractTarget, RunOptions
 from vassago_contract_runtime.design_runtime.runner import run_design
 from vassago_contract_runtime.phases.corpus_motifs import CorpusMotifsAdapter
 from vassago_contract_runtime.phases.dossier import DossierAdapter
 from vassago_contract_runtime.phases.intake import IntakeAdapter
+from vassago_contract_runtime.phases.semantic_surface import SemanticSurfaceAdapter
+from vassago_contract_runtime.phases.thesis_acquisition import ThesisAcquisitionAdapter
 
 
 class BootstrapPhaseTests(unittest.TestCase):
@@ -57,15 +58,16 @@ class BootstrapPhaseTests(unittest.TestCase):
             self.assertEqual(dossier["status"], "skeleton")
             self.assertEqual(dossier["source_resolution"]["status"], "unresolved")
 
-    def test_intake_dossier_and_corpus_adapters_use_local_fixture_source(self) -> None:
+    def test_intake_dossier_semantic_corpus_and_thesis_use_local_fixture_source(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             design = load_design(Path("designs") / "sc01-access" / "design.yaml")
             target = ContractTarget("eth", "0x1111111111111111111111111111111111111111")
             adapters = {
                 "00_intake": IntakeAdapter(),
                 "01_dossier": DossierAdapter(FixtureSourceResolver.from_file("tests/fixtures/source_fixture.json")),
-                "02_semantic_surface": DryRunPhaseAdapter(),
+                "02_semantic_surface": SemanticSurfaceAdapter(),
                 "03_corpus_motifs": CorpusMotifsAdapter.from_design_dir("designs/sc01-access"),
+                "04_thesis_acquisition": ThesisAcquisitionAdapter(),
             }
 
             result = run_design(design, [target], Path(tmp) / "run", adapters, RunOptions(resume=True))
@@ -73,10 +75,14 @@ class BootstrapPhaseTests(unittest.TestCase):
             self.assertEqual(result.status, "stopped")
             target_dir = Path(tmp) / "run" / "targets" / target.target_id / "phases"
             function_index = json.loads((target_dir / "01_dossier" / "function-index.json").read_text())
+            surface = json.loads((target_dir / "02_semantic_surface" / "access-surface.json").read_text())
             candidates = json.loads((target_dir / "03_corpus_motifs" / "sc01-thesis-candidates.json").read_text())
+            queue = json.loads((target_dir / "04_thesis_acquisition" / "sc01-thesis-queue.json").read_text())
             self.assertEqual(function_index["function_count"], 2)
+            self.assertEqual(surface["status"], "completed")
             self.assertGreaterEqual(candidates["candidate_count"], 1)
             self.assertIn("uups_weak_auth", {item["thesis_id"] for item in candidates["candidates"]})
+            self.assertGreaterEqual(queue["queue_count"], 1)
 
     def test_cli_bootstrap_adapters_run_bootstrap_phases_and_dry_run_rest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -107,9 +113,17 @@ class BootstrapPhaseTests(unittest.TestCase):
             later = json.loads(
                 (run_dir / "targets" / target_id / "phases" / "02_semantic_surface" / "access-surface.json").read_text()
             )
+            queue = json.loads(
+                (run_dir / "targets" / target_id / "phases" / "04_thesis_acquisition" / "sc01-thesis-queue.json").read_text()
+            )
+            dry_later = json.loads(
+                (run_dir / "targets" / target_id / "phases" / "05_source_truth" / "sc01-source-truth.json").read_text()
+            )
             self.assertEqual(dossier["status"], "skeleton")
             self.assertGreaterEqual(corpus["candidate_count"], 1)
-            self.assertEqual(later["status"], "dry_run")
+            self.assertEqual(later["status"], "completed")
+            self.assertGreaterEqual(queue["queue_count"], 1)
+            self.assertEqual(dry_later["status"], "dry_run")
 
 
 if __name__ == "__main__":

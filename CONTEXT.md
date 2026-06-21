@@ -94,8 +94,8 @@ not copy the entire tool surface. It should import or reimplement only behind
 deep Interfaces:
 
 - SourceResolver Adapter. Interface done; null and local fixture resolver done.
-- Explorer Adapter. Interface done; real provider/cache still pending.
-- Slither Adapter;
+- Explorer Adapter. Interface plus Etherscan V2 read-only cache adapter done.
+- Slither Adapter. Interface plus null adapter done.
 - Foundry Adapter;
 - ArtifactStore Adapter;
 - Corpus Adapter. Interface and local design corpus adapter done.
@@ -107,6 +107,10 @@ As of 2026-06-21:
 - phase 00 intake is a real local adapter;
 - phase 01 dossier is a real local skeleton adapter;
 - phase 01 can consume ABI/source through `--source-fixture`;
+- phase 02 semantic surface is a real local skeleton adapter;
 - phase 03 corpus motifs is a real local skeleton adapter;
-- phase 02 and phase 04+ are still dry-run in bootstrap mode;
-- no network provider, RPC, Slither, Foundry or broadcast path is wired.
+- phase 04 thesis acquisition is a real local skeleton adapter;
+- phase 05+ are still dry-run in bootstrap mode;
+- Etherscan V2 provider exists behind the Explorer interface but is not called
+  by default;
+- no RPC, Slither execution, Foundry or broadcast path is wired.

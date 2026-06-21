@@ -225,3 +225,70 @@ Next:
 - Implement `PT-024.T06` thesis acquisition skeleton.
 - Implement `PT-025.T02B` read-only Explorer provider/cache adapter.
 - Implement `PT-025.T03` Slither Adapter interface.
+
+## S-20260621-006 - Semantic surface, thesis acquisition, Explorer cache and Slither interface
+
+Goal:
+
+- Implement `PT-024.T04`, `PT-024.T06`, `PT-025.T02B` and `PT-025.T03`.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/phases/semantic_surface.py`.
+- Added `src/vassago_contract_runtime/phases/thesis_acquisition.py`.
+- Extended `src/vassago_contract_runtime/explorer/adapter.py` with:
+  - `ExplorerLogsResult`;
+  - `EtherscanV2ExplorerAdapter`;
+  - read-only `get_contract_context`;
+  - read-only `get_logs`;
+  - filesystem cache with API key excluded from cache key.
+- Added `src/vassago_contract_runtime/slither/adapter.py`.
+- Updated `src/vassago_contract_runtime/cli.py` so `--bootstrap-adapters`
+  runs real local phases 00, 01, 02, 03 and 04.
+- Added `tests/design_runtime/test_provider_adapters.py`.
+- Updated phase tests so bootstrap fixture now verifies semantic surface,
+  corpus candidates and thesis queue.
+
+Decisions:
+
+- Phase 02 is a semantic skeleton, not source truth. It writes static/candidate
+  sidecars only.
+- Phase 04 only ranks/routs thesis candidates to `05_source_truth`.
+- Etherscan V2 is implemented as a read-only provider using the documented
+  `chainid` parameter and `contract/getsourcecode`, `contract/getabi`,
+  `logs/getLogs` actions.
+- Slither is only an interface/null adapter in this slice. Real Slither
+  execution stays behind future `PT-025.T03B`.
+
+Validation:
+
+- `$env:PYTHONPATH='src'; python -m unittest discover -s tests` passed:
+  30 tests.
+- `$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check`
+  passed.
+- `$env:PYTHONPATH='src'; python -m compileall -q src` passed.
+
+Smoke:
+
+- `python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets.json --source-fixture tests/fixtures/source_fixture.json --output <temp> --bootstrap-adapters`
+  passed.
+- Result summary:
+  - `status=completed`;
+  - `failed_count=0`;
+  - `candidate_status=candidate_only`;
+  - `candidate_count=2`;
+  - thesis ids: `uninitialized_implementation_proxy,uups_weak_auth`.
+
+Blockers:
+
+- Phase 05 source truth does not exist yet.
+- Phase 06 on-chain state does not exist yet.
+- Real Slither execution does not exist yet.
+- Foundry adapter/interface still pending.
+
+Next:
+
+- Implement `PT-024.T07` source truth skeleton.
+- Implement `PT-024.T08` on-chain state skeleton.
+- Implement `PT-025.T04` Foundry Adapter interface.
+- Implement `PT-025.T03B` real Slither subprocess/Python API adapter.

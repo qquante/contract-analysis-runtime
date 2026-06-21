@@ -41,10 +41,23 @@ Phase `01_dossier`:
 - `compile-context.json`
 - `protocol-fingerprint.json`
 
+Phase `02_semantic_surface`:
+
+- `access-surface.json`
+- `semantic-map.json`
+- `guard-map.json`
+- `state-write-map.json`
+- `role-graph.json`
+
 Phase `03_corpus_motifs`:
 
 - `sc01-corpus-matches.json`
 - `sc01-thesis-candidates.json`
+
+Phase `04_thesis_acquisition`:
+
+- `sc01-thesis-queue.json`
+- `sc01-acquisition-report.json`
 
 `sc01-thesis-candidates.json` is candidate-only routing context. It is never
 runtime evidence and cannot enable Foundry by itself.

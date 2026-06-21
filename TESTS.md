@@ -17,7 +17,7 @@ Status labels:
 
 | Area | Command | Expected |
 | --- | --- | --- |
-| Unit | `python -m unittest discover -s tests` | all pass; current: 26 expected after corpus/source slice |
+| Unit | `python -m unittest discover -s tests` | all pass; current: 30 expected after semantic/acquisition/provider slice |
 | Check | `python -m vassago_contract_runtime.cli check` | passes; validates SC01 design and safety checks |
 | Design dry run | `python -m vassago_contract_runtime.cli run-design --dry-run ...` | passes; manifests + dry-run artifacts |
 | Resume | `python -m vassago_contract_runtime.cli resume --run ... --dry-run` | passes; skips completed phases |
@@ -50,7 +50,7 @@ python -m unittest discover -s tests
 Result:
 
 ```text
-Ran 26 tests
+Ran 30 tests
 OK
 ```
 
@@ -80,6 +80,10 @@ Coverage added:
 - CorpusAdapter interface and DesignCorpusAdapter.
 - phase 03 corpus motifs skeleton.
 - CLI `run-design --bootstrap-adapters --source-fixture`.
+- phase 02 semantic surface skeleton.
+- phase 04 thesis acquisition skeleton.
+- Etherscan V2 Explorer read-only adapter with fake transport/cache test.
+- Slither adapter interface and NullSlitherAdapter.
 
 Smoke:
 
@@ -94,8 +98,13 @@ Result:
 RunStatus=completed
 SourceStatus=resolved
 FunctionCount=2
+SurfaceStatus=completed
+SurfaceFunctionCount=2
 CandidateStatus=candidate_only
 CandidateCount=2
+QueueStatus=candidate_only
+QueueCount=2
+DryRunFromPhase05=dry_run
 ThesisIds=uninitialized_implementation_proxy,uups_weak_auth
 ```
 

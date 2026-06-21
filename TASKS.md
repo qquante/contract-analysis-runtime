@@ -7,14 +7,14 @@ here without reading the old Vassago conversation.
 
 Repository bootstrap complete.
 
-PT-023.T01-T05, PT-024.T01-T03, PT-024.T05, PT-025.T01, PT-025.T02 and PT-025.T05 are implemented and covered by unit tests.
+PT-023.T01-T05, PT-024.T01-T06, PT-025.T01-T03 and PT-025.T05 are implemented and covered by unit tests.
 
 ## NEXT UP
 
-1. `PT-024.T04` - implement phase 02 semantic surface skeleton.
-2. `PT-024.T06` - implement phase 04 thesis acquisition skeleton.
-3. `PT-025.T02B` - implement read-only Explorer provider/cache adapter.
-4. `PT-025.T03` - define Slither Adapter interface.
+1. `PT-024.T07` - implement phase 05 source truth skeleton.
+2. `PT-024.T08` - implement phase 06 on-chain state skeleton.
+3. `PT-025.T03B` - implement real Slither subprocess adapter.
+4. `PT-025.T04` - define Foundry Adapter interface.
 
 ---
 
@@ -279,7 +279,7 @@ Result:
 
 ## PT-024.T04 - Phase 02 Semantic Surface
 
-Status: pending.
+Status: done, 2026-06-21, skeleton adapter.
 
 Purpose:
 
@@ -298,6 +298,14 @@ Rules:
 - ABI is inventory only.
 - Source/IR/storage/events drive semantics.
 - Regex fallback is low confidence.
+
+Result:
+
+- Added `src/vassago_contract_runtime/phases/semantic_surface.py`.
+- Reads phase 01 `function-index.json` and `source-manifest.json`.
+- Writes `access-surface.json`, `semantic-map.json`, `guard-map.json`,
+  `state-write-map.json` and `role-graph.json`.
+- Output is static/candidate-only; source-truth must validate every claim.
 
 ## PT-024.T05 - Phase 03 Corpus Motifs
 
@@ -328,7 +336,7 @@ Result:
 
 ## PT-024.T06 - Phase 04 Thesis Acquisition
 
-Status: pending.
+Status: done, 2026-06-21, skeleton adapter.
 
 Purpose:
 
@@ -349,6 +357,13 @@ Outputs:
 
 - `sc01-thesis-queue.json`;
 - `sc01-acquisition-report.json`.
+
+Result:
+
+- Added `src/vassago_contract_runtime/phases/thesis_acquisition.py`.
+- Reads phase 03 thesis candidates plus phase 02 semantic/guard maps.
+- Writes a source-truth queue with `queued_for_source_truth` items.
+- Does not verify source truth, read chain state or enable Foundry.
 
 ## PT-024.T07 - Phase 05 Source Truth
 
@@ -518,30 +533,37 @@ Result:
 
 ## PT-025.T02 - Explorer Adapter
 
-Status: done, 2026-06-21, interface plus null adapter.
+Status: done, 2026-06-21, interface plus null and Etherscan V2 read-only cache adapter.
 
 Interface:
 
 - `get_contract_context(target)`.
+- `get_logs(target, from_block, to_block, topics)`.
 
 Result:
 
 - Added `src/vassago_contract_runtime/explorer/adapter.py`.
-- Implemented `ExplorerAdapter`, `ExplorerContractContext` and
-  `NullExplorerAdapter`.
-- Real Explorer provider, cache and rate limit are still future work.
+- Implemented `ExplorerAdapter`, `ExplorerContractContext`,
+  `ExplorerLogsResult`, `NullExplorerAdapter` and
+  `EtherscanV2ExplorerAdapter`.
+- Etherscan V2 adapter is read-only, uses `chainid`, supports filesystem cache
+  and never stores the API key in cache keys.
+- Sourcify and richer Explorer endpoints are still future work.
 
 ## PT-025.T03 - Slither Adapter
 
-Status: pending.
+Status: done, 2026-06-21, interface plus null adapter.
 
 Interface:
 
-- `analyze_source_bundle`;
-- `extract_ir`.
+- `analyze(input)`.
 
-Slither IR should be primary for writes/modifiers/calls when compile context
-allows.
+Result:
+
+- Added `src/vassago_contract_runtime/slither/adapter.py`.
+- Implemented `SlitherAdapter`, `SlitherInput`, `SlitherAnalysisResult` and
+  `NullSlitherAdapter`.
+- Real subprocess/Python API integration is future `PT-025.T03B`.
 
 ## PT-025.T04 - Foundry Adapter
 
@@ -656,11 +678,10 @@ Only after PT-027.T03.
 
 # RESUME FROM HERE
 
-Start with `PT-024.T04` semantic surface skeleton or `PT-025.T02B` real
-Explorer provider planning.
+Start with `PT-024.T07` source truth skeleton or `PT-024.T08` on-chain state
+skeleton.
 
-Current bootstrap runs real local phases 00, 01 and 03 when
-`--bootstrap-adapters` is used. Phase 02 and 04+ remain dry-run. Next concrete
-work is to add semantic surface as a real static adapter, then thesis
-acquisition/source-truth. Keep providers behind interfaces and keep evidence
-statuses separated.
+Current bootstrap runs real local phases 00, 01, 02, 03 and 04 when
+`--bootstrap-adapters` is used. Phase 05+ remains dry-run. Next concrete work
+is to add source-truth and on-chain state skeletons, then proof-piece gates.
+Keep providers behind interfaces and keep evidence statuses separated.
