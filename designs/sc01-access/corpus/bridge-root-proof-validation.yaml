@@ -1,0 +1,33 @@
+id: sc01-bridge-root-proof-validation
+thesis_id: bridge_root_proof_validation
+bug_family: access_control
+missing_property: bridge message processing must require a valid proof/root for the exact message
+violated_invariant: unproven messages cannot be processed through default mapping state or accepted legacy root/status
+entrypoint_type: bridge_message_authentication
+sensitive_sink: bridge message execution and recipient handle dispatch
+attacker_capabilities:
+  - submit forged bridge message calldata locally
+  - choose recipient and message body in a historical fork harness
+exploit_preconditions:
+  - process(bytes) validates acceptableRoot(messages[messageHash])
+  - unproven message mapping returns a default root/status
+  - historical root/status state makes the default acceptable
+search_motifs:
+  - acceptableRoot
+  - messages
+  - process
+  - prove
+  - proveAndProcess
+  - confirmAt
+  - branchRoot
+negative_signals:
+  - explicit LEGACY_STATUS_NONE rejection in the live implementation
+  - current source only without historical fork state
+  - proof verifier requires non-default root and message-specific proof
+required_evidence:
+  - replica source shape
+  - process(bytes) path
+  - messages(bytes32) reader
+  - acceptableRoot(bytes32) reader
+  - historical fork runtime state
+runtime_runner: nomad_bridge_root_proof_runtime

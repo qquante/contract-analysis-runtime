@@ -44,6 +44,23 @@ class SC01ImpactReviewTests(unittest.TestCase):
             self.assertEqual(review["current_live_risk"]["status"], "not_claimed")
             self.assertIn("current implementation", review["current_live_risk"]["required_to_upgrade_to_live_severity"][0])
 
+    def test_nomad_impact_review_separates_historical_runtime_from_live_claim(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "run"
+            target_id = "CT-nomad"
+            _write_minimal_nomad_run(run_dir, target_id)
+
+            summary = write_sc01_impact_review(run_dir, target_id)
+            review = build_sc01_impact_review(run_dir, target_id)
+
+            self.assertEqual(summary["status"], "completed")
+            self.assertEqual(review["bug_class"], "nomad_bridge_root_proof_message_authentication_bypass")
+            self.assertEqual(review["summary"]["verdict"], "historical_reproduced_critical")
+            self.assertEqual(review["historical_impact"]["severity"], "critical_historical")
+            self.assertEqual(review["local_reproduction"]["fork_block_number"], 15_259_100)
+            self.assertEqual(review["current_live_risk"]["status"], "not_claimed")
+            self.assertIn("current Replica implementation", review["current_live_risk"]["required_to_upgrade_to_live_severity"][0])
+
 
 def _write_minimal_audius_run(run_dir: Path, target_id: str) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -146,6 +163,61 @@ def _write_minimal_wormhole_run(run_dir: Path, target_id: str) -> None:
         "sc01-final-report.json",
         {
             "address": "0x98f3c9e6e3face36baad05fe09d375ef1464288b",
+            "chain": "eth",
+            "runtime_status": "runtime_completed",
+            "runtime_ready_count": 1,
+            "source_truth_verified_count": 1,
+            "final_status": "runtime_completed",
+        },
+    )
+
+
+def _write_minimal_nomad_run(run_dir: Path, target_id: str) -> None:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "run-manifest.json").write_text(json.dumps({"run_id": "RUN-nomad-test"}) + "\n", encoding="utf-8")
+    store = ArtifactStore(run_dir, "RUN-nomad-test")
+    store.write_json_artifact(
+        target_id,
+        "01_dossier",
+        "source-manifest.json",
+        {
+            "target": {"chain": "eth", "address": "0x5d94309e5a0090b165fa4181519701637b6daeba"},
+            "source_files": {"ReplicaProxy.sol": "contract ReplicaProxy {}"},
+        },
+    )
+    store.write_json_artifact(
+        target_id,
+        "05_source_truth",
+        "sc01-source-truth.json",
+        {
+            "status": "source_truth_verified",
+            "source_truth_verified_count": 1,
+            "reviews": [{"evidence_kind": "nomad_root_proof_message_auth_bypass", "source_truth_verified": True}],
+        },
+    )
+    store.write_json_artifact(
+        target_id,
+        "09_runtime_foundry",
+        "foundry-runtime-result.json",
+        {"status": "runtime_completed", "no_broadcast": True},
+    )
+    store.write_json_artifact(
+        target_id,
+        "09_runtime_foundry",
+        "assertion-result.json",
+        {
+            "status": "passed",
+            "evidence_status": "runtime_local",
+            "predicate": "forged message accepted",
+            "measured_delta": "message marked processed",
+        },
+    )
+    store.write_json_artifact(
+        target_id,
+        "10_final_report",
+        "sc01-final-report.json",
+        {
+            "address": "0x5d94309e5a0090b165fa4181519701637b6daeba",
             "chain": "eth",
             "runtime_status": "runtime_completed",
             "runtime_ready_count": 1,

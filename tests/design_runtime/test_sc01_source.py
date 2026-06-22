@@ -4,6 +4,7 @@ import json
 import unittest
 from pathlib import Path
 
+from vassago_contract_runtime.sc01_nomad import evaluate_nomad_bridge_root_proof
 from vassago_contract_runtime.sc01_source import (
     evaluate_access_control_initializer,
     evaluate_known_non_sc01_pattern,
@@ -485,6 +486,58 @@ class SC01SourceVerifierTests(unittest.TestCase):
         self.assertIn("function _signGovernanceVM", harness)
         self.assertIn("contract MaliciousImplementation", harness)
         self.assertIn("submitContractUpgrade", harness)
+
+    def test_nomad_bridge_root_proof_builds_runtime_harness(self) -> None:
+        fixture = {
+            "target": {"chain": "eth", "address": "0x5d94309e5a0090b165fa4181519701637b6daeba"},
+            "abi": [{"type": "fallback", "stateMutability": "payable"}],
+            "source_files": {"Proxy.sol": "contract UpgradeBeaconProxy { fallback() external payable {} }"},
+            "related_sources": {
+                "implementation": {
+                    "status": "resolved",
+                    "abi": [
+                        {"type": "function", "name": "localDomain", "inputs": [], "outputs": [{"type": "uint32"}], "stateMutability": "view"},
+                        {"type": "function", "name": "messages", "inputs": [{"type": "bytes32"}], "outputs": [{"type": "bytes32"}], "stateMutability": "view"},
+                        {"type": "function", "name": "acceptableRoot", "inputs": [{"type": "bytes32"}], "outputs": [{"type": "bool"}], "stateMutability": "view"},
+                        {"type": "function", "name": "confirmAt", "inputs": [{"type": "bytes32"}], "outputs": [{"type": "uint256"}], "stateMutability": "view"},
+                        {"type": "function", "name": "process", "inputs": [{"type": "bytes"}], "outputs": [{"type": "bool"}], "stateMutability": "nonpayable"},
+                        {"type": "function", "name": "prove", "inputs": [{"type": "bytes32"}, {"type": "bytes32[32]"}, {"type": "uint256"}], "outputs": [{"type": "bool"}], "stateMutability": "nonpayable"},
+                    ],
+                    "source_files": {
+                        "Replica.sol": """
+                        contract Replica {
+                            mapping(bytes32 => uint256) public confirmAt;
+                            mapping(bytes32 => bytes32) public messages;
+                            bytes32 public constant LEGACY_STATUS_PROCESSED = bytes32(uint256(2));
+                            function process(bytes memory _message) public returns (bool) {
+                                bytes32 _messageHash = keccak256(_message);
+                                require(acceptableRoot(messages[_messageHash]), "!proven");
+                                messages[_messageHash] = LEGACY_STATUS_PROCESSED;
+                                return true;
+                            }
+                            function prove(bytes32 _leaf, bytes32[32] calldata _proof, uint256 _index) public returns (bool) {}
+                            function acceptableRoot(bytes32 _root) public view returns (bool) {
+                                if (_root == bytes32(uint256(2))) return false;
+                                uint256 _time = confirmAt[_root];
+                                if (_time == 0) return false;
+                                return block.timestamp >= _time;
+                            }
+                        }
+                        """,
+                    },
+                }
+            },
+        }
+
+        result = evaluate_nomad_bridge_root_proof(fixture)
+        harness = render_sc01_harness(fixture)
+
+        self.assertTrue(result["verified"], result["blockers"])
+        self.assertEqual(result["runtime_runner"], "nomad_bridge_root_proof_runtime")
+        self.assertEqual(result["fork_block_number"], 15_259_100)
+        self.assertIn("testNomadProcessesUnprovenForgedMessageOnHistoricalFork", harness)
+        self.assertIn("target.process(message)", harness)
+        self.assertIn("target.acceptableRoot(defaultRoot)", harness)
 
     def test_pool_initializer_is_protocol_initializer_not_admin_initializer(self) -> None:
         fixture = {

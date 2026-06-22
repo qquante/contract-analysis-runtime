@@ -8,6 +8,7 @@ from vassago_contract_runtime.sc01_proxy_collision import (
     render_proxy_storage_collision_harness,
     should_use_proxy_storage_collision_harness,
 )
+from vassago_contract_runtime.sc01_nomad import render_nomad_harness, should_use_nomad_harness
 from vassago_contract_runtime.sc01_source import (
     contract_name_for_source,
     contract_name_for_harness,
@@ -82,7 +83,7 @@ def _read_json(context: PhaseContext, phase_id: str, name: str) -> dict:
 
 
 def _source_files_for_harness(source_manifest: dict) -> dict[str, str]:
-    if should_use_wormhole_harness(source_manifest):
+    if should_use_wormhole_harness(source_manifest) or should_use_nomad_harness(source_manifest):
         return {}
     return dict(source_manifest.get("source_files") or {})
 
@@ -108,6 +109,8 @@ def render_sc01_harness(source_manifest: dict) -> str:
         return render_proxy_storage_collision_harness(source_manifest)
     if should_use_wormhole_harness(source_manifest):
         return render_wormhole_harness(source_manifest)
+    if should_use_nomad_harness(source_manifest):
+        return render_nomad_harness(source_manifest)
     if should_use_uups_initializer_harness(source_manifest):
         return _uups_initializer_harness(source_manifest)
     if should_use_access_control_initializer_harness(source_manifest):

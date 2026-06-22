@@ -1572,3 +1572,55 @@ Important limits:
 - the selfdestruct path remains in the harness, but the immediate assertion is
   a storage marker written during malicious delegatecall because code deletion
   is a transaction-final effect and newer EVM semantics differ.
+
+## PT-027.T11 - Nomad bridge root/proof runtime mapper
+
+Status: done implementation + real runtime smoke, 2026-06-21.
+
+Implemented:
+
+- added `src/vassago_contract_runtime/sc01_nomad.py`;
+- added corpus thesis:
+  `designs/sc01-access/corpus/bridge-root-proof-validation.yaml`;
+- `SourceTruthAdapter` now recognizes
+  `thesis_id=bridge_root_proof_validation` and emits:
+  - `evidence_kind=nomad_root_proof_message_auth_bypass`;
+  - `runtime_runner=nomad_bridge_root_proof_runtime`;
+  - `fork_block_number=15_259_100`;
+- `CompileOnlyAdapter` and `RuntimeFoundryAdapter` now select the Nomad
+  interface-only harness separately from Wormhole;
+- `OnChainStateAdapter` accepts the Nomad runner as local/fork state ready;
+- impact review supports Nomad as historical reproduced critical, with current
+  live risk explicitly `not_claimed`.
+
+Real smoke:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v18-nomad-runtime --bootstrap-adapters --source-cache-dir runs/sc01-historical-6-v11-audius-runtime/_cache/etherscan-v2 --runtime-authorized
+python -m vassago_contract_runtime.cli impact-review --run runs/sc01-historical-6-v18-nomad-runtime --target-id CT-05f41610b129
+```
+
+Observed Nomad result:
+
+- target id: `CT-05f41610b129`;
+- source truth:
+  - `uninitialized_implementation_proxy` rejected;
+  - `bridge_root_proof_validation` verified;
+- compile: `compile_only_passed`;
+- runtime: `runtime_completed`;
+- assertion: `passed`;
+- Foundry test:
+  `[PASS] testNomadProcessesUnprovenForgedMessageOnHistoricalFork()`;
+- evidence status: `runtime_local`;
+- impact review verdict: `historical_reproduced_critical`;
+- current live risk: `not_claimed`;
+- broadcast: no.
+
+Important limits:
+
+- the current proxy source resolves to a fixed implementation; the reproduction
+  uses a pinned historical fork and does not claim current live exploitability;
+- the harness proves root/proof message-authentication bypass locally by
+  processing a forged unproven message into a local receiver;
+- do not reuse the Wormhole VM runner for Nomad.

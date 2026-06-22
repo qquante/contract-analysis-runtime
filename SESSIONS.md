@@ -1909,3 +1909,72 @@ If clean, commit with a message like
 `feat(sc01): add wormhole historical runtime runner`.
 Next technical task: Nomad bridge root/proof mapper, not another Wormhole
 iteration.
+
+## 2026-06-21 - PT-027.T11 Nomad Bridge Root/Proof Runtime Mapper
+
+Goal:
+
+- Implement Nomad as a separate bridge root/proof mapper, not as a Wormhole
+  initializer/VM variant.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/sc01_nomad.py`.
+- Added `designs/sc01-access/corpus/bridge-root-proof-validation.yaml`.
+- Integrated Nomad into:
+  - `src/vassago_contract_runtime/phases/source_truth.py`;
+  - `src/vassago_contract_runtime/phases/compile_only.py`;
+  - `src/vassago_contract_runtime/phases/runtime_foundry.py`;
+  - `src/vassago_contract_runtime/phases/onchain_state.py`;
+  - `src/vassago_contract_runtime/sc01_impact.py`.
+- Added tests in:
+  - `tests/design_runtime/test_sc01_source.py`;
+  - `tests/design_runtime/test_phases.py`;
+  - `tests/design_runtime/test_sc01_impact.py`.
+- Ran a real local/fork runtime smoke:
+  `runs/sc01-historical-6-v18-nomad-runtime`.
+- Generated Nomad impact review:
+  `runs/sc01-historical-6-v18-nomad-runtime/targets/CT-05f41610b129/phases/11_impact_review/sc01-impact-review.json`.
+
+Observed:
+
+- run id: `RUN-881c3ae4d0ba`;
+- target id: `CT-05f41610b129`;
+- source truth:
+  - `uninitialized_implementation_proxy` rejected;
+  - `bridge_root_proof_validation` verified;
+- compile: `compile_only_passed`;
+- runtime: `runtime_completed`;
+- assertion: `passed`;
+- Foundry:
+  `[PASS] testNomadProcessesUnprovenForgedMessageOnHistoricalFork()`;
+- evidence status: `runtime_local`;
+- impact verdict: `historical_reproduced_critical`;
+- current live risk: `not_claimed`;
+- broadcast: no.
+
+Decisions and reasoning:
+
+- Nomad is not an initializer bug. The runtime checks a bridge
+  message-authentication predicate: an unproven forged message is accepted by
+  historical root/status handling.
+- Current source resolves to a fixed Replica implementation. Therefore source
+  truth is scoped to the known historical target and runtime proof on a pinned
+  fork block `15_259_100`.
+- No current live exploitability is claimed.
+
+Blockers / next:
+
+- Remaining historical blockers are Furucombo delegatecall/proxy-storage and
+  Alchemix keeper-state.
+- For future bridge work, build proof/root/processed-message mappers rather
+  than initializer heuristics.
+
+RESUME FROM HERE:
+
+Run final regression:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`;
+`$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check`;
+`git diff --check`.
+If clean, commit with
+`feat(sc01): add nomad bridge root proof runtime`.

@@ -147,6 +147,14 @@ Historical runtime runners currently implemented:
 - Wormhole uninitialized implementation / guardian VM upgrade replay:
   local/fork-only, no broadcast, fork block `13818843`, interface-only harness
   that reads the historical implementation from the proxy EIP-1967 slot.
+- Nomad bridge root/proof message-authentication bypass:
+  local/fork-only, no broadcast, fork block `15259100`, interface-only harness
+  that crafts a local forged message and asserts `process(bytes)` marks it
+  processed on the historical Replica fork.
+
+Historical impact-review sidecars exist for Audius, Wormhole and Nomad. They
+classify those cases as `historical_reproduced_critical` only; current live
+risk remains `not_claimed` unless a fresh current-state review proves otherwise.
 
 The adversarial fixture set under
 `tests/fixtures/source_fixture_adversarial.json` covers disabled initializer,

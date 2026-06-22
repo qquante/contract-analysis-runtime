@@ -6,6 +6,7 @@ from typing import Any
 
 from vassago_contract_runtime.design_runtime.models import short_hash
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
+from vassago_contract_runtime.sc01_nomad import evaluate_nomad_bridge_root_proof
 from vassago_contract_runtime.sc01_source import (
     evaluate_access_control_initializer,
     evaluate_known_non_sc01_pattern,
@@ -138,6 +139,18 @@ def _review_queue_item(
             wormhole,
             runtime_runner="wormhole_implementation_runtime",
             evidence_kind="wormhole_uninitialized_implementation",
+        )
+    nomad = evaluate_nomad_bridge_root_proof(source_manifest)
+    if item.get("thesis_id") == "bridge_root_proof_validation" and nomad.get("verified") is True:
+        return _verified_runtime_specific_review(
+            item,
+            functions,
+            related_surface,
+            related_guards,
+            related_writes,
+            nomad,
+            runtime_runner="nomad_bridge_root_proof_runtime",
+            evidence_kind="nomad_root_proof_message_auth_bypass",
         )
     evaluation = evaluate_uninitialized_uups_initializer(source_manifest)
     if _is_verified_uninitialized_uups_initializer(item, related_surface, related_writes, evaluation):

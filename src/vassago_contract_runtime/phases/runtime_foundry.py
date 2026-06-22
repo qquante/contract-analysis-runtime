@@ -7,6 +7,7 @@ import os
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
 from vassago_contract_runtime.foundry import FoundryAdapter, FoundryHarnessInput, NullFoundryAdapter
 from vassago_contract_runtime.phases.compile_only import render_sc01_harness
+from vassago_contract_runtime.sc01_nomad import nomad_fork, should_use_nomad_harness
 from vassago_contract_runtime.sc01_proxy_collision import proxy_storage_collision_fork
 from vassago_contract_runtime.sc01_wormhole import should_use_wormhole_harness, wormhole_fork, wormhole_foundry_toml
 
@@ -30,7 +31,7 @@ class RuntimeFoundryAdapter:
         if self.runtime_authorized is not True:
             return _blocked(context, "blocked_runtime_authorization_required", ["runtime_authorized_required"])
 
-        fork = proxy_storage_collision_fork(source_manifest) or wormhole_fork(source_manifest)
+        fork = proxy_storage_collision_fork(source_manifest) or wormhole_fork(source_manifest) or nomad_fork(source_manifest)
         if fork.get("requires_rpc_url"):
             rpc_url = os.environ.get("VASSAGO_FORK_RPC_URL") or os.environ.get("VASSAGO_FORK_RPC_FALLBACK_ETH_URL")
             if not rpc_url:
@@ -105,7 +106,7 @@ def _blocked(context: PhaseContext, status: str, blockers: list[str]) -> PhaseRe
 
 
 def _source_files_for_harness(source_manifest: dict) -> dict[str, str]:
-    if should_use_wormhole_harness(source_manifest):
+    if should_use_wormhole_harness(source_manifest) or should_use_nomad_harness(source_manifest):
         return {}
     return dict(source_manifest.get("source_files") or {})
 

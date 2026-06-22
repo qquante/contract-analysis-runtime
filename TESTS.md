@@ -1024,3 +1024,81 @@ Interpretation:
 - The harness includes the selfdestruct path, but the assertion measures a
   storage marker written during malicious delegatecall because code deletion is
   transaction-final and hardfork-dependent.
+
+## PT-027.T11 Nomad Bridge Root/Proof Runtime Mapper
+
+Focused regression:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source tests.design_runtime.test_phases tests.design_runtime.test_sc01_impact
+```
+
+Observed:
+
+```text
+37 tests passed
+```
+
+Full checks during implementation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest discover -s tests
+python -m vassago_contract_runtime.cli check
+git diff --check
+```
+
+Observed before docs update:
+
+```text
+83 tests passed
+check status=passed
+git diff --check passed with CRLF warnings only
+```
+
+Real smoke:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v18-nomad-runtime --bootstrap-adapters --source-cache-dir runs/sc01-historical-6-v11-audius-runtime/_cache/etherscan-v2 --runtime-authorized
+python -m vassago_contract_runtime.cli impact-review --run runs/sc01-historical-6-v18-nomad-runtime --target-id CT-05f41610b129
+```
+
+Observed Nomad runtime:
+
+```text
+run_dir=runs/sc01-historical-6-v18-nomad-runtime
+run_id=RUN-881c3ae4d0ba
+executed_count=66
+failed_count=0
+Nomad source_truth_verified_count=1
+Nomad rejected thesis=uninitialized_implementation_proxy
+Nomad verified thesis=bridge_root_proof_validation
+Nomad compile_status=compile_only_passed
+Nomad runtime_status=runtime_completed
+Nomad assertion.status=passed
+Nomad evidence_status=runtime_local
+Impact review verdict=historical_reproduced_critical
+Current live risk=not_claimed
+```
+
+Foundry output excerpt:
+
+```text
+[PASS] testNomadProcessesUnprovenForgedMessageOnHistoricalFork()
+```
+
+Artifact:
+
+```text
+runs/sc01-historical-6-v18-nomad-runtime/targets/CT-05f41610b129/phases/11_impact_review/sc01-impact-review.json
+```
+
+Interpretation:
+
+- Nomad is locally reproduced on a historical fork for bridge root/proof
+  message-authentication bypass.
+- This is historical critical context, not a current live severity claim.
+- The current implementation source resolves as fixed; runtime proof depends
+  on the pinned historical fork.

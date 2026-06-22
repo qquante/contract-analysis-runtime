@@ -102,6 +102,7 @@ def _verified_initializer_review(source_truth: dict) -> dict | None:
             "access_control_initializer_runtime",
             "proxy_storage_collision_runtime",
             "wormhole_implementation_runtime",
+            "nomad_bridge_root_proof_runtime",
         }:
             return review
     return None

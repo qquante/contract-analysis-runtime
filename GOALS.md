@@ -57,8 +57,12 @@ Acceptance:
   pool/factory creation, token approval/operator APIs and caller-funded
   accounting/lifecycle behavior.
 - historical Wormhole runner is implemented as a local/fork-only harness behind
-  the same compile/runtime gates. It is not a live-chain action and still needs
-  real archive-fork smoke before impact wording.
+  the same compile/runtime gates. Its archive-fork smoke and impact review are
+  complete, with current live risk `not_claimed`.
+- historical Nomad root/proof mapper is implemented as a local/fork-only bridge
+  message-authentication harness behind the same compile/runtime gates. Its
+  archive-fork smoke and impact review are complete, with current live risk
+  `not_claimed`.
 
 ## G-004 - Small top-level agent Interface
 
@@ -97,3 +101,5 @@ Acceptance:
   impact review.
 - Wormhole-style uninitialized implementation context is represented as
   source-truth knowledge and now has a dedicated VM/payload runtime harness.
+- Nomad-style bridge root/proof validation failure is represented as corpus
+  knowledge and now has a dedicated historical fork runtime harness.

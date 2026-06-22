@@ -409,6 +409,52 @@ class BootstrapPhaseTests(unittest.TestCase):
             self.assertIn("MALICIOUS_MARKER_SLOT", harness)
             self.assertEqual(runtime_result["status"], "runtime_completed")
 
+    def test_nomad_fixture_reaches_runtime_gate_with_specific_harness(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source_fixture = Path(tmp) / "nomad-source.json"
+            source_fixture.write_text(json.dumps(_nomad_source_fixture()), encoding="utf-8")
+            design = load_design(Path("designs") / "sc01-access" / "design.yaml")
+            target = ContractTarget("eth", "0x5d94309e5a0090b165fa4181519701637b6daeba")
+            foundry = _FakeFoundry()
+            adapters = {
+                "00_intake": IntakeAdapter(),
+                "01_dossier": DossierAdapter(FixtureSourceResolver.from_file(source_fixture)),
+                "02_semantic_surface": SemanticSurfaceAdapter(),
+                "03_corpus_motifs": CorpusMotifsAdapter.from_design_dir("designs/sc01-access"),
+                "04_thesis_acquisition": ThesisAcquisitionAdapter(),
+                "05_source_truth": SourceTruthAdapter(),
+                "06_onchain_state": OnChainStateAdapter(),
+                "07_proof_pieces": ProofPiecesAdapter(),
+                "08_compile_only": CompileOnlyAdapter(foundry),
+                "09_runtime_foundry": RuntimeFoundryAdapter(foundry, runtime_authorized=True),
+                "10_final_report": FinalReportAdapter(),
+            }
+
+            old_rpc = os.environ.get("VASSAGO_FORK_RPC_URL")
+            os.environ["VASSAGO_FORK_RPC_URL"] = "http://127.0.0.1:8545"
+            try:
+                result = run_design(design, [target], Path(tmp) / "run", adapters, RunOptions(resume=True))
+            finally:
+                if old_rpc is None:
+                    os.environ.pop("VASSAGO_FORK_RPC_URL", None)
+                else:
+                    os.environ["VASSAGO_FORK_RPC_URL"] = old_rpc
+
+            self.assertEqual(result.status, "completed")
+            target_dir = Path(tmp) / "run" / "targets" / target.target_id / "phases"
+            source_truth = json.loads((target_dir / "05_source_truth" / "sc01-source-truth.json").read_text())
+            runtime_ready = json.loads((target_dir / "07_proof_pieces" / "sc01-runtime-ready.json").read_text())
+            harness = (target_dir / "08_compile_only" / "VassagoSC01Harness.t.sol").read_text()
+            runtime_result = json.loads((target_dir / "09_runtime_foundry" / "foundry-runtime-result.json").read_text())
+            self.assertEqual(source_truth["source_truth_verified_count"], 1)
+            self.assertIn("bridge_root_proof_validation", {item["thesis_id"] for item in source_truth["reviews"]})
+            nomad_review = next(item for item in source_truth["reviews"] if item["thesis_id"] == "bridge_root_proof_validation")
+            self.assertEqual(nomad_review["runtime_runner"], "nomad_bridge_root_proof_runtime")
+            self.assertEqual(runtime_ready["foundry_allowed"], True)
+            self.assertIn("testNomadProcessesUnprovenForgedMessageOnHistoricalFork", harness)
+            self.assertIn("VassagoNomadReceiver", harness)
+            self.assertEqual(runtime_result["status"], "runtime_completed")
+
     def test_negative_public_accounting_fixture_rejects_initialize_name_noise(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             design = load_design(Path("designs") / "sc01-access" / "design.yaml")
@@ -636,6 +682,69 @@ def _wormhole_source_fixture() -> dict:
                 },
                 "compiler": {"language": "Solidity", "version": "v0.8.24"},
                 "metadata": {"contract_name": "Implementation"},
+            },
+        ]
+    }
+
+
+def _nomad_source_fixture() -> dict:
+    replica_source = """
+    contract Replica {
+        mapping(bytes32 => uint256) public confirmAt;
+        mapping(bytes32 => bytes32) public messages;
+        bytes32 public constant LEGACY_STATUS_PROCESSED = bytes32(uint256(2));
+        function localDomain() public view returns (uint32) {}
+        function process(bytes memory _message) public returns (bool) {
+            bytes32 _messageHash = keccak256(_message);
+            require(acceptableRoot(messages[_messageHash]), "!proven");
+            messages[_messageHash] = LEGACY_STATUS_PROCESSED;
+            return true;
+        }
+        function prove(bytes32 _leaf, bytes32[32] calldata _proof, uint256 _index) public returns (bool) {}
+        function proveAndProcess(bytes memory _message, bytes32[32] calldata _proof, uint256 _index) external {
+            bytes32 _messageHash = keccak256(_message);
+            require(acceptableRoot(messages[_messageHash]) || prove(_messageHash, _proof, _index), "!prove");
+            process(_message);
+        }
+        function acceptableRoot(bytes32 _root) public view returns (bool) {
+            if (_root == LEGACY_STATUS_PROCESSED) return false;
+            uint256 _time = confirmAt[_root];
+            if (_time == 0) return false;
+            return block.timestamp >= _time;
+        }
+    }
+    """
+    return {
+        "targets": [
+            {
+                "chain": "eth",
+                "address": "0x5d94309e5a0090b165fa4181519701637b6daeba",
+                "status": "resolved",
+                "provider": "fixture",
+                "abi": [{"type": "fallback", "stateMutability": "payable"}],
+                "source_files": {"Proxy.sol": "contract UpgradeBeaconProxy { fallback() external payable {} }"},
+                "compiler": {"language": "Solidity", "version": "v0.7.6"},
+                "metadata": {"contract_name": "UpgradeBeaconProxy"},
+                "proxy_context": {"proxy": "1", "implementation": "0xb92336759618f55bd0f8313bd843604592e27bd8"},
+            },
+            {
+                "chain": "eth",
+                "address": "0xb92336759618f55bd0f8313bd843604592e27bd8",
+                "status": "resolved",
+                "provider": "fixture",
+                "abi": [
+                    {"type": "function", "name": "localDomain", "inputs": [], "outputs": [{"type": "uint32"}], "stateMutability": "view"},
+                    {"type": "function", "name": "messages", "inputs": [{"type": "bytes32"}], "outputs": [{"type": "bytes32"}], "stateMutability": "view"},
+                    {"type": "function", "name": "acceptableRoot", "inputs": [{"type": "bytes32"}], "outputs": [{"type": "bool"}], "stateMutability": "view"},
+                    {"type": "function", "name": "confirmAt", "inputs": [{"type": "bytes32"}], "outputs": [{"type": "uint256"}], "stateMutability": "view"},
+                    {"type": "function", "name": "LEGACY_STATUS_PROCESSED", "inputs": [], "outputs": [{"type": "bytes32"}], "stateMutability": "view"},
+                    {"type": "function", "name": "process", "inputs": [{"type": "bytes"}], "outputs": [{"type": "bool"}], "stateMutability": "nonpayable"},
+                    {"type": "function", "name": "prove", "inputs": [{"type": "bytes32"}, {"type": "bytes32[32]"}, {"type": "uint256"}], "outputs": [{"type": "bool"}], "stateMutability": "nonpayable"},
+                    {"type": "function", "name": "proveAndProcess", "inputs": [{"type": "bytes"}, {"type": "bytes32[32]"}, {"type": "uint256"}], "outputs": [], "stateMutability": "nonpayable"},
+                ],
+                "source_files": {"Replica.sol": replica_source},
+                "compiler": {"language": "Solidity", "version": "v0.7.6"},
+                "metadata": {"contract_name": "Replica"},
             },
         ]
     }

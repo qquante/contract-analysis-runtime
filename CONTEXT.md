@@ -495,3 +495,44 @@ Interpretation:
 - Do not claim current live exploitability without a fresh current-state review.
 - Next historical blocker is Nomad root/proof bridge mapping, which is a
   separate bridge-specific mapper and should not reuse the Wormhole VM runner.
+
+## Current Nomad Root/Proof State
+
+Nomad now has a separate bridge root/proof mapper and runtime harness.
+
+Runner implementation:
+
+- module: `src/vassago_contract_runtime/sc01_nomad.py`;
+- corpus: `designs/sc01-access/corpus/bridge-root-proof-validation.yaml`;
+- runtime runner: `nomad_bridge_root_proof_runtime`;
+- fork block: `15_259_100`;
+- harness: interface-only, crafts a local forged Nomad message, checks
+  `messages(messageHash)` default state, checks `acceptableRoot(defaultRoot)`,
+  calls `process(bytes)`, then asserts:
+  - local receiver `handle(...)` was called;
+  - `messages(messageHash)` became `LEGACY_STATUS_PROCESSED()`.
+
+Current Nomad runtime evidence:
+
+- run: `runs/sc01-historical-6-v18-nomad-runtime`;
+- target id: `CT-05f41610b129`;
+- source truth:
+  - `uninitialized_implementation_proxy` rejected;
+  - `bridge_root_proof_validation` verified;
+- compile: `compile_only_passed`;
+- runtime: `runtime_completed`;
+- assertion: `passed`;
+- Foundry test:
+  `testNomadProcessesUnprovenForgedMessageOnHistoricalFork`;
+- impact review:
+  `runs/sc01-historical-6-v18-nomad-runtime/targets/CT-05f41610b129/phases/11_impact_review/sc01-impact-review.json`;
+- impact verdict: `historical_reproduced_critical`;
+- current live risk: `not_claimed`.
+
+Interpretation:
+
+- Nomad is historically reproduced in a local fork, no broadcast.
+- The current proxy source resolves to a fixed implementation. Do not claim
+  current live exploitability without a fresh current-state review.
+- The Nomad mapper is bridge root/proof-specific and must remain separate from
+  Wormhole's implementation-initializer VM runner.

@@ -69,6 +69,7 @@ PT-027.T07 Audius proxy collision runtime mapper - done 2026-06-21, run baseline
 PT-027.T08 Audius impact review sidecar - done 2026-06-21, artifact baseline runs/sc01-historical-6-v11-audius-runtime/.../11_impact_review
 PT-027.T09 Wormhole implementation/UUPS context source-truth - done first slice 2026-06-21, run baseline runs/sc01-historical-6-v14-wormhole-source-truth
 PT-027.T10 Wormhole historical fork runtime runner - done 2026-06-21, run baseline runs/sc01-historical-6-v16-wormhole-runtime
+PT-027.T11 Nomad bridge root/proof runtime mapper - done 2026-06-21, run baseline runs/sc01-historical-6-v18-nomad-runtime
 ```
 
 ## Current Next Up
@@ -83,10 +84,13 @@ PT-027.T10 Wormhole historical fork runtime runner - done 2026-06-21, run baseli
 3. Use `runs/sc01-historical-6-v16-wormhole-runtime` as the Wormhole
    historical local/fork runtime baseline. Impact review exists and says
    `historical_reproduced_critical`, with current live risk `not_claimed`.
-4. Build mappers for the remaining historical blockers: Nomad bridge
-   root/proof, Furucombo delegatecall/proxy-storage and Alchemix keeper-state.
-5. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
+4. Use `runs/sc01-historical-6-v18-nomad-runtime` as the Nomad bridge
+   root/proof local/fork runtime baseline. Impact review exists and says
+   `historical_reproduced_critical`, with current live risk `not_claimed`.
+5. Build mappers for the remaining historical blockers: Furucombo
+   delegatecall/proxy-storage and Alchemix keeper-state.
+6. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
    Safe/module, bridge endpoint/source and ERC4337 validator.
-6. Add per-target Slither/source summary only if a larger real smoke shows
+7. Add per-target Slither/source summary only if a larger real smoke shows
    repeated compiler/import misses.
-7. Implement PT-026.T04 A2A card after the design runtime remains stable.
+8. Implement PT-026.T04 A2A card after the design runtime remains stable.

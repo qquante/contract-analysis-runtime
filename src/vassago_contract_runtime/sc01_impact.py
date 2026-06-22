@@ -21,6 +21,7 @@ IMPACT_JSON = "sc01-impact-review.json"
 IMPACT_MD = "sc01-impact-review.md"
 AUDIUS_GOVERNANCE_PROXY = "0x4deca517d6817b6510798b7328f2314d3003abac"
 WORMHOLE_PROXY = "0x98f3c9e6e3face36baad05fe09d375ef1464288b"
+NOMAD_REPLICA_PROXY = "0x5d94309e5a0090b165fa4181519701637b6daeba"
 
 
 def write_sc01_impact_review(run_dir: str | Path, target_id: str) -> dict[str, Any]:
@@ -67,6 +68,17 @@ def build_sc01_impact_review(run_dir: str | Path, target_id: str) -> dict[str, A
         )
     if _is_wormhole_proxy(address, source_truth):
         return _wormhole_impact_review(
+            review_id=review_id,
+            run_id=manifest["run_id"],
+            target_id=target_id,
+            target=target,
+            final_report=final_report,
+            assertion=assertion,
+            runtime=runtime,
+            source_truth=source_truth,
+        )
+    if _is_nomad_replica(address, source_truth):
+        return _nomad_impact_review(
             review_id=review_id,
             run_id=manifest["run_id"],
             target_id=target_id,
@@ -354,6 +366,104 @@ def _generic_sc01_impact_review(
     }
 
 
+def _nomad_impact_review(
+    *,
+    review_id: str,
+    run_id: str,
+    target_id: str,
+    target: dict[str, Any],
+    final_report: dict[str, Any],
+    assertion: dict[str, Any],
+    runtime: dict[str, Any],
+    source_truth: dict[str, Any],
+) -> dict[str, Any]:
+    runtime_status = str(runtime.get("status") or final_report.get("runtime_status") or "")
+    assertion_status = str(assertion.get("status") or "")
+    reproduced = runtime_status == "runtime_completed" and assertion_status == "passed"
+    return {
+        "status": "completed",
+        "impact_review_id": review_id,
+        "run_id": run_id,
+        "target_id": target_id,
+        "chain": str(target.get("chain") or final_report.get("chain") or "eth"),
+        "address": str(target.get("address") or final_report.get("address") or NOMAD_REPLICA_PROXY),
+        "bug_class": "nomad_bridge_root_proof_message_authentication_bypass",
+        "summary": {
+            "verdict": "historical_reproduced_critical" if reproduced else "historical_context_runtime_not_reproduced",
+            "severity_posture": "critical_historical_do_not_claim_live_without_current_state_review",
+            "reasoning": (
+                "The local historical fork replay proves that Nomad Replica accepted and processed a forged "
+                "unproven message through the root/proof validation path. Public Nomad and incident-analysis "
+                "reports describe this as the bridge message-authentication failure that enabled the 2022 drain. "
+                "This artifact does not claim current live exploitability."
+            ),
+        },
+        "historical_impact": {
+            "severity": "critical_historical",
+            "affected_system": "Nomad Replica / bridge message authentication",
+            "reported_loss_context": "public reports describe roughly $190M drained in August 2022",
+            "impact_classes": [
+                "forged_cross_chain_message_execution",
+                "bridge_router_authentication_bypass",
+                "token_bridge_drain_historical",
+            ],
+        },
+        "local_reproduction": {
+            "status": runtime_status,
+            "assertion_status": assertion_status,
+            "evidence_status": assertion.get("evidence_status"),
+            "predicate": assertion.get("predicate"),
+            "measured_delta": assertion.get("measured_delta"),
+            "final_status": final_report.get("final_status"),
+            "runtime_ready_count": final_report.get("runtime_ready_count"),
+            "source_truth_verified_count": final_report.get("source_truth_verified_count"),
+            "no_broadcast": bool(runtime.get("no_broadcast", True)),
+            "fork_block_number": 15_259_100,
+        },
+        "current_live_risk": {
+            "status": "not_claimed",
+            "reason": (
+                "The run uses a pinned historical fork and the proxy source currently resolves to a fixed "
+                "implementation. Current live severity would require a fresh implementation, root-state and "
+                "message-authentication review."
+            ),
+            "required_to_upgrade_to_live_severity": [
+                "current Replica implementation slot and code hash",
+                "current acceptableRoot/default root behavior",
+                "current message/root state for bridge deployments",
+                "proof that a forged message still reaches an asset-moving recipient",
+            ],
+        },
+        "source_truth": {
+            "status": source_truth.get("status"),
+            "verified_count": source_truth.get("source_truth_verified_count"),
+            "evidence_kinds": sorted({str(item.get("evidence_kind")) for item in source_truth.get("reviews") or []}),
+        },
+        "external_context": {
+            "status": "public_historical_context",
+            "sources": [
+                {
+                    "name": "Nomad bridge hack root cause analysis",
+                    "url": "https://medium.com/nomad-xyz-blog/nomad-bridge-hack-root-cause-analysis-875ad2e5aacd",
+                },
+                {
+                    "name": "BlockSec Nomad unchecked mapping analysis",
+                    "url": "https://blocksec.com/blog/how-unchecked-mapping-makes-200-M-losses-of-nomad-bridge",
+                },
+                {
+                    "name": "Coinbase Nomad incident analysis",
+                    "url": "https://www.coinbase.com/blog/nomad-bridge-incident-analysis",
+                },
+            ],
+        },
+        "next_steps": [
+            "Keep this as historical reproduced critical unless current exploitability is independently revalidated.",
+            "Use this mapper as a regression pattern for bridge root/proof and default mapping authentication failures.",
+            "Build the next bridge mapper around proof/root/processed-message readers, not initializer heuristics.",
+        ],
+    }
+
+
 def _read_json(store: ArtifactStore, target_id: str, phase_id: str, name: str) -> dict[str, Any]:
     payload = store.read_artifact(store.uri(target_id, phase_id, name))
     if not isinstance(payload, dict):
@@ -375,5 +485,14 @@ def _is_wormhole_proxy(address: str, source_truth: dict[str, Any]) -> bool:
         return True
     return any(
         item.get("evidence_kind") == "wormhole_uninitialized_implementation"
+        for item in source_truth.get("reviews") or []
+    )
+
+
+def _is_nomad_replica(address: str, source_truth: dict[str, Any]) -> bool:
+    if address.lower() == NOMAD_REPLICA_PROXY:
+        return True
+    return any(
+        item.get("evidence_kind") == "nomad_root_proof_message_auth_bypass"
         for item in source_truth.get("reviews") or []
     )
