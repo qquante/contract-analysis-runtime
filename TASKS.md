@@ -26,16 +26,14 @@ PT-028.T05 post-run scorer is implemented as
 
 ## NEXT UP
 
-1. `PT-028.T07` - analyze the blind score buckets:
-   `67 candidate`, `32 none`, `1 runtime`, grouped by family and missing
-   mapper.
-2. `PT-028.T08` - turn the top missing mappers into design tasks:
-   bridge paths, proxy/upgrade/signature, oracle/accounting and reentrancy/token.
-3. `PT-028.T06` - expand corpus beyond 100 using DeFiHackLabs, DeFiVulnLabs,
+1. `PT-028.T12` - proxy impact/proof-piece reader for the one verified
+   initializer case: prove or reject `proxy_or_implementation_state_impact`
+   from source/ABI/storage, without labels or addresses as detector logic.
+2. `PT-028.T06` - expand corpus beyond 100 using DeFiHackLabs, DeFiVulnLabs,
    SmartContractAttackPoC, Rekt/SlowMist incident lists and manually verified
    addresses.
-4. `PT-024.T19` - add per-target Slither/source failure summary if the blind
-   benchmark shows repeated compile/import misses.
+3. `PT-024.T19` - add per-target Slither/source failure summary if a larger
+   real smoke shows repeated compile/import misses.
 
 ---
 
@@ -2235,7 +2233,7 @@ Result:
 
 ## PT-028.T11 - Proxy source-truth/proof-piece hardening
 
-Status: next.
+Status: done first slice, 2026-06-22.
 
 Goal:
 
@@ -2253,6 +2251,76 @@ Needed:
   evidence terminal or blocked, not runtime-ready;
 - move the one `07_proof_pieces_incomplete` case only if proxy impact, reader,
   delta and codable args become concrete.
+
+Implemented:
+
+- Added `src/vassago_contract_runtime/sc01_proxy_semantics.py`.
+- `SourceTruthAdapter` now writes:
+  - `proxy-upgrade-dossier.json`;
+  - `proxy-upgrade-semantic-proposals.json`;
+  - `proxy-upgrade-proposal-validation.json`.
+- `evaluate_proxy_upgrade_signature()` can consume accepted semantic proposals,
+  but only after validation against source/ABI evidence.
+- Added tests:
+  - `tests/design_runtime/test_sc01_proxy_semantics.py`;
+  - `tests.design_runtime.test_phases.BootstrapPhaseTests.test_source_truth_writes_proxy_upgrade_semantic_artifacts`.
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_semantics tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_phases tests.design_runtime.test_historical_stage_report
+python -m vassago_contract_runtime.cli check
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t11-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t11-v1 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t11-v1\historical-stage-failure
+```
+
+Observed:
+
+```text
+focused tests: Ran 26 tests, OK
+check: passed
+T11 family rerun: executed_count=220 failed_count=0 target_count=20
+stage report:
+  04_no_thesis_candidate=3
+  05_source_truth_not_verified=16
+  07_proof_pieces_incomplete=1
+  runtime_ready_count=0
+accepted semantic proposals:
+  custom_guard_semantic_mapping: ifAdmin, proxyCallIfNotOwner, onlyFactory,
+    onlyOwner, onlyAssetManager where source-backed
+  initializer_semantic_mapping: initialize in source-backed implementation
+```
+
+Result:
+
+- T11 explains and validates proxy/upgrade semantics without using hidden
+  historical labels, benchmark ids or addresses as detector logic.
+- It does not unlock Foundry: the only source-truth verified case is still
+  blocked by missing `proxy_or_implementation_state_impact`.
+- Next task is `PT-028.T12`: prove or reject proxy/implementation state impact
+  for the verified initializer case with source/ABI/storage readers.
+
+## PT-028.T12 - Proxy impact/proof-piece reader
+
+Status: queued.
+
+Goal:
+
+- consume T11 `proxy-upgrade-dossier.json` and
+  `proxy-upgrade-proposal-validation.json`;
+- for the verified initializer case, derive whether initializing the
+  implementation can affect proxy storage/assets or only implementation-local
+  state;
+- write a sidecar such as `proxy-upgrade-impact-review.json` with:
+  `impact_status`, `proxy_state_reader`, `implementation_state_reader`,
+  `asset_balance_context`, `required_runtime_runner`, `blockers`.
+
+Rules:
+
+- no Foundry unless the fresh report has `runtime_ready_count > 0`;
+- no address/label-specific shortcut;
+- no live transaction or broadcast.
 
 ## PT-028.T06 - Corpus expansion to 100+
 

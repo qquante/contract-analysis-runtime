@@ -9,6 +9,11 @@ from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseRe
 from vassago_contract_runtime.sc01_alchemix import evaluate_alchemix_keeper_state
 from vassago_contract_runtime.sc01_furucombo import evaluate_furucombo_delegatecall_proxy_storage
 from vassago_contract_runtime.sc01_nomad import build_nomad_root_proof_analysis, evaluate_nomad_bridge_root_proof
+from vassago_contract_runtime.sc01_proxy_semantics import (
+    build_proxy_upgrade_dossier,
+    build_proxy_upgrade_semantic_proposals,
+    validate_proxy_upgrade_semantic_proposals,
+)
 from vassago_contract_runtime.sc01_proxy_upgrade import evaluate_proxy_upgrade_signature
 from vassago_contract_runtime.sc01_source import (
     evaluate_access_control_initializer,
@@ -33,8 +38,11 @@ class SourceTruthAdapter:
         guard_map = _read_json(context, "02_semantic_surface", "guard-map.json")
         state_map = _read_json(context, "02_semantic_surface", "state-write-map.json")
         source_manifest = _read_json(context, "01_dossier", "source-manifest.json")
+        proxy_dossier = build_proxy_upgrade_dossier(source_manifest, queue)
+        proxy_proposals = build_proxy_upgrade_semantic_proposals(proxy_dossier)
+        proxy_validation = validate_proxy_upgrade_semantic_proposals(proxy_dossier, proxy_proposals)
         reviews = [
-            _review_queue_item(item, surface, guard_map, state_map, source_manifest)
+            _review_queue_item(item, surface, guard_map, state_map, source_manifest, proxy_validation)
             for item in queue.get("queue", [])
         ]
         verified_count = sum(1 for item in reviews if item.get("source_truth_verified") is True)
@@ -51,7 +59,10 @@ class SourceTruthAdapter:
                 "evidence_status": "static_only",
                 "blockers": _source_truth_blockers(status),
                 "warning": _source_truth_warning(status),
-            }
+            },
+            "proxy-upgrade-dossier.json": proxy_dossier,
+            "proxy-upgrade-semantic-proposals.json": proxy_proposals,
+            "proxy-upgrade-proposal-validation.json": proxy_validation,
         }
         nomad_analysis = _nomad_analysis_if_relevant(queue, source_manifest)
         if nomad_analysis is not None:
@@ -104,6 +115,7 @@ def _review_queue_item(
     guard_map: dict,
     state_map: dict,
     source_manifest: dict,
+    proxy_semantic_validation: dict,
 ) -> dict[str, Any]:
     functions = list(item.get("matched_functions") or [])
     related_surface = _functions(functions, surface)
@@ -210,7 +222,12 @@ def _review_queue_item(
             alchemix,
             evidence_kind="alchemix_keeper_state_candidate",
         )
-    proxy_upgrade = evaluate_proxy_upgrade_signature(source_manifest, str(item.get("thesis_id") or ""), functions)
+    proxy_upgrade = evaluate_proxy_upgrade_signature(
+        source_manifest,
+        str(item.get("thesis_id") or ""),
+        functions,
+        semantic_validation=proxy_semantic_validation,
+    )
     if proxy_upgrade.get("applicable") is True:
         if proxy_upgrade.get("status") == "source_truth_verified":
             return _verified_runtime_specific_review(

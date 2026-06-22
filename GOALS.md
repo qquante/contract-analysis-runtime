@@ -151,9 +151,14 @@ Current state:
 - Proxy/upgrade family reruns now hydrate source/proxy context from
   `runs/source-cache-historical-100`: `20/20` sources resolved with
   `cache_hit=true` in `runs/sc01-historical-proxy-upgrade-t10-v1`.
-- The current proxy/upgrade blocker is source-truth/proof-piece quality:
-  `16` `05_source_truth_not_verified`, `1` `07_proof_pieces_incomplete`,
-  `runtime_ready_count=0`.
+- `PT-028.T11` added proxy semantic dossiers/proposals/validation in phase
+  `05_source_truth`: `proxy-upgrade-dossier.json`,
+  `proxy-upgrade-semantic-proposals.json` and
+  `proxy-upgrade-proposal-validation.json`.
+- The current proxy/upgrade blocker is no longer source/proxy context or
+  semantic mapping. It is proxy/implementation state impact:
+  `runtime_ready_count=0`, with the verified initializer case still missing
+  `proxy_or_implementation_state_impact`.
 
 Non-goal:
 

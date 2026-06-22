@@ -87,7 +87,8 @@ PT-028.T07 Blind score triage - done first slice 2026-06-22
 PT-028.T08 Proxy/upgrade historical mapper hardening - done first slice 2026-06-22
 PT-028.T09 Proxy family thesis acquisition/routing - done first slice 2026-06-22
 PT-028.T10 Source resolver/cache reliability for family reruns - done first slice 2026-06-22, run runs/sc01-historical-proxy-upgrade-t10-v1
-PT-028.T11 Proxy source-truth/proof-piece hardening - next
+PT-028.T11 Proxy source-truth/proof-piece hardening - done first slice 2026-06-22, run runs/sc01-historical-proxy-upgrade-t11-v1
+PT-028.T12 Proxy impact/proof-piece reader - next
 PT-028.T06 Expand corpus beyond 100 - queued
 ```
 
@@ -139,7 +140,11 @@ PT-028.T06 Expand corpus beyond 100 - queued
    family rerun baseline. It resolved `20/20` sources from
    `runs/source-cache-historical-100` with `cache_hit=true`, so the remaining
    proxy blocker is source-truth/proof-piece quality, not resolver/cache.
-16. Implement `PT-028.T11` by inspecting the `16`
-   `05_source_truth_not_verified` proxy-upgrade candidates and the one
-   `07_proof_pieces_incomplete` case from the T10 stage report.
-17. Implement PT-026.T04 A2A card after the design runtime remains stable.
+16. Use `runs/sc01-historical-proxy-upgrade-t11-v1` as the proxy semantic
+   proposal baseline. It writes `proxy-upgrade-dossier.json`,
+   `proxy-upgrade-semantic-proposals.json` and
+   `proxy-upgrade-proposal-validation.json` for phase `05_source_truth`.
+17. Implement `PT-028.T12`: prove or reject proxy/implementation state impact
+   for the one verified initializer case. Foundry remains blocked until a
+   fresh report has `runtime_ready_count > 0`.
+18. Implement PT-026.T04 A2A card after the design runtime remains stable.

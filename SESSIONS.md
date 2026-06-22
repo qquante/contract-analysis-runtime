@@ -2730,3 +2730,80 @@ classify the `16` `05_source_truth_not_verified` proxy candidates, and move
 only source-backed cases forward. Do not use hidden labels or addresses as
 detector logic. Do not run Foundry unless a fresh report has
 `runtime_ready_count > 0`.
+
+## 2026-06-22 - PT-028.T11 Proxy Semantic Dossier/Proposal Layer
+
+Goal:
+
+- For the proxy-upgrade family, create a source-backed semantic layer that
+  explains custom owners/admins/guards/initializers/upgrade paths without
+  relying on historical labels, benchmark ids or addresses.
+- Rerun the proxy-upgrade family and only allow Foundry if a fresh report gets
+  `runtime_ready_count > 0`.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/sc01_proxy_semantics.py`.
+- Updated `src/vassago_contract_runtime/phases/source_truth.py` to write:
+  - `proxy-upgrade-dossier.json`;
+  - `proxy-upgrade-semantic-proposals.json`;
+  - `proxy-upgrade-proposal-validation.json`.
+- Updated `src/vassago_contract_runtime/sc01_proxy_upgrade.py` so accepted
+  semantic proposals can supply source-backed critical writes, readers and
+  guard evidence to source-truth/proof-piece evaluation.
+- Added `tests/design_runtime/test_sc01_proxy_semantics.py`.
+- Extended `tests/design_runtime/test_phases.py` to prove phase `05_source_truth`
+  writes the new proxy semantic sidecars.
+
+Commands:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_semantics tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_phases tests.design_runtime.test_historical_stage_report
+python -m vassago_contract_runtime.cli check
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t11-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t11-v1 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t11-v1\historical-stage-failure
+```
+
+Observed:
+
+```text
+focused tests: Ran 26 tests, OK
+check: passed
+family rerun: executed_count=220 failed_count=0 target_count=20
+stage report:
+  04_no_thesis_candidate=3
+  05_source_truth_not_verified=16
+  07_proof_pieces_incomplete=1
+  runtime_ready_count=0
+```
+
+Decisions and reasoning:
+
+- The proposal layer is deterministic and validator-backed. It is not allowed
+  to promote a thesis from name-only evidence.
+- Accepted proposals appeared for custom guards such as `ifAdmin`,
+  `proxyCallIfNotOwner`, `onlyFactory`, `onlyOwner`, `onlyAssetManager`, and
+  for source-backed `initialize` paths where implementation context exists.
+- Transparent proxy admin paths, `_disableInitializers()` and role graph
+  blockers remain rejected/blocked.
+- Foundry remains blocked because no fresh proxy-upgrade report produced
+  `runtime_ready_count > 0`.
+
+Blockers:
+
+- The one source-truth verified initializer case is still missing
+  `proxy_or_implementation_state_impact`.
+- T11 improves semantic understanding, but does not yet prove proxy storage or
+  asset impact.
+
+RESUME FROM HERE:
+
+Run final regression after doc updates:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`.
+Run `python -m vassago_contract_runtime.cli check` and `git diff --check`.
+Commit T11 if green.
+Next implementation is `PT-028.T12`: build a proxy impact/proof-piece reader
+that proves or rejects `proxy_or_implementation_state_impact` for the verified
+initializer case using source/ABI/storage, still without Foundry unless a fresh
+report has `runtime_ready_count > 0`.

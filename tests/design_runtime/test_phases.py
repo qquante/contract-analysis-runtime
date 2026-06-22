@@ -217,6 +217,89 @@ class BootstrapPhaseTests(unittest.TestCase):
             self.assertIn("uninitialized_implementation_proxy", {item["thesis_id"] for item in candidates["candidates"]})
             self.assertIn("uninitialized_implementation_proxy", {item["thesis_id"] for item in queue["queue"]})
 
+    def test_source_truth_writes_proxy_upgrade_semantic_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source_fixture = Path(tmp) / "source.json"
+            source_fixture.write_text(
+                json.dumps(
+                    {
+                        "targets": [
+                            {
+                                "chain": "eth",
+                                "address": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                "status": "resolved",
+                                "provider": "fixture",
+                                "abi": [{"type": "fallback", "stateMutability": "payable"}],
+                                "source_files": {"Proxy.sol": "contract Proxy { fallback() external payable {} }"},
+                                "compiler": {"language": "Solidity", "version": "v0.8.20"},
+                                "metadata": {"contract_name": "Proxy"},
+                                "proxy_context": {
+                                    "proxy": "1",
+                                    "implementation": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                                },
+                            },
+                            {
+                                "chain": "eth",
+                                "address": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                                "status": "resolved",
+                                "provider": "fixture",
+                                "abi": [
+                                    {
+                                        "type": "function",
+                                        "name": "initialize",
+                                        "inputs": [{"type": "address"}],
+                                        "outputs": [],
+                                        "stateMutability": "nonpayable",
+                                    },
+                                    {
+                                        "type": "function",
+                                        "name": "ownerProxy1",
+                                        "inputs": [],
+                                        "outputs": [{"type": "address"}],
+                                        "stateMutability": "view",
+                                    },
+                                ],
+                                "source_files": {
+                                    "Implementation.sol": """
+                                    contract Implementation {
+                                        address public ownerProxy1;
+                                        function initialize(address who) external { ownerProxy1 = who; }
+                                    }
+                                    """
+                                },
+                                "compiler": {"language": "Solidity", "version": "v0.8.20"},
+                                "metadata": {"contract_name": "Implementation"},
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            design = load_design(Path("designs") / "sc01-access" / "design.yaml")
+            target = ContractTarget("eth", "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            adapters = {
+                "00_intake": IntakeAdapter(),
+                "01_dossier": DossierAdapter(FixtureSourceResolver.from_file(source_fixture)),
+                "02_semantic_surface": SemanticSurfaceAdapter(),
+                "03_corpus_motifs": CorpusMotifsAdapter.from_design_dir("designs/sc01-access"),
+                "04_thesis_acquisition": ThesisAcquisitionAdapter(),
+                "05_source_truth": SourceTruthAdapter(),
+            }
+
+            run_design(design, [target], Path(tmp) / "run", adapters, RunOptions(resume=True))
+
+            phase_dir = Path(tmp) / "run" / "targets" / target.target_id / "phases" / "05_source_truth"
+            dossier = json.loads((phase_dir / "proxy-upgrade-dossier.json").read_text())
+            proposals = json.loads((phase_dir / "proxy-upgrade-semantic-proposals.json").read_text())
+            validation = json.loads((phase_dir / "proxy-upgrade-proposal-validation.json").read_text())
+            source_truth = json.loads((phase_dir / "sc01-source-truth.json").read_text())
+            self.assertEqual(dossier["summary"]["has_related_implementation"], True)
+            self.assertGreaterEqual(proposals["proposal_count"], 1)
+            self.assertGreaterEqual(validation["accepted_count"], 1)
+            self.assertEqual(source_truth["source_truth_verified_count"], 1)
+            review = source_truth["reviews"][0]
+            self.assertEqual(review["measurable_reader"], "ownerProxy1()")
+
     def test_intake_and_dossier_adapters_write_real_bootstrap_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             design = load_design(Path("designs") / "sc01-access" / "design.yaml")

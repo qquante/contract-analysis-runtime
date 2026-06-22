@@ -1644,6 +1644,59 @@ Interpretation:
 - no Foundry/runtime is implied: the remaining blockers are source-truth and
   proof-piece completeness for proxy-upgrade candidates.
 
+## PT-028.T11 proxy semantic dossier/proposals
+
+Focused regression:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_semantics tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_phases tests.design_runtime.test_historical_stage_report
+python -m vassago_contract_runtime.cli check
+```
+
+Observed:
+
+```text
+focused regression: Ran 26 tests, OK
+check: passed, failed_count=0
+```
+
+Fresh proxy-upgrade family rerun:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t11-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t11-v1 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t11-v1\historical-stage-failure
+```
+
+Observed:
+
+```text
+run-design executed_count=220 failed_count=0 target_count=20
+stage report:
+  04_no_thesis_candidate=3
+  05_source_truth_not_verified=16
+  07_proof_pieces_incomplete=1
+  runtime_ready_count=0
+```
+
+Artifact checks:
+
+- phase `05_source_truth` now writes `proxy-upgrade-dossier.json`;
+- phase `05_source_truth` now writes `proxy-upgrade-semantic-proposals.json`;
+- phase `05_source_truth` now writes
+  `proxy-upgrade-proposal-validation.json`;
+- accepted proposals are source/ABI backed and do not use hidden labels,
+  benchmark ids or addresses as detector logic.
+
+Interpretation:
+
+- T11 improves semantic explanation and source-truth inputs;
+- it does not unlock Foundry because the fresh report still has
+  `runtime_ready_count=0`;
+- the next test target is `PT-028.T12`, proving or rejecting
+  `proxy_or_implementation_state_impact` for the verified initializer case.
+
 Observed:
 
 ```text

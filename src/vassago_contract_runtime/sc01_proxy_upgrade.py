@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from vassago_contract_runtime.sc01_proxy_semantics import accepted_semantic_proposals
+
 
 RELEVANT_THESES = {
     "uninitialized_implementation_proxy",
@@ -49,6 +51,8 @@ def evaluate_proxy_upgrade_signature(
     source_manifest: dict[str, Any],
     thesis_id: str,
     matched_functions: list[str],
+    *,
+    semantic_validation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Classify proxy/upgrade candidates with source-backed evidence."""
 
@@ -89,6 +93,7 @@ def evaluate_proxy_upgrade_signature(
             implementation_source=implementation_source,
             implementation_abi=implementation_abi,
             names=names,
+            semantic_validation=semantic_validation or {},
         )
 
     if thesis_id == "uups_weak_auth":
@@ -101,6 +106,7 @@ def evaluate_proxy_upgrade_signature(
             implementation_source=implementation_source,
             implementation_abi=implementation_abi,
             names=names,
+            semantic_validation=semantic_validation or {},
         )
 
     if thesis_id == "role_admin_escalation":
@@ -119,6 +125,7 @@ def _evaluate_initializer_context(
     implementation_source: str,
     implementation_abi: list[dict[str, Any]],
     names: set[str],
+    semantic_validation: dict[str, Any],
 ) -> dict[str, Any]:
     source = implementation_source or target_source
     abi = implementation_abi or target_abi
@@ -158,7 +165,11 @@ def _evaluate_initializer_context(
             "Implementation source contains _disableInitializers(), blocking the generic uninitialized-implementation thesis.",
             ["source:_disableInitializers"],
         )
+    semantic_initializer = _semantic_initializer(semantic_validation, initializer["name"])
+    semantic_payload = dict(semantic_initializer.get("semantic_payload") or {}) if semantic_initializer else {}
     critical_writes = _critical_writes(body)
+    if not critical_writes:
+        critical_writes = list(semantic_payload.get("critical_writes") or [])
     if not critical_writes:
         return _blocked(
             "initializer_without_measurable_critical_write",
@@ -166,7 +177,7 @@ def _evaluate_initializer_context(
             [f"source:{initializer['name']}"],
             proxy_context=proxy_context,
         )
-    reader = _reader_for_any(source, abi, critical_writes)
+    reader = _reader_for_any(source, abi, critical_writes) or str(semantic_payload.get("measurable_reader") or "")
     if not reader:
         return _blocked(
             "critical_reader_missing",
@@ -176,6 +187,8 @@ def _evaluate_initializer_context(
             critical_writes=critical_writes,
         )
     codable_args, unsupported_args = _codable_args_for_initializer(abi, initializer["name"])
+    if not codable_args and semantic_payload.get("codable_args"):
+        codable_args = list(semantic_payload.get("codable_args") or [])
     missing_proof_pieces = ["proxy_or_implementation_state_impact"]
     if unsupported_args:
         missing_proof_pieces.append("codable_initializer_args")
@@ -192,6 +205,7 @@ def _evaluate_initializer_context(
             f"source:{initializer['name']} external/public initializer",
             f"source:critical writes {', '.join(critical_writes)}",
             f"source:reader {reader}",
+            *(list(semantic_initializer.get("evidence_refs") or []) if semantic_initializer else []),
             *[f"abi:unsupported initializer arg {arg}" for arg in unsupported_args],
         ],
         proxy_context=proxy_context,
@@ -209,6 +223,7 @@ def _evaluate_uups_context(
     implementation_source: str,
     implementation_abi: list[dict[str, Any]],
     names: set[str],
+    semantic_validation: dict[str, Any],
 ) -> dict[str, Any]:
     source = implementation_source or target_source
     abi = implementation_abi or target_abi
@@ -254,7 +269,9 @@ def _evaluate_uups_context(
             "_authorizeUpgrade always reverts or is not an executable weak-auth path.",
             ["source:_authorizeUpgrade revert"],
         )
-    reader = _implementation_reader(source, abi, proxy_like)
+    semantic_authorize = _semantic_authorize(semantic_validation)
+    semantic_payload = dict(semantic_authorize.get("semantic_payload") or {}) if semantic_authorize else {}
+    reader = _implementation_reader(source, abi, proxy_like) or str(semantic_payload.get("measurable_reader") or "")
     return _verified(
         "uups_authorize_upgrade_weak_or_ambiguous",
         runtime_runner="proxy_upgrade_signature_runtime",
@@ -268,6 +285,7 @@ def _evaluate_uups_context(
             f"source:{','.join(sorted(upgrade_names))}",
             "source:_authorizeUpgrade without recognized authorization marker",
             f"source:reader {reader}",
+            *(list(semantic_authorize.get("evidence_refs") or []) if semantic_authorize else []),
         ],
         proxy_context=proxy_context,
     )
@@ -510,6 +528,18 @@ def _implementation_manifest(source_manifest: dict[str, Any]) -> dict[str, Any]:
     if isinstance(implementation, dict) and implementation.get("status") == "resolved":
         return implementation
     return {}
+
+
+def _semantic_initializer(validation: dict[str, Any], name: str) -> dict[str, Any]:
+    for proposal in accepted_semantic_proposals(validation, "initializer_semantic_mapping"):
+        if proposal.get("target_symbol") == name:
+            return proposal
+    return {}
+
+
+def _semantic_authorize(validation: dict[str, Any]) -> dict[str, Any]:
+    proposals = accepted_semantic_proposals(validation, "uups_authorize_upgrade_mapping")
+    return proposals[0] if proposals else {}
 
 
 def _verified(

@@ -960,3 +960,67 @@ Current interpretation:
 - the next blocker is `PT-028.T11`: explain and harden the `16`
   `05_source_truth_not_verified` candidates and the one incomplete proof-piece
   case without using labels, addresses or case ids.
+
+## PT-028.T11 Proxy Semantic Dossier/Proposal State
+
+`PT-028.T11` adds a deterministic semantic-proposal layer for proxy-upgrade
+source truth. It is intentionally not an LLM shortcut and it does not use
+historical labels, benchmark ids or addresses as detector logic.
+
+Files:
+
+- `src/vassago_contract_runtime/sc01_proxy_semantics.py`
+- `src/vassago_contract_runtime/sc01_proxy_upgrade.py`
+- `src/vassago_contract_runtime/phases/source_truth.py`
+- `tests/design_runtime/test_sc01_proxy_semantics.py`
+- `tests/design_runtime/test_phases.py`
+
+Artifacts written in phase `05_source_truth`:
+
+- `proxy-upgrade-dossier.json`
+- `proxy-upgrade-semantic-proposals.json`
+- `proxy-upgrade-proposal-validation.json`
+
+Behavior:
+
+- build a source-backed dossier over the target and related implementation;
+- propose semantic mappings for real initializer paths, custom guards and
+  `_authorizeUpgrade`;
+- validate proposals only when ABI/source evidence supports the symbol and
+  the evidence payload;
+- feed accepted proposals into proxy/upgrade source-truth and proof-piece
+  generation.
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_semantics tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_phases tests.design_runtime.test_historical_stage_report
+python -m vassago_contract_runtime.cli check
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t11-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t11-v1 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t11-v1\historical-stage-failure
+```
+
+Observed:
+
+```text
+focused tests: Ran 26 tests, OK
+check: passed
+fresh T11 family run: executed_count=220 failed_count=0 target_count=20
+stage report:
+  04_no_thesis_candidate=3
+  05_source_truth_not_verified=16
+  07_proof_pieces_incomplete=1
+  runtime_ready_count=0
+```
+
+Interpretation:
+
+- the semantic layer is working and produces accepted proposals where source
+  evidence exists;
+- it correctly does not promote transparent proxy admin paths,
+  `_disableInitializers()` cases or role graph blockers;
+- the only source-truth verified proxy initializer case is still blocked by
+  missing `proxy_or_implementation_state_impact`;
+- next task is `PT-028.T12`: prove or reject proxy/implementation state impact
+  from source/ABI/storage readers before considering Foundry.
