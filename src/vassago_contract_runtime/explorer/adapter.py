@@ -287,7 +287,24 @@ def _default_transport(url: str) -> dict[str, Any]:
 
 
 def _chain_id(chain: str) -> str:
-    return {"eth": "1", "ethereum": "1", "bsc": "56", "base": "8453"}.get(chain.lower(), chain)
+    return {
+        "eth": "1",
+        "ethereum": "1",
+        "mainnet": "1",
+        "bsc": "56",
+        "bnb": "56",
+        "binance": "56",
+        "polygon": "137",
+        "matic": "137",
+        "arbitrum": "42161",
+        "arbitrum-one": "42161",
+        "optimism": "10",
+        "op": "10",
+        "base": "8453",
+        "gnosis": "100",
+        "xdai": "100",
+        "moonriver": "1285",
+    }.get(chain.lower(), chain)
 
 
 def _cache_key(params: dict[str, str]) -> str:

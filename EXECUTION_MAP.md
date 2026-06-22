@@ -79,8 +79,11 @@ PT-027.T17 Bridge current-path review sidecar - done 2026-06-22, artifact sc01-b
 PT-028.T01 Historical exploit corpus research - done first slice 2026-06-22
 PT-028.T02 100-case balanced historical seed - done 2026-06-22
 PT-028.T03 Historical corpus CLI/report/export - done 2026-06-22
-PT-028.T04 Blind benchmark over targets-blind-100 - next
-PT-028.T05 Post-run scoring against hidden_ground_truth - queued
+PT-028.T04 Blind benchmark over targets-blind-100 - done 2026-06-22, run runs/sc01-historical-blind-100-v1
+PT-028.T05 Post-run scoring against hidden_ground_truth - done implementation 2026-06-22
+PT-028.T05B Score blind benchmark output - done 2026-06-22
+PT-028.T05C Runtime follow-up for actionable HEC-031 - done 2026-06-22
+PT-028.T07 Blind score triage - next
 PT-028.T06 Expand corpus beyond 100 - queued
 ```
 
@@ -113,11 +116,14 @@ PT-028.T06 Expand corpus beyond 100 - queued
    Furucombo and Alchemix historical local/fork runtime baseline.
 9. Use `SC01_HISTORICAL_REPRODUCTION_REPORT.md` as the consolidated SC01
    historical reproduction inventory.
-10. Use `designs/historical-exploits/targets-blind-100.json` as the next
-   historical blind benchmark input. Detection phases must not read
-   `hidden_ground_truth`.
-11. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
+10. Use `runs/sc01-historical-blind-100-v1/historical-corpus-score/historical-corpus-score.json`
+   as the current blind benchmark score. It has `67` candidate-only cases,
+   `32` none cases and `1` runtime-ready case.
+11. Use `runs/sc01-historical-blind-hec031-runtime-v1` as the runtime follow-up
+   for HEC-031/Nomad. It has `runtime_completed` and `runtime_local`, still
+   historical/fork-only.
+12. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
    Safe/module, bridge endpoint/source and ERC4337 validator.
-12. Add per-target Slither/source summary only if a larger real smoke shows
+13. Add per-target Slither/source summary only if a larger real smoke shows
    repeated compiler/import misses.
-13. Implement PT-026.T04 A2A card after the design runtime remains stable.
+14. Implement PT-026.T04 A2A card after the design runtime remains stable.

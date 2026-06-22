@@ -137,6 +137,11 @@ Current state:
   proxy/upgrade/signature.
 - `designs/historical-exploits/targets-blind-100.json` is ready for the next
   blind benchmark.
+- `historical-corpus-score` can score a completed run after the blind phase.
+- Current blind benchmark `runs/sc01-historical-blind-100-v1` is complete:
+  `67` candidate-only, `32` none and `1` runtime-ready.
+- Current runtime follow-up `runs/sc01-historical-blind-hec031-runtime-v1`
+  reproduced HEC-031/Nomad locally on a historical fork.
 
 Non-goal:
 

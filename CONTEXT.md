@@ -696,6 +696,56 @@ $env:PYTHONPATH='src'
 python -m vassago_contract_runtime.cli run-design --design sc01-access --targets designs/historical-exploits/targets-blind-100.json --output runs/sc01-historical-blind-100-v1 --source-cache-dir runs/source-cache-v20 --bootstrap-adapters
 ```
 
+Post-run scoring:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-score --run runs/sc01-historical-blind-100-v1 --manifest designs/historical-exploits/manifest.json --output-dir runs/sc01-historical-blind-100-v1/historical-corpus-score
+```
+
+Current blind benchmark result:
+
+```text
+run=runs/sc01-historical-blind-100-v1
+status=completed
+scored_count=100
+candidate_count=67
+none_count=32
+runtime_ready_count=1
+runtime_count=0
+```
+
+The runtime-ready case was:
+
+```text
+benchmark_id=HEC-031
+case_id=nomadbridge
+family=bridge_message_auth
+target=ethereum:0x5d94309e5a0090b165fa4181519701637b6daeba
+```
+
+Runtime follow-up:
+
+```text
+run=runs/sc01-historical-blind-hec031-runtime-v1
+final_status=runtime_completed
+evidence_status=runtime_local
+test=testNomadProcessesUnprovenForgedMessageOnHistoricalFork
+```
+
+This is historical fork-local reproduction only. It does not claim current live
+exploitability.
+
+Scoring buckets:
+
+- `missing`;
+- `none`;
+- `candidate`;
+- `source_truth`;
+- `compile_only`;
+- `runtime_ready`;
+- `runtime`.
+
 Interpretation:
 
 - This is the right path to measure detection quality before another random

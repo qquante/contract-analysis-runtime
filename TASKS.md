@@ -21,14 +21,16 @@ lifecycle noise.
 PT-028.T01-T03 first historical exploit corpus seed is implemented: 100 blind
 targets from DeFiHackLabs metadata, balanced across SC01, bridge/message-auth,
 oracle/accounting, reentrancy/token and proxy/upgrade/signature.
+PT-028.T05 post-run scorer is implemented as
+`historical-corpus-score`.
 
 ## NEXT UP
 
-1. `PT-028.T04` - run blind benchmark on
-   `designs/historical-exploits/targets-blind-100.json`, grouped by family,
-   without reading `hidden_ground_truth` during detection.
-2. `PT-028.T05` - add scoring/report phase that compares run outputs against
-   `hidden_ground_truth` after the blind run.
+1. `PT-028.T07` - analyze the blind score buckets:
+   `67 candidate`, `32 none`, `1 runtime`, grouped by family and missing
+   mapper.
+2. `PT-028.T08` - turn the top missing mappers into design tasks:
+   bridge paths, proxy/upgrade/signature, oracle/accounting and reentrancy/token.
 3. `PT-028.T06` - expand corpus beyond 100 using DeFiHackLabs, DeFiVulnLabs,
    SmartContractAttackPoC, Rekt/SlowMist incident lists and manually verified
    addresses.
@@ -1257,7 +1259,7 @@ Interpretation:
 
 ## PT-027.T04 - next high-signal acquisition
 
-Status: next.
+Status: done, 2026-06-22.
 
 Use the 20-contract smoke result to avoid random expansion. The next useful
 step is acquiring targets with stronger SC01 signal:
@@ -1903,17 +1905,123 @@ Acceptance:
 - no hidden labels are consumed by phases;
 - no Foundry runtime unless the normal proof gate marks runtime-ready.
 
+Observed blind benchmark:
+
+- run: `runs/sc01-historical-blind-100-v1`;
+- `100/100` final reports after one resume;
+- first pass had one Windows manifest write failure on HEC-054/LUSD
+  (`WinError 5`); resume reexecuted the target and completed cleanly;
+- no broadcast and no runtime authorization in the blind run.
+
 ## PT-028.T05 - Post-run scoring
 
-Status: queued.
+Status: done implementation + smoke, 2026-06-22.
 
-Compare run outputs with `hidden_ground_truth` only after the blind run:
+Implemented:
+
+- `src/vassago_contract_runtime/historical_scoring.py`;
+- CLI command:
+  `python -m vassago_contract_runtime.cli historical-corpus-score`;
+- tests:
+  `tests/design_runtime/test_historical_scoring.py`.
+
+The scorer compares run outputs with `hidden_ground_truth` only after the blind
+run:
 
 - true positive / false negative by family;
 - source failure by chain/compiler/import;
 - thesis mismatch;
 - runtime-ready count;
 - required mapper/corpus expansion.
+
+Current signal buckets:
+
+- `missing`;
+- `none`;
+- `candidate`;
+- `source_truth`;
+- `compile_only`;
+- `runtime_ready`;
+- `runtime`.
+
+Smoke command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-score --run runs\sc01-historical-6-v23-nomad-sidecars --manifest designs\historical-exploits\manifest.json --limit 2 --output-dir runs\_score-smoke-limit2
+```
+
+Observed:
+
+- `status=completed`;
+- artifacts written:
+  - `historical-corpus-score.json`;
+  - `historical-corpus-score.md`.
+
+## PT-028.T05B - Score blind benchmark
+
+Status: next after PT-028.T04.
+
+Command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-score --run runs/sc01-historical-blind-100-v1 --manifest designs/historical-exploits/manifest.json --output-dir runs/sc01-historical-blind-100-v1/historical-corpus-score
+```
+
+Observed:
+
+- `case_count=100`;
+- `scored_count=100`;
+- `candidate_count=67`;
+- `none_count=32`;
+- `runtime_ready_count=1`;
+- `runtime_count=0`;
+- runtime-ready case: `HEC-031` / Nomad bridge.
+
+## PT-028.T05C - Runtime follow-up for actionable HEC-031
+
+Status: done, 2026-06-22.
+
+Command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs/_selected/hec-031-target.json --output runs/sc01-historical-blind-hec031-runtime-v1 --source-cache-dir runs/source-cache-historical-100 --bootstrap-adapters --runtime-authorized
+python -m vassago_contract_runtime.cli historical-corpus-score --run runs/sc01-historical-blind-hec031-runtime-v1 --manifest designs/historical-exploits/manifest.json --benchmark-id HEC-031 --output-dir runs/sc01-historical-blind-hec031-runtime-v1/historical-corpus-score-hec031
+```
+
+Observed:
+
+- target: `HEC-031`, Nomad Replica;
+- runtime: `runtime_completed`;
+- evidence: `runtime_local`;
+- Foundry command was local/fork only with redacted RPC URL;
+- assertion passed:
+  `testNomadProcessesUnprovenForgedMessageOnHistoricalFork`;
+- score with `--benchmark-id HEC-031`:
+  `case_count=1`, `runtime_count=1`.
+
+Boundary:
+
+- This is historical fork-local reproduction.
+- It is not a current live exploitability claim.
+
+## PT-028.T07 - Blind score triage
+
+Status: next.
+
+Input:
+
+- `runs/sc01-historical-blind-100-v1/historical-corpus-score/historical-corpus-score.json`.
+
+Tasks:
+
+- inspect the `67` candidate-only cases by family;
+- inspect the `32` none cases by family;
+- separate source-resolution/compiler/import misses from real detector misses;
+- create mapper tasks for the highest-value misses;
+- keep HEC-031 as known runtime proof, not as a rule.
 
 ## PT-028.T06 - Corpus expansion to 100+
 

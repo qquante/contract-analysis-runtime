@@ -294,6 +294,39 @@ $env:PYTHONPATH='src'
 python -m vassago_contract_runtime.cli run-design --design sc01-access --targets designs/historical-exploits/targets-blind-100.json --output runs/sc01-historical-blind-100-v1 --source-cache-dir runs/source-cache-v20 --bootstrap-adapters
 ```
 
+Score the blind benchmark after it finishes:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-score --run runs/sc01-historical-blind-100-v1 --manifest designs/historical-exploits/manifest.json --output-dir runs/sc01-historical-blind-100-v1/historical-corpus-score
+```
+
+Score one benchmark case:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-score --run runs/sc01-historical-blind-hec031-runtime-v1 --manifest designs/historical-exploits/manifest.json --benchmark-id HEC-031 --output-dir runs/sc01-historical-blind-hec031-runtime-v1/historical-corpus-score-hec031
+```
+
+Current blind benchmark baseline:
+
+```text
+runs/sc01-historical-blind-100-v1
+scored_count=100
+candidate_count=67
+none_count=32
+runtime_ready_count=1
+```
+
+Runtime follow-up baseline:
+
+```text
+runs/sc01-historical-blind-hec031-runtime-v1
+HEC-031 Nomad
+runtime_completed
+runtime_local
+```
+
 Boundary:
 
 - phases may consume only `blind_inputs`;

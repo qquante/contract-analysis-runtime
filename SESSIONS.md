@@ -2302,3 +2302,139 @@ Then run:
 Then run `git diff --check`. If clean, run the blind benchmark with
 `designs/historical-exploits/targets-blind-100.json`. Do not read
 `hidden_ground_truth` until scoring after the blind run.
+
+## 2026-06-22 - PT-028.T05 Historical Corpus Scoring
+
+Goal:
+
+- Add the post-run scorer required to turn the blind historical corpus into a
+  measurable benchmark.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/historical_scoring.py`.
+- Added CLI command:
+  `python -m vassago_contract_runtime.cli historical-corpus-score`.
+- Added `tests/design_runtime/test_historical_scoring.py`.
+- Updated control docs with the scoring flow.
+
+Scoring model:
+
+- `missing`: no final report for the target.
+- `none`: final report exists but no candidate signal.
+- `candidate`: thesis queue signal only.
+- `source_truth`: source-truth verified, but no compile/runtime path yet.
+- `compile_only`: compile-only evidence exists.
+- `runtime_ready`: proof gate allows runtime but local Foundry was not run.
+- `runtime`: local runtime result exists.
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_historical_scoring tests.design_runtime.test_historical_corpus
+python -m vassago_contract_runtime.cli historical-corpus-score --run runs\sc01-historical-6-v23-nomad-sidecars --manifest designs\historical-exploits\manifest.json --limit 2 --output-dir runs\_score-smoke-limit2
+```
+
+Observed:
+
+```text
+4 scoring/corpus tests passed
+historical-corpus-score status=completed
+```
+
+Decisions:
+
+- The scorer is post-run only.
+- It may read `hidden_ground_truth`, but only after a design has already
+  produced artifacts from blind inputs.
+- It reports funnel signal, not a live exploitability claim.
+
+RESUME FROM HERE:
+
+Run full regression:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`.
+Run `python -m vassago_contract_runtime.cli check` and `git diff --check`.
+Then run the blind benchmark:
+`python -m vassago_contract_runtime.cli run-design --design sc01-access --targets designs/historical-exploits/targets-blind-100.json --output runs/sc01-historical-blind-100-v1 --source-cache-dir runs/source-cache-v20 --bootstrap-adapters`.
+After the run finishes, score it with `historical-corpus-score`.
+
+## 2026-06-22 - PT-028.T04/T05B/T05C Blind Benchmark + Runtime Follow-Up
+
+Goal:
+
+- Run the 100-case blind historical benchmark, score it, and execute local
+  Foundry only if the normal gate produces an actionable runtime-ready case.
+
+What was done:
+
+- Loaded `ETHERSCAN_API_KEY` and fork RPC variables from the existing
+  `C:\Users\PC\Desktop\Vassago\.env` into the process only. Values were not
+  printed.
+- Added Etherscan V2 chain-id support for historical corpus chains:
+  Ethereum, BSC, Polygon, Arbitrum, Optimism, Gnosis and Moonriver.
+- Ran the 100-case blind benchmark:
+  `runs/sc01-historical-blind-100-v1`.
+- Resumed once after a Windows manifest write race on HEC-054/LUSD.
+- Scored the benchmark with `historical-corpus-score`.
+- Ran local/fork runtime for the single actionable case, HEC-031/Nomad:
+  `runs/sc01-historical-blind-hec031-runtime-v1`.
+
+Commands:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets designs\historical-exploits\targets-blind-100.json --output runs\sc01-historical-blind-100-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli resume --run runs\sc01-historical-blind-100-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-corpus-score --run runs\sc01-historical-blind-100-v1 --manifest designs\historical-exploits\manifest.json --output-dir runs\sc01-historical-blind-100-v1\historical-corpus-score
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\hec-031-target.json --output runs\sc01-historical-blind-hec031-runtime-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters --runtime-authorized
+python -m vassago_contract_runtime.cli historical-corpus-score --run runs\sc01-historical-blind-hec031-runtime-v1 --manifest designs\historical-exploits\manifest.json --benchmark-id HEC-031 --output-dir runs\sc01-historical-blind-hec031-runtime-v1\historical-corpus-score-hec031
+```
+
+Observed blind benchmark:
+
+```text
+run=runs/sc01-historical-blind-100-v1
+final phase count=1100 completed
+scored_count=100
+candidate_count=67
+none_count=32
+runtime_ready_count=1
+runtime_count=0
+```
+
+Actionable case:
+
+```text
+benchmark_id=HEC-031
+case_id=nomadbridge
+family=bridge_message_auth
+target=ethereum:0x5d94309e5a0090b165fa4181519701637b6daeba
+```
+
+Runtime follow-up:
+
+```text
+run=runs/sc01-historical-blind-hec031-runtime-v1
+runtime_status=runtime_completed
+assertion_status=passed
+evidence_status=runtime_local
+test=testNomadProcessesUnprovenForgedMessageOnHistoricalFork
+```
+
+Decisions:
+
+- HEC-031 is historical/fork-local evidence only.
+- No live exploitability claim is made.
+- The main next work is not more random sampling; it is triage of the `67`
+  candidate-only and `32` none buckets.
+
+RESUME FROM HERE:
+
+Run full regression and check:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`;
+`$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check`;
+`git diff --check`.
+Then commit the scoring/benchmark slice. Next task: `PT-028.T07`, cluster
+`runs/sc01-historical-blind-100-v1/historical-corpus-score/historical-corpus-score.json`
+by family and missing mapper.

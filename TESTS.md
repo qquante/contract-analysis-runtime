@@ -1361,3 +1361,83 @@ Next benchmark:
 $env:PYTHONPATH='src'
 python -m vassago_contract_runtime.cli run-design --design sc01-access --targets designs/historical-exploits/targets-blind-100.json --output runs/sc01-historical-blind-100-v1 --source-cache-dir runs/source-cache-v20 --bootstrap-adapters
 ```
+
+Actual blind benchmark run:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets designs\historical-exploits\targets-blind-100.json --output runs\sc01-historical-blind-100-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli resume --run runs\sc01-historical-blind-100-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+```
+
+Observed:
+
+```text
+first pass: executed_count=1091 failed_count=1 skipped_count=9 status=stopped
+failure: CT-bd324a5e31c2 phase=01_dossier WinError 5 manifest write
+resume: executed_count=10 failed_count=0 skipped_count=1090 status=completed
+final phase count: completed=1100
+```
+
+Scoring tests:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_historical_scoring tests.design_runtime.test_historical_corpus
+```
+
+Observed:
+
+```text
+4 tests passed
+```
+
+Scoring smoke:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-score --run runs\sc01-historical-6-v23-nomad-sidecars --manifest designs\historical-exploits\manifest.json --limit 2 --output-dir runs\_score-smoke-limit2
+```
+
+Observed:
+
+```text
+status=completed
+historical-corpus-score.json written
+historical-corpus-score.md written
+```
+
+Blind benchmark score:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-score --run runs\sc01-historical-blind-100-v1 --manifest designs\historical-exploits\manifest.json --output-dir runs\sc01-historical-blind-100-v1\historical-corpus-score
+```
+
+Observed:
+
+```text
+case_count=100
+scored_count=100
+candidate_count=67
+none_count=32
+runtime_ready_count=1
+runtime_count=0
+```
+
+Runtime follow-up for HEC-031:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\hec-031-target.json --output runs\sc01-historical-blind-hec031-runtime-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters --runtime-authorized
+python -m vassago_contract_runtime.cli historical-corpus-score --run runs\sc01-historical-blind-hec031-runtime-v1 --manifest designs\historical-exploits\manifest.json --benchmark-id HEC-031 --output-dir runs\sc01-historical-blind-hec031-runtime-v1\historical-corpus-score-hec031
+```
+
+Observed:
+
+```text
+runtime status=runtime_completed
+assertion status=passed
+evidence_status=runtime_local
+score case_count=1 runtime_count=1
+```

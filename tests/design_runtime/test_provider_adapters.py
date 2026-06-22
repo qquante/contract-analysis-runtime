@@ -76,6 +76,42 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertIn("Fixture.sol", first.source_files)
         self.assertIn("Fixture", " ".join(first.source_files.values()))
 
+    def test_etherscan_v2_maps_historical_corpus_chains(self) -> None:
+        expected = {
+            "ethereum": "1",
+            "bsc": "56",
+            "polygon": "137",
+            "arbitrum": "42161",
+            "optimism": "10",
+            "gnosis": "100",
+            "moonriver": "1285",
+        }
+
+        for chain, chainid in expected.items():
+            with self.subTest(chain=chain):
+                def transport(url: str, expected_chainid: str = chainid) -> dict:
+                    params = parse_qs(urlparse(url).query)
+                    self.assertEqual(params["chainid"], [expected_chainid])
+                    return {
+                        "status": "1",
+                        "message": "OK",
+                        "result": [
+                            {
+                                "ContractName": "Fixture",
+                                "CompilerVersion": "v0.8.24",
+                                "ABI": "[]",
+                                "SourceCode": "contract Fixture {}",
+                                "Proxy": "0",
+                                "Implementation": "",
+                            }
+                        ],
+                    }
+
+                target = ContractTargetRef.from_target(ContractTarget(chain, "0x1111111111111111111111111111111111111111"))
+                result = EtherscanV2ExplorerAdapter("test-key", min_interval_seconds=0, transport=transport).get_contract_context(target)
+
+                self.assertEqual(result.status, "resolved")
+
     def test_etherscan_v2_standard_json_normalizes_absolute_source_units(self) -> None:
         source_json = {
             "language": "Solidity",
