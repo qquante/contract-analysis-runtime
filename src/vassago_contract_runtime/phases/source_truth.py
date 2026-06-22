@@ -9,6 +9,7 @@ from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseRe
 from vassago_contract_runtime.sc01_alchemix import evaluate_alchemix_keeper_state
 from vassago_contract_runtime.sc01_furucombo import evaluate_furucombo_delegatecall_proxy_storage
 from vassago_contract_runtime.sc01_nomad import build_nomad_root_proof_analysis, evaluate_nomad_bridge_root_proof
+from vassago_contract_runtime.sc01_proxy_upgrade import evaluate_proxy_upgrade_signature
 from vassago_contract_runtime.sc01_source import (
     evaluate_access_control_initializer,
     evaluate_known_non_sc01_pattern,
@@ -209,6 +210,38 @@ def _review_queue_item(
             alchemix,
             evidence_kind="alchemix_keeper_state_candidate",
         )
+    proxy_upgrade = evaluate_proxy_upgrade_signature(source_manifest, str(item.get("thesis_id") or ""), functions)
+    if proxy_upgrade.get("applicable") is True:
+        if proxy_upgrade.get("status") == "source_truth_verified":
+            return _verified_runtime_specific_review(
+                item,
+                functions,
+                related_surface,
+                related_guards,
+                related_writes,
+                proxy_upgrade,
+                runtime_runner=str(proxy_upgrade.get("runtime_runner") or "proxy_upgrade_signature_runtime"),
+                evidence_kind=str(proxy_upgrade.get("classification") or "proxy_upgrade_signature"),
+            )
+        if proxy_upgrade.get("status") == "source_truth_rejected":
+            return _rejected_review(
+                item,
+                functions,
+                related_surface,
+                related_guards,
+                related_writes,
+                proxy_upgrade,
+                "terminal_no_foundry_proxy_upgrade_signature",
+            )
+        return _runtime_specific_blocked_review(
+            item,
+            functions,
+            related_surface,
+            related_guards,
+            related_writes,
+            proxy_upgrade,
+            evidence_kind=str(proxy_upgrade.get("classification") or "proxy_upgrade_signature_candidate"),
+        )
     evaluation = evaluate_uninitialized_uups_initializer(source_manifest)
     if _is_verified_uninitialized_uups_initializer(item, related_surface, related_writes, evaluation):
         return _verified_initializer_review(
@@ -379,6 +412,9 @@ def _verified_runtime_specific_review(
         "fork_block_number": evaluation.get("fork_block_number"),
         "runtime_strategy": evaluation.get("runtime_strategy"),
         "runtime_components": list(evaluation.get("runtime_components") or []),
+        "classification": evaluation.get("classification"),
+        "proxy_context": evaluation.get("proxy_context"),
+        "critical_writes": list(evaluation.get("critical_writes") or []),
         "next_required_adapter": "compile_only_then_local_foundry" if complete else runtime_runner,
         "evidence_refs": _refs(related_surface, related_guards, related_writes)
         + list(evaluation.get("evidence_refs") or []),
@@ -408,6 +444,10 @@ def _runtime_specific_blocked_review(
         "related_state_variables": [write.get("variable") for write in related_writes],
         "missing_proof_pieces": list(evaluation.get("missing_proof_pieces") or []),
         "blockers": list(evaluation.get("blockers") or []),
+        "classification": evaluation.get("classification"),
+        "reason": evaluation.get("reason"),
+        "proxy_context": evaluation.get("proxy_context"),
+        "critical_writes": list(evaluation.get("critical_writes") or []),
         "actor_model": evaluation.get("actor_model"),
         "measurable_reader": evaluation.get("measurable_reader"),
         "measurable_delta": evaluation.get("measurable_delta"),

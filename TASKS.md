@@ -2063,7 +2063,7 @@ Artifacts:
 
 ## PT-028.T08 - Proxy/upgrade historical mapper hardening
 
-Status: next.
+Status: done first slice 2026-06-22.
 
 Input:
 
@@ -2085,6 +2085,65 @@ Needed pieces:
 - signature/replay and owner/admin reader mapping;
 - implementation-slot or privileged-storage delta;
 - compile-only harness only after source truth is verified.
+
+Implemented:
+
+- Added `src/vassago_contract_runtime/sc01_proxy_upgrade.py`.
+- Integrated `evaluate_proxy_upgrade_signature()` into
+  `src/vassago_contract_runtime/phases/source_truth.py`.
+- Added focused tests in
+  `tests/design_runtime/test_sc01_proxy_upgrade.py`.
+
+Current behavior:
+
+- rejects transparent proxy admin paths for `uups_weak_auth`;
+- rejects implementations with `_disableInitializers()`;
+- blocks proxy candidates with missing implementation source;
+- blocks role-admin escalation until `hasRole/getRoleAdmin` graph and state
+  readers exist;
+- verifies initializer/UUPS candidates only as source-truth and keeps runtime
+  blocked when proxy impact, upgrade target, state reader or codable args are
+  missing.
+
+Validation:
+
+- focused tests:
+  `python -m unittest tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_sc01_source`
+  -> `32` tests OK.
+- applied the integrated source-truth review over resolved artifacts from
+  `runs/sc01-historical-blind-100-v1` for all `20`
+  `proxy_upgrade_signature` cases.
+- observed one source-truth verified/runtime-blocked initializer case
+  (`uninitialized_proxy_or_implementation_initializer`) and several terminal
+  or precise blocked classes:
+  `transparent_proxy_admin_path`, `disable_initializers_present`,
+  `proxy_implementation_source_missing`, `role_admin_graph_required`,
+  `initializer_without_measurable_critical_write`.
+
+Important limitation:
+
+- a fresh isolated `run-design` over only proxy-upgrade targets produced
+  `04_no_thesis_candidate=20` because source/thesis acquisition did not route
+  those isolated targets into the same queue. That run is useful as a routing
+  diagnostic, not as proof that the mapper failed.
+
+## PT-028.T09 - Proxy family thesis acquisition/routing
+
+Status: next.
+
+Goal:
+
+- make `proxy_upgrade_signature` targets enter source-truth consistently in
+  fresh runs, without relying on historical labels or old artifacts.
+
+Needed:
+
+- source-backed proxy/implementation signals in thesis acquisition;
+- source-cache or resolver behavior that works for family-only reruns;
+- semantic motifs for `TransparentUpgradeableProxy`, EIP-1967 proxy context,
+  `initialize`, `upgradeTo`, `upgradeToAndCall`, `_authorizeUpgrade`,
+  `getRoleAdmin/hasRole`;
+- no use of `benchmark_id`, case id, address or hidden label as detector rule.
 
 ## PT-028.T06 - Corpus expansion to 100+
 

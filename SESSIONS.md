@@ -2511,3 +2511,76 @@ Run `python -m vassago_contract_runtime.cli check` and `git diff --check`.
 Then commit this stage-report slice. Next implementation: `PT-028.T08`,
 starting with `proxy_upgrade_signature` candidates from
 `runs/sc01-historical-blind-100-v1/historical-stage-failure/historical-stage-failure-report.json`.
+
+## 2026-06-22 - PT-028.T08 Proxy/Upgrade Source-Truth Mapper
+
+Goal:
+
+- Implement the first source-truth mapper for the largest blind-100 missing
+  family, `proxy_upgrade_signature`, without using benchmark ids, addresses,
+  case ids or hidden labels as detector rules.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/sc01_proxy_upgrade.py`.
+- Integrated `evaluate_proxy_upgrade_signature()` into
+  `src/vassago_contract_runtime/phases/source_truth.py`.
+- Added focused tests:
+  `tests/design_runtime/test_sc01_proxy_upgrade.py`.
+- Updated state docs:
+  `TASKS.md`, `EXECUTION_MAP.md`, `CONTEXT.md`, `TESTS.md`, `SESSIONS.md`.
+
+Commands:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_sc01_source
+python -m vassago_contract_runtime.cli historical-corpus-report --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --targets-output runs\_selected\proxy-upgrade-t08-targets.json
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t08-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t08-v1 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t08-v1\historical-stage-failure
+```
+
+Observed:
+
+```text
+focused tests: Ran 32 tests, OK
+run-design: executed_count=220 failed_count=0 target_count=20
+fresh isolated stage report: 04_no_thesis_candidate=20
+```
+
+Additional validation:
+
+- Replayed the integrated source-truth review directly over resolved artifacts
+  from `runs/sc01-historical-blind-100-v1` for the 20
+  `proxy_upgrade_signature` cases.
+- Observed precise mapper classes:
+  `transparent_proxy_admin_path`, `disable_initializers_present`,
+  `proxy_implementation_source_missing`, `role_admin_graph_required`,
+  `initializer_without_measurable_critical_write`, and one
+  `source_truth_verified_runtime_blocked` initializer candidate.
+
+Decisions and reasoning:
+
+- The mapper works once candidates reach source-truth.
+- A fresh isolated family run does not currently route proxy-upgrade targets to
+  thesis acquisition, so `PT-028.T09` must fix acquisition/routing before
+  Foundry.
+- Foundry remains blocked for this family until a fresh run produces
+  source-truth verified candidates with proxy impact, reader/delta, codable
+  args and compile-only readiness.
+
+Blockers:
+
+- Proxy family thesis acquisition is too weak in fresh family-only runs.
+- Source/cache reuse for family-only runs did not reproduce the resolved state
+  from the original blind-100 run.
+
+RESUME FROM HERE:
+
+Run full regression:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`.
+Run `python -m vassago_contract_runtime.cli check` and `git diff --check`.
+Commit the PT-028.T08 mapper slice if green.
+Next implementation is `PT-028.T09`: make proxy-upgrade thesis acquisition
+route fresh targets into source-truth using source/ABI/proxy context only, not
+historical labels.

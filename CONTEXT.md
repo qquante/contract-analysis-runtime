@@ -796,3 +796,58 @@ Operational meaning:
   it has the largest candidate bucket.
 - Do not turn historical labels, case ids or addresses into detector rules.
   The historical report is post-run scoring and triage only.
+
+## PT-028.T08 Proxy/Upgrade Mapper State
+
+`PT-028.T08` adds the first source-truth mapper for the largest blind-100
+candidate bucket, `proxy_upgrade_signature`.
+
+Files:
+
+- `src/vassago_contract_runtime/sc01_proxy_upgrade.py`
+- `src/vassago_contract_runtime/phases/source_truth.py`
+- `tests/design_runtime/test_sc01_proxy_upgrade.py`
+
+What it does:
+
+- classifies transparent proxy admin paths as terminal for generic
+  `uups_weak_auth`;
+- rejects implementations with `_disableInitializers()`;
+- blocks proxy candidates when implementation source is missing;
+- blocks role-admin escalation when role graph/state readers are not available;
+- emits source-truth verified/runtime-blocked for initializer/UUPS candidates
+  only when source evidence exists, while keeping runtime blocked until proxy
+  impact, upgrade target, reader/delta and codable args are known.
+
+Observed validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_sc01_source
+```
+
+Result:
+
+```text
+Ran 32 tests
+OK
+```
+
+The mapper was also applied directly to resolved artifacts from
+`runs/sc01-historical-blind-100-v1` for the 20 proxy-upgrade cases. It produced
+precise classes such as:
+
+- `transparent_proxy_admin_path`
+- `disable_initializers_present`
+- `proxy_implementation_source_missing`
+- `role_admin_graph_required`
+- `initializer_without_measurable_critical_write`
+- `uninitialized_proxy_or_implementation_initializer`
+
+Fresh isolated rerun note:
+
+- `runs/sc01-historical-proxy-upgrade-t08-v1` completed all phases with
+  `failed_count=0`, but produced `04_no_thesis_candidate=20` because the fresh
+  family-only run did not route those targets into proxy-upgrade theses.
+- Therefore the next blocker is `PT-028.T09` thesis acquisition/routing for
+  proxy family, not Foundry.

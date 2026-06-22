@@ -344,6 +344,18 @@ sc01_access_control=11
 bridge_message_auth=10
 ```
 
+Current proxy-upgrade mapper state:
+
+- `PT-028.T08` adds `src/vassago_contract_runtime/sc01_proxy_upgrade.py`
+  and routes it through phase `05_source_truth`.
+- It rejects transparent proxy admin paths and `_disableInitializers()`, blocks
+  missing implementation source/role graph cases, and keeps initializer/UUPS
+  candidates runtime-blocked until proxy impact, upgrade target, reader/delta
+  and codable args exist.
+- A fresh family-only proxy run currently stops at `04_no_thesis_candidate=20`;
+  therefore the next blocker is `PT-028.T09` proxy thesis acquisition/routing,
+  not Foundry.
+
 Runtime follow-up baseline:
 
 ```text

@@ -1483,6 +1483,63 @@ sc01_access_control=11
 bridge_message_auth=10
 ```
 
+## PT-028.T08 proxy/upgrade mapper
+
+Focused regression:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_sc01_source
+```
+
+Observed:
+
+```text
+Ran 32 tests
+OK
+```
+
+Mapper integration smoke over previously resolved blind-100 artifacts:
+
+```powershell
+$env:PYTHONPATH='src'
+# Python one-shot script imported _review_queue_item and replayed source-truth
+# over runs/sc01-historical-blind-100-v1 for the 20 proxy_upgrade_signature cases.
+```
+
+Observed classes:
+
+```text
+source_truth_verified_runtime_blocked/uninitialized_proxy_or_implementation_initializer=1
+source_truth_rejected/transparent_proxy_admin_path=4
+source_truth_rejected/disable_initializers_present=3
+source_truth_blocked_runtime_specific_mapper/proxy_implementation_source_missing=5
+source_truth_blocked_runtime_specific_mapper/role_admin_graph_required=2
+source_truth_blocked_runtime_specific_mapper/initializer_without_measurable_critical_write=2
+```
+
+Fresh isolated family run:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-report --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --targets-output runs\_selected\proxy-upgrade-t08-targets.json
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t08-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t08-v1 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t08-v1\historical-stage-failure
+```
+
+Observed:
+
+```text
+run-design executed_count=220 failed_count=0 target_count=20
+stage report: 04_no_thesis_candidate=20
+```
+
+Interpretation:
+
+- the mapper works when source-truth receives proxy candidates;
+- the isolated fresh run exposed a routing/acquisition gap before source-truth;
+- next task is `PT-028.T09`, not Foundry.
+
 Observed:
 
 ```text

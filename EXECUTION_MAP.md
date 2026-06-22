@@ -84,7 +84,8 @@ PT-028.T05 Post-run scoring against hidden_ground_truth - done implementation 20
 PT-028.T05B Score blind benchmark output - done 2026-06-22
 PT-028.T05C Runtime follow-up for actionable HEC-031 - done 2026-06-22
 PT-028.T07 Blind score triage - done first slice 2026-06-22
-PT-028.T08 Proxy/upgrade historical mapper hardening - next
+PT-028.T08 Proxy/upgrade historical mapper hardening - done first slice 2026-06-22
+PT-028.T09 Proxy family thesis acquisition/routing - next
 PT-028.T06 Expand corpus beyond 100 - queued
 ```
 
