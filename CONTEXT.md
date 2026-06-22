@@ -536,6 +536,12 @@ Interpretation:
   current live exploitability without a fresh current-state review.
 - The Nomad mapper is bridge root/proof-specific and must remain separate from
   Wormhole's implementation-initializer VM runner.
+- PT-027.T15 strengthens this with two explicit sidecars:
+  - phase 05 `nomad-root-proof-analysis.json`;
+  - phase 06 `bridge-state-review.json`.
+- These sidecars record the root/proof model, deterministic forged message
+  plan, runtime assertions and current-state checks required before any
+  live-risk claim.
 
 ## Current SC01 Historical Reproduction Inventory
 

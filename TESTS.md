@@ -1152,3 +1152,49 @@ impact verdict=historical_reproduced_high_context
 current live risk=not_claimed
 no_broadcast=true
 ```
+
+## PT-027.T15 Nomad Root/Proof Sidecars
+
+Focused regression:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source tests.design_runtime.test_phases
+```
+
+Observed:
+
+```text
+38 tests passed
+```
+
+Coverage added:
+
+- `build_nomad_root_proof_analysis()` returns root/proof model, message plan,
+  runtime assertions and current-state review checklist.
+- Phase 05 emits `nomad-root-proof-analysis.json`.
+- Phase 06 emits `bridge-state-review.json`.
+- Nomad no longer uses `local_initializer_*` status labels in on-chain state.
+- `current_state_review.live_claim_allowed=false` remains explicit.
+
+Real sidecar smoke without runtime:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v23-nomad-sidecars --source-cache-dir runs/source-cache-v20 --bootstrap-adapters
+```
+
+Observed:
+
+```text
+run_id=RUN-0ded12db3e58
+status=completed
+failed_count=0
+Nomad target_id=CT-05f41610b129
+nomad-root-proof-analysis.status=historical_runtime_ready
+bridge-state-review.status=historical_fork_state_ready_current_live_not_claimed
+admin-state.status=protocol_specific_admin_state_not_required
+current_state_review.live_claim_allowed=false
+final_status=runtime_ready_pending_local_execution
+runtime_status=blocked_runtime_authorization_required
+```

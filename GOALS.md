@@ -63,6 +63,8 @@ Acceptance:
   message-authentication harness behind the same compile/runtime gates. Its
   archive-fork smoke and impact review are complete, with current live risk
   `not_claimed`.
+- Nomad now also emits root/proof and current-state-review sidecars so
+  historical reproduction cannot be confused with a live exploitability claim.
 
 ## G-004 - Small top-level agent Interface
 

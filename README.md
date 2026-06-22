@@ -151,6 +151,9 @@ Historical runtime runners currently implemented:
   local/fork-only, no broadcast, fork block `15259100`, interface-only harness
   that crafts a local forged message and asserts `process(bytes)` marks it
   processed on the historical Replica fork.
+  The design run also emits `nomad-root-proof-analysis.json` and
+  `bridge-state-review.json` to keep root/proof reasoning and current-state
+  review requirements separate from historical reproduction.
 
 Historical impact-review sidecars exist for Audius, Wormhole and Nomad. They
 classify those cases as `historical_reproduced_critical` only; current live

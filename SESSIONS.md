@@ -2021,3 +2021,71 @@ Run final regression:
 `git diff --check`.
 If clean, commit with
 `feat(sc01): add furucombo and alchemix historical runtimes`.
+
+## 2026-06-22 - PT-027.T15 Nomad Root/Proof Analysis Sidecars
+
+Goal:
+
+- Strengthen the Nomad bridge root/proof mapper and make current-state review
+  explicit without changing the historical evidence gate.
+
+What was done:
+
+- Added `build_nomad_root_proof_analysis()` in
+  `src/vassago_contract_runtime/sc01_nomad.py`.
+- `SourceTruthAdapter` now writes
+  `nomad-root-proof-analysis.json` for `bridge_root_proof_validation`.
+- `OnChainStateAdapter` now writes `bridge-state-review.json` for Nomad.
+- Corrected misleading Nomad state labels from `local_initializer_*` to
+  protocol-specific bridge/message-authentication statuses.
+- Updated `designs/sc01-access/design.yaml` so phase 06 declares
+  `bridge-state-review.json`.
+
+Decisions and reasoning:
+
+- The best next step was not another runtime replay. Nomad already reproduced
+  historically. The missing piece was a stable, auditable root/proof sidecar
+  and a clear list of current-state checks required before any live-risk claim.
+- The current-state review remains `not_performed`; this is intentional and
+  prevents historical proof from becoming a live exploitability claim.
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source tests.design_runtime.test_phases
+```
+
+Observed:
+
+```text
+38 tests passed
+```
+
+Real sidecar smoke:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v23-nomad-sidecars --source-cache-dir runs/source-cache-v20 --bootstrap-adapters
+```
+
+Observed:
+
+```text
+status=completed
+failed_count=0
+Nomad nomad-root-proof-analysis.status=historical_runtime_ready
+Nomad bridge-state-review.status=historical_fork_state_ready_current_live_not_claimed
+Nomad admin-state.status=protocol_specific_admin_state_not_required
+Nomad final_status=runtime_ready_pending_local_execution
+Nomad runtime_status=blocked_runtime_authorization_required
+```
+
+RESUME FROM HERE:
+
+Run full regression:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`;
+`$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check`;
+`git diff --check`.
+If clean, commit with
+`feat(sc01): add nomad root proof sidecars`.

@@ -64,7 +64,39 @@ def evaluate_nomad_bridge_root_proof(source_manifest: dict[str, Any]) -> dict[st
             "message because the default message root/status passes acceptableRoot()."
         ),
         "evidence_kind": "nomad_root_proof_message_auth_bypass",
+        "root_proof_model": _root_proof_model(),
+        "current_state_review": _current_state_review(),
         "evidence_refs": _evidence_refs(exact_historical_target, vulnerable_source_shape, replica_shape),
+    }
+
+
+def build_nomad_root_proof_analysis(source_manifest: dict[str, Any]) -> dict[str, Any]:
+    """Build a structured Nomad root/proof sidecar.
+
+    This is not extra proof and it is not a current-live claim. It makes the
+    historical predicate auditable and gives later bridge mappers a stable
+    contract for root, proof, processed-message and current-state checks.
+    """
+    evaluation = evaluate_nomad_bridge_root_proof(source_manifest)
+    target = _target_address(source_manifest)
+    return {
+        "status": "historical_runtime_ready" if evaluation.get("verified") else "blocked",
+        "target_address": target or NOMAD_REPLICA_PROXY,
+        "historical_replica_proxy": NOMAD_REPLICA_PROXY,
+        "fork_block_number": NOMAD_EXPLOIT_FORK_BLOCK,
+        "verified": bool(evaluation.get("verified")),
+        "blockers": list(evaluation.get("blockers") or []),
+        "runtime_runner": "nomad_bridge_root_proof_runtime",
+        "root_proof_model": _root_proof_model(),
+        "message_plan": _message_plan(),
+        "runtime_assertions": _runtime_assertions(),
+        "current_state_review": _current_state_review(),
+        "evidence_status": "static_only_until_runtime",
+        "warning": (
+            "This sidecar separates historical fork reproduction from current live exploitability. "
+            "It must not be used as a live-risk claim without current implementation, root-state and "
+            "asset-moving recipient checks."
+        ),
     }
 
 
@@ -144,6 +176,61 @@ def render_nomad_harness(source_manifest: dict[str, Any]) -> str:
             "",
         ]
     )
+
+
+def _root_proof_model() -> dict[str, Any]:
+    return {
+        "message_hash_source": "keccak256(forged_nomad_message)",
+        "message_root_reader": "messages(bytes32) -> bytes32 root_or_status",
+        "root_confirmation_reader": "confirmAt(bytes32) -> uint256 timestamp",
+        "acceptance_check": "acceptableRoot(messages[messageHash])",
+        "historical_bug_condition": (
+            "An unproven message reads the default bytes32(0) root/status, and the historical "
+            "Replica state made acceptableRoot(bytes32(0)) true."
+        ),
+        "fixed_or_negative_signals": [
+            "process checks messages[messageHash] == Proven/Processed enum instead of acceptableRoot(default)",
+            "acceptableRoot rejects LEGACY_STATUS_NONE/default root",
+            "committed root initialization skips bytes32(0)",
+        ],
+    }
+
+
+def _message_plan() -> dict[str, Any]:
+    return {
+        "origin_domain": 1000,
+        "nonce": 7,
+        "sender": "address(this) encoded as Nomad bytes32 sender",
+        "destination_domain": "target.localDomain()",
+        "recipient": "fresh local VassagoNomadReceiver encoded as bytes32",
+        "body": "bytes(\"vassago.nomad.local.receiver\")",
+        "argument_policy": "fully local deterministic forged message; no private key or live transaction",
+    }
+
+
+def _runtime_assertions() -> list[str]:
+    return [
+        "messages(messageHash) == bytes32(0) before process",
+        "acceptableRoot(bytes32(0)) == true at pinned historical fork",
+        "process(forgedMessage) returns true",
+        "local receiver handle(...) is invoked",
+        "messages(messageHash) == LEGACY_STATUS_PROCESSED after process",
+    ]
+
+
+def _current_state_review() -> dict[str, Any]:
+    return {
+        "status": "not_performed",
+        "live_claim_allowed": False,
+        "required_checks": [
+            "read current proxy implementation and code hash",
+            "confirm current process(bytes) validation logic",
+            "confirm current acceptableRoot(defaultRoot) behavior",
+            "read current messages(forgedMessageHash) and confirmAt(defaultRoot) state",
+            "prove forged message reaches an asset-moving recipient on current deployment",
+        ],
+        "safe_default": "historical_reproduced_only",
+    }
 
 
 def _target_address(source_manifest: dict[str, Any]) -> str:

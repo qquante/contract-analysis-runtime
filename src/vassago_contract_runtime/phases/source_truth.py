@@ -8,7 +8,7 @@ from vassago_contract_runtime.design_runtime.models import short_hash
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
 from vassago_contract_runtime.sc01_alchemix import evaluate_alchemix_keeper_state
 from vassago_contract_runtime.sc01_furucombo import evaluate_furucombo_delegatecall_proxy_storage
-from vassago_contract_runtime.sc01_nomad import evaluate_nomad_bridge_root_proof
+from vassago_contract_runtime.sc01_nomad import build_nomad_root_proof_analysis, evaluate_nomad_bridge_root_proof
 from vassago_contract_runtime.sc01_source import (
     evaluate_access_control_initializer,
     evaluate_known_non_sc01_pattern,
@@ -39,20 +39,24 @@ class SourceTruthAdapter:
         verified_count = sum(1 for item in reviews if item.get("source_truth_verified") is True)
         rejected_count = sum(1 for item in reviews if item.get("status") == "source_truth_rejected")
         status = _source_truth_status(reviews, verified_count, rejected_count)
-        return PhaseResult.completed(
-            json_artifacts={
-                "sc01-source-truth.json": {
-                    "status": status,
-                    "target_id": context.target.target_id,
-                    "review_count": len(reviews),
-                    "source_truth_verified_count": verified_count,
-                    "source_truth_rejected_count": rejected_count,
-                    "reviews": reviews,
-                    "evidence_status": "static_only",
-                    "blockers": _source_truth_blockers(status),
-                    "warning": _source_truth_warning(status),
-                }
+        artifacts = {
+            "sc01-source-truth.json": {
+                "status": status,
+                "target_id": context.target.target_id,
+                "review_count": len(reviews),
+                "source_truth_verified_count": verified_count,
+                "source_truth_rejected_count": rejected_count,
+                "reviews": reviews,
+                "evidence_status": "static_only",
+                "blockers": _source_truth_blockers(status),
+                "warning": _source_truth_warning(status),
             }
+        }
+        nomad_analysis = _nomad_analysis_if_relevant(queue, source_manifest)
+        if nomad_analysis is not None:
+            artifacts["nomad-root-proof-analysis.json"] = nomad_analysis
+        return PhaseResult.completed(
+            json_artifacts=artifacts
         )
 
 
@@ -84,6 +88,13 @@ def _source_truth_warning(status: str) -> str:
     if status == "source_truth_rejected":
         return "Source-backed negative policy rejected all SC01 candidates before Foundry."
     return "Skeleton source truth. No candidate is verified or runtime-ready in this phase."
+
+
+def _nomad_analysis_if_relevant(queue: dict[str, Any], source_manifest: dict[str, Any]) -> dict[str, Any] | None:
+    thesis_ids = {str(item.get("thesis_id") or "") for item in queue.get("queue", [])}
+    if "bridge_root_proof_validation" not in thesis_ids:
+        return None
+    return build_nomad_root_proof_analysis(source_manifest)
 
 
 def _review_queue_item(

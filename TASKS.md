@@ -1683,3 +1683,27 @@ Status: done, 2026-06-22.
 Artifact:
 
 - `SC01_HISTORICAL_REPRODUCTION_REPORT.md`.
+
+## PT-027.T15 - Nomad root/proof analysis + current-state separation
+
+Status: done implementation, 2026-06-22.
+
+Implemented:
+
+- strengthened `src/vassago_contract_runtime/sc01_nomad.py` with
+  `build_nomad_root_proof_analysis()`;
+- phase 05 now emits `nomad-root-proof-analysis.json` whenever
+  `bridge_root_proof_validation` is in the thesis queue;
+- phase 06 now emits `bridge-state-review.json` for Nomad and no longer labels
+  Nomad as local initializer state;
+- `bridge-state-review.json` records:
+  - root/proof model;
+  - deterministic forged message plan;
+  - runtime assertions;
+  - current-state checks required before any live-risk claim.
+
+Key decision:
+
+- Nomad remains historical local/fork reproduction. Current live risk stays
+  `not_claimed` unless a separate current implementation/root/message/recipient
+  review is performed.

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from vassago_contract_runtime.sc01_alchemix import evaluate_alchemix_keeper_state
 from vassago_contract_runtime.sc01_furucombo import evaluate_furucombo_delegatecall_proxy_storage
-from vassago_contract_runtime.sc01_nomad import evaluate_nomad_bridge_root_proof
+from vassago_contract_runtime.sc01_nomad import build_nomad_root_proof_analysis, evaluate_nomad_bridge_root_proof
 from vassago_contract_runtime.sc01_source import (
     evaluate_access_control_initializer,
     evaluate_known_non_sc01_pattern,
@@ -540,6 +540,48 @@ class SC01SourceVerifierTests(unittest.TestCase):
         self.assertIn("testNomadProcessesUnprovenForgedMessageOnHistoricalFork", harness)
         self.assertIn("target.process(message)", harness)
         self.assertIn("target.acceptableRoot(defaultRoot)", harness)
+
+    def test_nomad_root_proof_analysis_separates_current_state_review(self) -> None:
+        fixture = {
+            "target": {"chain": "eth", "address": "0x5d94309e5a0090b165fa4181519701637b6daeba"},
+            "abi": [{"type": "fallback", "stateMutability": "payable"}],
+            "source_files": {"Proxy.sol": "contract UpgradeBeaconProxy { fallback() external payable {} }"},
+            "related_sources": {
+                "implementation": {
+                    "status": "resolved",
+                    "abi": [
+                        {"type": "function", "name": "localDomain", "inputs": [], "outputs": [{"type": "uint32"}], "stateMutability": "view"},
+                        {"type": "function", "name": "messages", "inputs": [{"type": "bytes32"}], "outputs": [{"type": "bytes32"}], "stateMutability": "view"},
+                        {"type": "function", "name": "acceptableRoot", "inputs": [{"type": "bytes32"}], "outputs": [{"type": "bool"}], "stateMutability": "view"},
+                        {"type": "function", "name": "confirmAt", "inputs": [{"type": "bytes32"}], "outputs": [{"type": "uint256"}], "stateMutability": "view"},
+                        {"type": "function", "name": "process", "inputs": [{"type": "bytes"}], "outputs": [{"type": "bool"}], "stateMutability": "nonpayable"},
+                        {"type": "function", "name": "prove", "inputs": [{"type": "bytes32"}, {"type": "bytes32[32]"}, {"type": "uint256"}], "outputs": [{"type": "bool"}], "stateMutability": "nonpayable"},
+                    ],
+                    "source_files": {
+                        "Replica.sol": """
+                        contract Replica {
+                            mapping(bytes32 => uint256) public confirmAt;
+                            mapping(bytes32 => bytes32) public messages;
+                            function process(bytes memory _message) public returns (bool) {
+                                bytes32 _messageHash = keccak256(_message);
+                                require(acceptableRoot(messages[_messageHash]), "!proven");
+                                return true;
+                            }
+                            function prove(bytes32 _leaf, bytes32[32] calldata _proof, uint256 _index) public returns (bool) {}
+                            function acceptableRoot(bytes32 _root) public view returns (bool) {}
+                        }
+                        """,
+                    },
+                }
+            },
+        }
+
+        analysis = build_nomad_root_proof_analysis(fixture)
+
+        self.assertEqual(analysis["status"], "historical_runtime_ready")
+        self.assertEqual(analysis["root_proof_model"]["acceptance_check"], "acceptableRoot(messages[messageHash])")
+        self.assertEqual(analysis["current_state_review"]["status"], "not_performed")
+        self.assertFalse(analysis["current_state_review"]["live_claim_allowed"])
 
     def test_furucombo_delegatecall_proxy_storage_requires_historical_proxy(self) -> None:
         fixture = {

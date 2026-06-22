@@ -55,6 +55,7 @@ phases:
       - admin-state.json
       - proxy-state.json
       - role-state.json
+      - bridge-state-review.json
   - id: "07_proof_pieces"
     name: Proof Pieces
     required: true
