@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from vassago_contract_runtime.sc01_proxy_collision import evaluate_proxy_storage_collision_reinitializer
+
 
 ADMIN_VARIABLES = ("owner", "admin", "governor")
 
@@ -130,88 +132,6 @@ def evaluate_access_control_initializer(source_manifest: dict[str, Any]) -> dict
             "hasRole(DEFAULT_ADMIN_ROLE, caller) is true."
         ),
         "evidence_refs": _access_control_evidence_refs(verified, role_setups),
-    }
-
-
-def evaluate_proxy_storage_collision_reinitializer(source_manifest: dict[str, Any]) -> dict[str, Any]:
-    """Return partial evidence for an Audius-style proxy collision thesis."""
-
-    source_text = _source_text(source_manifest)
-    abi = list(source_manifest.get("abi") or [])
-    proxy_context = dict(source_manifest.get("proxy_context") or {})
-    blockers = []
-    proxy_admin = _proxy_admin_storage_declaration(source_text)
-    delegates = "delegatecall" in source_text and ("function ()" in source_text or "fallback" in source_text or "_fallback" in source_text)
-    implementation = str(proxy_context.get("implementation") or "")
-    is_proxy = str(proxy_context.get("proxy") or "").lower() in {"1", "true", "yes"}
-    admin_reader = _abi_function(abi, "getAudiusProxyAdminAddress") or _abi_function(abi, "admin")
-    implementation_reader = _abi_function(abi, "implementation")
-    implementation_manifest = _related_implementation_manifest(source_manifest)
-    implementation_source = _source_text(implementation_manifest) if implementation_manifest else ""
-    implementation_contract_name = _contract_name(implementation_manifest, implementation_source) if implementation_manifest else ""
-    implementation_contract_source = _contract_source_by_name(
-        implementation_source,
-        implementation_contract_name,
-    )
-    implementation_initializable = _has_initializable_slot_zero_flags(implementation_source)
-    implementation_initializers = _implementation_initializer_names(implementation_contract_source or implementation_source)
-    privileged_writes = _implementation_initializer_privileged_writes(
-        implementation_contract_source or implementation_source,
-        list((implementation_manifest or {}).get("abi") or []),
-    )
-
-    if "pragma solidity" not in source_text:
-        blockers.append("source_not_compile_context")
-    if not proxy_admin:
-        blockers.append("slot_zero_proxy_admin_missing")
-    if not delegates:
-        blockers.append("delegatecall_fallback_missing")
-    if not is_proxy:
-        blockers.append("explorer_proxy_context_missing")
-    if not implementation or implementation == "0x0000000000000000000000000000000000000000":
-        blockers.append("implementation_address_missing")
-    if not admin_reader:
-        blockers.append("proxy_admin_reader_missing")
-    if not implementation_reader:
-        blockers.append("implementation_reader_missing")
-
-    verified_proxy_side = not blockers
-    missing = []
-    if not implementation_source:
-        missing.append("implementation_source_required")
-    if not implementation_initializable:
-        missing.append("implementation_initializable_slot0_layout_required")
-    if not implementation_initializers:
-        missing.append("implementation_initializer_required")
-    if not privileged_writes:
-        missing.append("initializer_privileged_write_required")
-    missing.extend(
-        [
-            "proxy_delegatecall_initializer_calldata_required",
-            "measurable_proxy_state_delta_required",
-        ]
-    )
-    return {
-        "verified": False,
-        "proxy_side_verified": verified_proxy_side,
-        "blockers": blockers,
-        "missing_proof_pieces": missing,
-        "contract_name": _contract_name(source_manifest, source_text),
-        "implementation_address": implementation,
-        "proxy_admin_variable": proxy_admin.get("variable"),
-        "proxy_admin_reader": _signature(admin_reader, "getAudiusProxyAdminAddress"),
-        "implementation_reader": _signature(implementation_reader, "implementation"),
-        "implementation_source_status": "resolved" if implementation_source else "missing",
-        "implementation_contract_name": implementation_contract_name,
-        "implementation_initializable": implementation_initializable,
-        "implementation_initializers": implementation_initializers,
-        "initializer_privileged_writes": privileged_writes,
-        "measurable_delta": "initializer changes privileged proxy/governance state through delegatecall",
-        "explicit_predicate": (
-            "Proxy fallback delegatecalls implementation initializer and bypasses "
-            "Initializable guard because proxy slot-zero admin collides with implementation flags."
-        ),
-        "evidence_refs": _proxy_collision_evidence_refs(verified_proxy_side, proxy_admin, privileged_writes),
     }
 
 
@@ -494,129 +414,6 @@ def _source_text(source_manifest: dict[str, Any]) -> str:
     return "\n".join(str(value) for value in (source_manifest.get("source_files") or {}).values())
 
 
-def _related_implementation_manifest(source_manifest: dict[str, Any]) -> dict[str, Any]:
-    related = dict(source_manifest.get("related_sources") or {})
-    implementation = related.get("implementation")
-    if not isinstance(implementation, dict) or implementation.get("status") != "resolved":
-        return {}
-    return implementation
-
-
-def _related_implementation_source(source_manifest: dict[str, Any]) -> str:
-    implementation = _related_implementation_manifest(source_manifest)
-    return _source_text(implementation) if implementation else ""
-
-
-def _has_initializable_slot_zero_flags(source_text: str) -> bool:
-    if not source_text:
-        return False
-    compact = re.sub(r"\s+", " ", source_text)
-    has_flags = (
-        re.search(r"\bbool\s+(?:private|internal|public)?\s*initialized\s*;", compact) is not None
-        and re.search(r"\bbool\s+(?:private|internal|public)?\s*initializing\s*;", compact) is not None
-    )
-    has_initializer_modifier = "modifier initializer()" in source_text and "initialized" in source_text and "initializing" in source_text
-    return has_flags or has_initializer_modifier
-
-
-def _implementation_initializer_names(source_text: str) -> list[str]:
-    if not source_text:
-        return []
-    names = []
-    for match in re.finditer(r"\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)\s*\([^)]*\)(?P<header>[^{;]*)\{", source_text):
-        name = match.group(1)
-        header = match.group("header")
-        if name.lower().startswith("initialize") or " initializer" in f" {header} ":
-            names.append(name)
-    return sorted(set(names))
-
-
-def _implementation_initializer_privileged_writes(source_text: str, abi: list[dict[str, Any]]) -> list[dict[str, str]]:
-    initializer = _function_body(source_text, "initialize")
-    body = initializer.get("body", "")
-    if not body:
-        return []
-    writes = []
-    for match in re.finditer(
-        r"\b(?P<variable>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?P<value>[A-Za-z_][A-Za-z0-9_]*\([^;\n]*\)|_[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*)\s*;",
-        body,
-    ):
-        variable = match.group("variable")
-        reader = _reader_for_variable(source_text, abi, variable)
-        if not reader:
-            continue
-        if not _is_privileged_initializer_variable(variable):
-            continue
-        writes.append(
-            {
-                "variable": variable,
-                "value": match.group("value"),
-                "reader": reader,
-                "initializer": "initialize",
-            }
-        )
-    return writes
-
-
-def _reader_for_variable(source_text: str, abi: list[dict[str, Any]], variable: str) -> str:
-    direct = _abi_function(abi, variable)
-    if direct:
-        return _signature(direct, variable)
-    camel = variable[:1].upper() + variable[1:]
-    for candidate in (f"get{camel}", f"is{camel}", f"{variable}Address"):
-        function = _abi_function(abi, candidate)
-        if function:
-            return _signature(function, candidate)
-    for match in re.finditer(r"\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)\s*\([^)]*\)(?P<header>[^{;]*)\{", source_text):
-        name = match.group(1)
-        start = match.end() - 1
-        body = _body_from_index(source_text, start)
-        if re.search(rf"\breturn\s+(?:address\()?{re.escape(variable)}\)?\s*;", body):
-            return f"{name}()"
-    return ""
-
-
-def _is_privileged_initializer_variable(variable: str) -> bool:
-    lowered = variable.lower()
-    markers = (
-        "admin",
-        "guardian",
-        "govern",
-        "registry",
-        "voting",
-        "quorum",
-        "execution",
-        "inprogress",
-        "staking",
-        "delegate",
-        "serviceprovider",
-    )
-    return any(marker in lowered for marker in markers)
-
-
-def _proxy_admin_storage_declaration(source_text: str) -> dict[str, str]:
-    match = re.search(r"\baddress\s+(?:private|public|internal)?\s*(?P<name>proxyAdmin)\s*;", source_text)
-    if match:
-        return {"variable": match.group("name"), "type": "address", "slot_assumption": "slot0_first_proxy_state"}
-    return {}
-
-
-def _proxy_collision_evidence_refs(
-    verified_proxy_side: bool,
-    proxy_admin: dict[str, str],
-    privileged_writes: list[dict[str, str]] | None = None,
-) -> list[str]:
-    refs = ["source:delegatecall fallback", "source:EIP1967 implementation slot"]
-    if proxy_admin:
-        refs.append(f"source:proxy admin storage {proxy_admin['variable']}")
-    for write in privileged_writes or []:
-        refs.append(f"implementation:initializer write {write.get('variable')}")
-        refs.append(f"implementation:reader {write.get('reader')}")
-    if verified_proxy_side:
-        refs.append("explorer:proxy implementation")
-    return sorted(set(refs))
-
-
 def _contract_name(source_manifest: dict[str, Any], source_text: str) -> str:
     metadata = dict(source_manifest.get("metadata") or {})
     if metadata.get("contract_name"):
@@ -659,30 +456,6 @@ def _function_body(source_text: str, name: str) -> dict[str, str]:
                     "visibility": _visibility(header),
                 }
     return {}
-
-
-def _body_from_index(source_text: str, start: int) -> str:
-    depth = 0
-    for index in range(start, len(source_text)):
-        char = source_text[index]
-        if char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                return source_text[start + 1 : index]
-    return ""
-
-
-def _contract_source_by_name(source_text: str, name: str) -> str:
-    if not source_text or not name:
-        return ""
-    match = re.search(rf"\bcontract\s+{re.escape(name)}\b[^\{{]*\{{", source_text)
-    if not match:
-        return ""
-    start = match.end() - 1
-    body = _body_from_index(source_text, start)
-    return source_text[match.start() : start + len(body) + 2]
 
 
 def _visibility(header: str) -> str:

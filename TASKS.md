@@ -1388,16 +1388,44 @@ source-backed readiness improvement for the next mapper.
 
 ## PT-027.T07 - proxy collision runtime mapper
 
-Status: next.
+Status: done, 2026-06-21.
 
-Build the missing Audius-style mapper before any runtime:
+Implemented the Audius-style runtime mapper:
 
-- derive callable initializer calldata for proxy fallback/delegatecall;
-- choose bounded local initializer arguments;
-- read or model proxy-side before/after readers for
+- added `src/vassago_contract_runtime/sc01_proxy_collision.py`;
+- derives the exact delegated initializer plan for
+  `initialize(address,uint256,uint256,uint256,uint16,address)`;
+- uses bounded local arguments:
+  `address(this), 3, 0, 1, 4, address(this)`;
+- generates an interface-only Foundry harness that calls the historical
+  Audius Governance proxy through fallback/delegatecall;
+- measures proxy-side reader deltas:
   `getGuardianAddress()`, `getRegistryAddress()`,
   `getVotingPeriod()`, `getExecutionDelay()`,
   `getVotingQuorumPercent()`, `getMaxInProgressProposals()`;
-- only mark runtime-ready if the local fork can measure at least one proxy
-  state delta from unauthorized initializer replay;
-- no broadcast and no live transaction.
+- pins the fork at block `15201793`;
+- redacts `--fork-url` in Foundry artifacts before writing JSON.
+
+Validated run:
+
+```powershell
+# loaded ETHERSCAN_API_KEY and VASSAGO_FORK_RPC_* from C:\Users\PC\Desktop\Vassago\.env without printing values
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v11-audius-runtime --bootstrap-adapters --allow-solc-install --runtime-authorized
+```
+
+Audius result:
+
+- artifact:
+  `runs/sc01-historical-6-v11-audius-runtime/targets/CT-3f08e02c1bef`;
+- `source_truth_verified_count=1`;
+- `foundry_allowed=true`;
+- `compile_status=compile_only_passed`;
+- `runtime_status=runtime_completed`;
+- `assertion-result.status=passed`;
+- evidence status: `runtime_local`;
+- broadcast: no;
+- RPC URL token: not present in target artifacts.
+
+This is historical fork/local evidence for Audius. It is not a current live
+funds-at-risk claim.

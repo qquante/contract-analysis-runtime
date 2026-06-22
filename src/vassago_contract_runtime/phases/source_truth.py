@@ -107,6 +107,17 @@ def _review_queue_item(
         )
     proxy_collision = evaluate_proxy_storage_collision_reinitializer(source_manifest)
     if item.get("thesis_id") == "proxy_storage_collision_reinitializer" and proxy_collision.get("proxy_side_verified") is True:
+        if proxy_collision.get("verified") is True:
+            return _verified_initializer_review(
+                item,
+                functions,
+                related_surface,
+                related_guards,
+                related_writes,
+                proxy_collision,
+                runtime_runner="proxy_storage_collision_runtime",
+                evidence_kind="proxy_storage_collision_reinitializer",
+            )
         return _partial_proxy_collision_review(
             item,
             functions,
@@ -200,9 +211,13 @@ def _verified_initializer_review(
         "actor_model": "any_external_caller",
         "codable_args": list(evaluation.get("codable_args") or []),
         "harness_setup": list(evaluation.get("harness_setup") or []),
-        "measurable_reader": evaluation.get("admin_reader"),
+        "measurable_reader": evaluation.get("measurable_reader") or evaluation.get("admin_reader"),
         "measurable_delta": evaluation.get("measurable_delta"),
         "explicit_predicate": evaluation.get("explicit_predicate"),
+        "initializer_call_plan": evaluation.get("initializer_call_plan"),
+        "initializer_privileged_writes": list(evaluation.get("initializer_privileged_writes") or []),
+        "implementation_address": evaluation.get("implementation_address"),
+        "implementation_contract_name": evaluation.get("implementation_contract_name"),
         "next_required_adapter": "compile_only_then_local_foundry",
         "evidence_refs": _refs(related_surface, related_guards, related_writes)
         + list(evaluation.get("evidence_refs") or []),

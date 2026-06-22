@@ -47,7 +47,7 @@ class FoundryRunResult:
             "status": self.status,
             "provider": self.provider,
             "target_id": self.target_id,
-            "command": list(self.command),
+            "command": _redacted_command(self.command),
             "stdout": self.stdout[-4000:],
             "stderr": self.stderr[-4000:],
             "metadata": dict(self.metadata),
@@ -207,6 +207,20 @@ def _run_foundry(
         },
         error=None if completed.returncode == 0 else {"code": "forge_failed", "message": completed.stderr},
     )
+
+
+def _redacted_command(command: list[str]) -> list[str]:
+    redacted = []
+    redact_next = False
+    for item in command:
+        if redact_next:
+            redacted.append("<redacted-rpc-url>")
+            redact_next = False
+            continue
+        redacted.append(item)
+        if item == "--fork-url":
+            redact_next = True
+    return redacted
 
 
 def _write_workspace(workspace: Path, item: FoundryHarnessInput) -> None:

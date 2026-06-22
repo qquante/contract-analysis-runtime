@@ -380,16 +380,17 @@ Remaining historical blockers:
 - Alchemix: keeper actor/state-delta mapper.
 - Wormhole: implementation initializer/UUPS context mapper.
 
-## Current Audius Proxy-Collision Readiness
+## Current Audius Proxy-Collision Runtime Evidence
 
-`PT-027.T06` current Audius baseline is:
+`PT-027.T07` current Audius baseline is:
 
 ```text
-runs/sc01-historical-6-v9-audius-privileged-writes-live
+runs/sc01-historical-6-v11-audius-runtime
 ```
 
-The run was executed with `ETHERSCAN_API_KEY` loaded from
-`C:\Users\PC\Desktop\Vassago\.env` into the process without printing it.
+The run was executed with `ETHERSCAN_API_KEY` and `VASSAGO_FORK_RPC_*` loaded
+from `C:\Users\PC\Desktop\Vassago\.env` into the process without printing
+values.
 
 Current Audius status:
 
@@ -400,7 +401,7 @@ Current Audius status:
 - `upgradeTo(address)` is rejected as `custom_proxy_admin_path`, not weak UUPS;
 - new thesis `proxy_storage_collision_reinitializer` reaches source truth;
 - source truth status:
-  `source_truth_blocked_proxy_side_verified`;
+  `source_truth_verified`;
 - implementation Initializable flags and `initialize(...)` are detected;
 - initializer privileged writes are detected with readers:
   - `registry` / `getRegistryAddress()`;
@@ -409,11 +410,16 @@ Current Audius status:
   - `maxInProgressProposals` / `getMaxInProgressProposals()`;
   - `votingQuorumPercent` / `getVotingQuorumPercent()`;
   - `guardianAddress` / `getGuardianAddress()`;
-- remaining proof pieces:
-  - `proxy_delegatecall_initializer_calldata_required`;
-  - `measurable_proxy_state_delta_required`;
-- `foundry_allowed=false` for Audius.
+- delegated initializer plan:
+  `initialize(address,uint256,uint256,uint256,uint16,address)` with
+  `address(this), 3, 0, 1, 4, address(this)`;
+- fork block: `15201793`;
+- `foundry_allowed=true`;
+- `compile_status=compile_only_passed`;
+- `runtime_status=runtime_completed`;
+- `assertion-result.status=passed`;
+- evidence status: `runtime_local`;
+- broadcast: no.
 
-This is source-backed readiness, not reproduction. The next mapper must derive
-delegated initializer calldata and measure a local/fork proxy-state delta before
-Foundry runtime is allowed for Audius.
+This is historical fork/local reproduction of the Audius initializer replay
+proxy-collision thesis. It is not a current live funds-at-risk claim.

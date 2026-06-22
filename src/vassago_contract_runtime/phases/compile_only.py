@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
 from vassago_contract_runtime.foundry import FoundryAdapter, FoundryHarnessInput, NullFoundryAdapter
+from vassago_contract_runtime.sc01_proxy_collision import (
+    render_proxy_storage_collision_harness,
+    should_use_proxy_storage_collision_harness,
+)
 from vassago_contract_runtime.sc01_source import (
     contract_name_for_source,
     contract_name_for_harness,
@@ -88,6 +92,8 @@ def _sentinel_harness() -> str:
 
 
 def render_sc01_harness(source_manifest: dict) -> str:
+    if should_use_proxy_storage_collision_harness(source_manifest):
+        return render_proxy_storage_collision_harness(source_manifest)
     if should_use_uups_initializer_harness(source_manifest):
         return _uups_initializer_harness(source_manifest)
     if should_use_access_control_initializer_harness(source_manifest):

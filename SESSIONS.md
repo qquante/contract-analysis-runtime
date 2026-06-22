@@ -1577,3 +1577,107 @@ Use `runs/sc01-historical-6-v9-audius-privileged-writes-live` as the Audius
 readiness baseline. Next implementation: `PT-027.T07`, deriving proxy fallback
 initializer calldata and measurable reader deltas for Audius-style storage
 collision. Do not claim Audius reproduction until runtime-local evidence exists.
+
+## S-20260621-026 - PT-027.T07 Audius proxy collision runtime mapper
+
+Goal:
+
+- Convert Audius proxy-storage-collision readiness into a gated local/fork
+  runtime reproduction without broadcast and without leaking RPC secrets.
+
+What changed:
+
+- Added `src/vassago_contract_runtime/sc01_proxy_collision.py`.
+- Moved Audius proxy-collision logic out of `sc01_source.py`.
+- `source_truth.py` now marks the Audius proxy-collision thesis as
+  `source_truth_verified` only when the proxy side, related implementation
+  source, initializer call plan and measurable reader delta are complete.
+- `compile_only.py` renders an interface-only
+  `VassagoSC01Harness.t.sol` for Audius instead of compiling the whole
+  implementation as the test target.
+- `runtime_foundry.py` passes fork config only after `foundry_allowed=true`,
+  compile pass and explicit `--runtime-authorized`.
+- `foundry/adapter.py` redacts the `--fork-url` argument in
+  `FoundryRunResult.to_json()`.
+
+Runtime mapper details:
+
+- Historical proxy: `0x4DEcA517D6817B6510798b7328F2314d3003AbAC`.
+- Implementation: `0x1c91af03a390b4c619b444425b3119e553b5b44b`.
+- Fork block: `15201793`.
+- Harness call:
+  `initialize(address(this), 3, 0, 1, 4, address(this))`.
+- Assertions:
+  `getGuardianAddress()==address(this)`,
+  `getVotingPeriod()==3`,
+  `getExecutionDelay()==0`,
+  `getVotingQuorumPercent()==1`,
+  `getMaxInProgressProposals()==4`,
+  `getRegistryAddress()==address(this)`.
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source tests.design_runtime.test_phases tests.design_runtime.test_provider_adapters
+python -m vassago_contract_runtime.cli check
+```
+
+Observed:
+
+- focused tests: `45 passed`;
+- runtime check: `status=passed`, `failed_count=0`;
+- `sc01_source.py` is 477 lines;
+- `sc01_proxy_collision.py` is 252 lines.
+
+Historical runtime run:
+
+```powershell
+# loaded ETHERSCAN_API_KEY and VASSAGO_FORK_RPC_* from C:\Users\PC\Desktop\Vassago\.env without printing values
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v11-audius-runtime --bootstrap-adapters --allow-solc-install --runtime-authorized
+```
+
+Observed:
+
+- run id: `RUN-c3c0ace00102`;
+- `executed_count=66`;
+- `failed_count=0`;
+- Audius target id: `CT-3f08e02c1bef`;
+- final report:
+  `runs/sc01-historical-6-v11-audius-runtime/targets/CT-3f08e02c1bef/phases/10_final_report/sc01-final-report.json`;
+- `compile_status=compile_only_passed`;
+- `runtime_status=runtime_completed`;
+- `assertion-result.status=passed`;
+- `evidence_status=runtime_local`;
+- `no_broadcast=true`;
+- Foundry output: 1 test passed, 0 failed.
+
+Security checks:
+
+- Foundry command in artifact stores `--fork-url <redacted-rpc-url>`.
+- Scan against loaded `.env` values found no `ETHERSCAN_API_KEY` or
+  `VASSAGO_FORK_RPC_FALLBACK_ETH_URL` in the Audius target artifacts.
+
+Decision:
+
+- Audius is now reproduced locally on a historical fork for the initializer
+  replay proxy-collision thesis.
+- Do not present this as current live funds-at-risk. It is historical/fork
+  evidence only.
+
+Blockers:
+
+- Remaining historical blockers are still protocol-specific:
+  Nomad bridge root/proof, Furucombo delegatecall/proxy-storage,
+  Alchemix keeper actor/state delta and Wormhole implementation/UUPS context.
+
+RESUME FROM HERE:
+
+Run the full suite before committing if not already done:
+`python -m unittest discover -s tests`,
+`python -m vassago_contract_runtime.cli check`, and `git diff --check`.
+Use `runs/sc01-historical-6-v11-audius-runtime` as the current Audius runtime
+baseline. Next productive blocker is either Wormhole implementation/UUPS
+context or Nomad bridge root/proof mapper. Keep runtime local/fork only, with
+no broadcast and no severity claim without explicit impact review.

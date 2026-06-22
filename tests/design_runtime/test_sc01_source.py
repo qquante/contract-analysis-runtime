@@ -323,6 +323,109 @@ class SC01SourceVerifierTests(unittest.TestCase):
         )
         self.assertIn("proxy_delegatecall_initializer_calldata_required", result["missing_proof_pieces"])
 
+    def test_audius_style_proxy_storage_collision_with_exact_initializer_builds_runtime_plan(self) -> None:
+        fixture = {
+            "target": {"chain": "eth", "address": "0x4deca517d6817b6510798b7328f2314d3003abac"},
+            "abi": [
+                {"type": "function", "name": "getAudiusProxyAdminAddress", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
+                {"type": "function", "name": "implementation", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
+            ],
+            "proxy_context": {"proxy": "1", "implementation": "0x1c91af03a390b4c619b444425b3119e553b5b44b"},
+            "source_files": {
+                "AudiusProxy.sol": """
+                pragma solidity ^0.5.0;
+                contract Proxy {
+                    function () payable external { _fallback(); }
+                    function _implementation() internal view returns (address);
+                    function _delegate(address implementation) internal { assembly { let result := delegatecall(gas, implementation, 0, calldatasize, 0, 0) } }
+                    function _fallback() internal { _delegate(_implementation()); }
+                }
+                contract AudiusProxy is Proxy {
+                    bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+                    address private proxyAdmin;
+                    function getAudiusProxyAdminAddress() external view returns (address) { return proxyAdmin; }
+                    function implementation() external view returns (address) { return _implementation(); }
+                }
+                """,
+            },
+            "related_sources": {
+                "implementation": {
+                    "status": "resolved",
+                    "abi": [
+                        {
+                            "type": "function",
+                            "name": "initialize",
+                            "inputs": [
+                                {"type": "address"},
+                                {"type": "uint256"},
+                                {"type": "uint256"},
+                                {"type": "uint256"},
+                                {"type": "uint16"},
+                                {"type": "address"},
+                            ],
+                            "outputs": [],
+                            "stateMutability": "nonpayable",
+                        },
+                        {"type": "function", "name": "getGuardianAddress", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
+                        {"type": "function", "name": "getRegistryAddress", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
+                        {"type": "function", "name": "getVotingPeriod", "inputs": [], "outputs": [{"type": "uint256"}], "stateMutability": "view"},
+                        {"type": "function", "name": "getExecutionDelay", "inputs": [], "outputs": [{"type": "uint256"}], "stateMutability": "view"},
+                        {"type": "function", "name": "getVotingQuorumPercent", "inputs": [], "outputs": [{"type": "uint256"}], "stateMutability": "view"},
+                        {"type": "function", "name": "getMaxInProgressProposals", "inputs": [], "outputs": [{"type": "uint16"}], "stateMutability": "view"},
+                    ],
+                    "metadata": {"contract_name": "Governance"},
+                    "source_files": {
+                        "Governance.sol": """
+                        pragma solidity ^0.5.0;
+                        contract InitializableV2 {
+                            bool private initialized;
+                            bool private initializing;
+                            modifier initializer() { _; }
+                        }
+                        contract Governance is InitializableV2 {
+                            address private guardianAddress;
+                            address private registry;
+                            uint256 private votingPeriod;
+                            uint256 private executionDelay;
+                            uint256 private votingQuorumPercent;
+                            uint16 private maxInProgressProposals;
+                            function initialize(
+                                address _registryAddress,
+                                uint256 _votingPeriod,
+                                uint256 _executionDelay,
+                                uint256 _votingQuorumPercent,
+                                uint16 _maxInProgressProposals,
+                                address _guardianAddress
+                            ) public initializer {
+                                registry = _registryAddress;
+                                votingPeriod = _votingPeriod;
+                                executionDelay = _executionDelay;
+                                votingQuorumPercent = _votingQuorumPercent;
+                                maxInProgressProposals = _maxInProgressProposals;
+                                guardianAddress = _guardianAddress;
+                            }
+                            function getGuardianAddress() external view returns (address) { return guardianAddress; }
+                            function getRegistryAddress() external view returns (address) { return registry; }
+                            function getVotingPeriod() external view returns (uint256) { return votingPeriod; }
+                            function getExecutionDelay() external view returns (uint256) { return executionDelay; }
+                            function getVotingQuorumPercent() external view returns (uint256) { return votingQuorumPercent; }
+                            function getMaxInProgressProposals() external view returns (uint16) { return maxInProgressProposals; }
+                        }
+                        """,
+                    },
+                }
+            },
+        }
+
+        result = evaluate_proxy_storage_collision_reinitializer(fixture)
+        harness = render_sc01_harness(fixture)
+
+        self.assertTrue(result["verified"], result["missing_proof_pieces"])
+        self.assertEqual(result["initializer_call_plan"]["fork_block_number"], 15_201_793)
+        self.assertNotIn("proxy_delegatecall_initializer_calldata_required", result["missing_proof_pieces"])
+        self.assertNotIn("measurable_proxy_state_delta_required", result["missing_proof_pieces"])
+        self.assertIn("testAudiusProxyInitializerReplayChangesGuardian", harness)
+
     def test_pool_initializer_is_protocol_initializer_not_admin_initializer(self) -> None:
         fixture = {
             "abi": [],

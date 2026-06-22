@@ -97,6 +97,10 @@ def _verified_initializer_review(source_truth: dict) -> dict | None:
     for review in source_truth.get("reviews") or []:
         if review.get("source_truth_verified") is not True:
             continue
-        if review.get("runtime_runner") in {"initializer_runtime", "access_control_initializer_runtime"}:
+        if review.get("runtime_runner") in {
+            "initializer_runtime",
+            "access_control_initializer_runtime",
+            "proxy_storage_collision_runtime",
+        }:
             return review
     return None

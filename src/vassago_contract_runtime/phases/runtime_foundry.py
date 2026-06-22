@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import os
+
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
 from vassago_contract_runtime.foundry import FoundryAdapter, FoundryHarnessInput, NullFoundryAdapter
 from vassago_contract_runtime.phases.compile_only import render_sc01_harness
+from vassago_contract_runtime.sc01_proxy_collision import proxy_storage_collision_fork
 
 
 class RuntimeFoundryAdapter:
@@ -26,11 +29,20 @@ class RuntimeFoundryAdapter:
         if self.runtime_authorized is not True:
             return _blocked(context, "blocked_runtime_authorization_required", ["runtime_authorized_required"])
 
+        fork = proxy_storage_collision_fork(source_manifest)
+        if fork.get("requires_rpc_url"):
+            rpc_url = os.environ.get("VASSAGO_FORK_RPC_URL") or os.environ.get("VASSAGO_FORK_RPC_FALLBACK_ETH_URL")
+            if not rpc_url:
+                return _blocked(context, "blocked_runtime_fork_rpc_required", ["fork_rpc_url_required"])
+            fork = {key: value for key, value in fork.items() if key != "requires_rpc_url"}
+            fork["rpc_url"] = rpc_url
+
         item = FoundryHarnessInput(
             target_id=context.target.target_id,
             harness_name="VassagoSC01Harness",
             source_files=dict(source_manifest.get("source_files") or {}),
             test_files={"VassagoSC01Harness.t.sol": render_sc01_harness(source_manifest)},
+            fork=fork,
             metadata={"runtime_ready": True, "runtime_authorized": True},
         )
         result = self.foundry.run_local_fork(item)

@@ -423,6 +423,9 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertIn("--fork-url", commands[0])
         self.assertIn("--fork-block-number", commands[0])
         self.assertEqual(result.metadata["no_broadcast_command"], True)
+        serialized = result.to_json()
+        self.assertIn("<redacted-rpc-url>", serialized["command"])
+        self.assertNotIn("http://127.0.0.1:8545", serialized["command"])
 
 
 if __name__ == "__main__":
