@@ -1,0 +1,33 @@
+id: sc01-alchemix-keeper-state
+thesis_id: alchemix_keeper_state
+bug_family: access_control
+missing_property: keeper-only harvest execution must use a dedicated trusted caller or validate task parameters/source
+violated_invariant: permissionless automation cannot trigger sensitive harvest with arbitrary alchemist/yieldToken/minimumAmountOut
+entrypoint_type: keeper_authorized_external_action
+sensitive_sink: harvest execution, slippage/minimumAmountOut, resolver harvest state
+attacker_capabilities:
+  - create or influence a Gelato automation task
+  - choose harvest parameters routed through the generic keeper executor
+exploit_preconditions:
+  - harvest checks msg.sender only against a generic automation caller
+  - harvest accepts attacker-selected alchemist/yieldToken/minimumAmountOut
+  - resolver records harvest state after external alchemist call
+search_motifs:
+  - harvest
+  - gelatoPoker
+  - minimumAmountOut
+  - recordHarvest
+  - resolver
+  - maxGasPrice
+  - Unauthorized
+negative_signals:
+  - dedicated project-controlled msg.sender
+  - parameter validation against resolver output
+  - immutable safe yield-token/alchemist mapping
+required_evidence:
+  - harvest function source
+  - gelatoPoker reader
+  - arbitrary parameter path
+  - resolver recordHarvest side effect
+  - historical fork actor model
+runtime_runner: alchemix_keeper_runtime

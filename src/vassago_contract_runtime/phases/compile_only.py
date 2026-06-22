@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
 from vassago_contract_runtime.foundry import FoundryAdapter, FoundryHarnessInput, NullFoundryAdapter
+from vassago_contract_runtime.sc01_alchemix import render_alchemix_harness, should_use_alchemix_harness
+from vassago_contract_runtime.sc01_furucombo import render_furucombo_harness, should_use_furucombo_harness
 from vassago_contract_runtime.sc01_proxy_collision import (
     render_proxy_storage_collision_harness,
     should_use_proxy_storage_collision_harness,
@@ -83,7 +85,12 @@ def _read_json(context: PhaseContext, phase_id: str, name: str) -> dict:
 
 
 def _source_files_for_harness(source_manifest: dict) -> dict[str, str]:
-    if should_use_wormhole_harness(source_manifest) or should_use_nomad_harness(source_manifest):
+    if (
+        should_use_wormhole_harness(source_manifest)
+        or should_use_nomad_harness(source_manifest)
+        or should_use_furucombo_harness(source_manifest)
+        or should_use_alchemix_harness(source_manifest)
+    ):
         return {}
     return dict(source_manifest.get("source_files") or {})
 
@@ -105,6 +112,10 @@ def _sentinel_harness() -> str:
 
 
 def render_sc01_harness(source_manifest: dict) -> str:
+    if should_use_furucombo_harness(source_manifest):
+        return render_furucombo_harness(source_manifest)
+    if should_use_alchemix_harness(source_manifest):
+        return render_alchemix_harness(source_manifest)
     if should_use_proxy_storage_collision_harness(source_manifest):
         return render_proxy_storage_collision_harness(source_manifest)
     if should_use_wormhole_harness(source_manifest):

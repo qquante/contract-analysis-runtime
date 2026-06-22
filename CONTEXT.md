@@ -536,3 +536,32 @@ Interpretation:
   current live exploitability without a fresh current-state review.
 - The Nomad mapper is bridge root/proof-specific and must remain separate from
   Wormhole's implementation-initializer VM runner.
+
+## Current SC01 Historical Reproduction Inventory
+
+Consolidated report:
+
+```text
+SC01_HISTORICAL_REPRODUCTION_REPORT.md
+```
+
+Historical local/fork cases currently reproduced:
+
+- Audius governance proxy:
+  `runs/sc01-historical-6-v11-audius-runtime`,
+  `CT-3f08e02c1bef`, `historical_reproduced_critical`;
+- Wormhole core bridge:
+  `runs/sc01-historical-6-v16-wormhole-runtime`,
+  `CT-24700f446e33`, `historical_reproduced_critical`;
+- Nomad Replica:
+  `runs/sc01-historical-6-v18-nomad-runtime`,
+  `CT-05f41610b129`, `historical_reproduced_critical`;
+- Furucombo proxy v1.0.0:
+  `runs/sc01-historical-6-v22-furucombo-alchemix-runtime`,
+  `CT-2964504f0811`, `historical_reproduced_critical`;
+- Alchemix Harvester:
+  `runs/sc01-historical-6-v22-furucombo-alchemix-runtime`,
+  `CT-4b5839bd1d37`, `historical_reproduced_high_context`.
+
+All five are local/fork-only, no broadcast, and current live risk remains
+`not_claimed` unless a fresh current-state review proves otherwise.

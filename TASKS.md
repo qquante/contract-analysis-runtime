@@ -1624,3 +1624,62 @@ Important limits:
 - the harness proves root/proof message-authentication bypass locally by
   processing a forged unproven message into a local receiver;
 - do not reuse the Wormhole VM runner for Nomad.
+
+## PT-027.T12 - Furucombo delegatecall/proxy-storage mapper
+
+Status: done implementation + real runtime smoke, 2026-06-22.
+
+Implemented:
+
+- added `src/vassago_contract_runtime/sc01_furucombo.py`;
+- added corpus thesis
+  `designs/sc01-access/corpus/furucombo-delegatecall-proxy-storage.yaml`;
+- corrected the historical fixture to use vulnerable Furucombo proxy
+  `0x17e8Ca1b4798B97602895f63206afCd1Fc90Ca5f`;
+- integrated source-truth, compile-only, runtime Foundry, on-chain state gate
+  and impact review.
+
+Observed:
+
+- run: `runs/sc01-historical-6-v22-furucombo-alchemix-runtime`;
+- target id: `CT-2964504f0811`;
+- compile: `compile_only_passed`;
+- runtime: `runtime_completed`;
+- assertion: `passed`;
+- Foundry test:
+  `[PASS] testFurucomboWhitelistedProxyDelegatecallDrainsVictimAllowance()`;
+- impact verdict: `historical_reproduced_critical`;
+- current live risk: `not_claimed`;
+- broadcast: no.
+
+## PT-027.T13 - Alchemix keeper-state mapper
+
+Status: done implementation + real runtime smoke, 2026-06-22.
+
+Implemented:
+
+- added `src/vassago_contract_runtime/sc01_alchemix.py`;
+- added corpus thesis `designs/sc01-access/corpus/alchemix-keeper-state.yaml`;
+- integrated source-truth, compile-only, runtime Foundry, on-chain state gate
+  and impact review.
+
+Observed:
+
+- run: `runs/sc01-historical-6-v22-furucombo-alchemix-runtime`;
+- target id: `CT-4b5839bd1d37`;
+- compile: `compile_only_passed`;
+- runtime: `runtime_completed`;
+- assertion: `passed`;
+- Foundry test:
+  `[PASS] testAlchemixGenericKeeperCanTriggerLowMinHarvest()`;
+- impact verdict: `historical_reproduced_high_context`;
+- current live risk: `not_claimed`;
+- broadcast: no.
+
+## PT-027.T14 - SC01 historical reproduction report
+
+Status: done, 2026-06-22.
+
+Artifact:
+
+- `SC01_HISTORICAL_REPRODUCTION_REPORT.md`.

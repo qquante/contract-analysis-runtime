@@ -22,6 +22,8 @@ IMPACT_MD = "sc01-impact-review.md"
 AUDIUS_GOVERNANCE_PROXY = "0x4deca517d6817b6510798b7328f2314d3003abac"
 WORMHOLE_PROXY = "0x98f3c9e6e3face36baad05fe09d375ef1464288b"
 NOMAD_REPLICA_PROXY = "0x5d94309e5a0090b165fa4181519701637b6daeba"
+FURUCOMBO_VULNERABLE_PROXY = "0x17e8ca1b4798b97602895f63206afcd1fc90ca5f"
+ALCHEMIX_HARVESTER = "0x7879a9c464af7805712404cf4a8366c475034f91"
 
 
 def write_sc01_impact_review(run_dir: str | Path, target_id: str) -> dict[str, Any]:
@@ -79,6 +81,28 @@ def build_sc01_impact_review(run_dir: str | Path, target_id: str) -> dict[str, A
         )
     if _is_nomad_replica(address, source_truth):
         return _nomad_impact_review(
+            review_id=review_id,
+            run_id=manifest["run_id"],
+            target_id=target_id,
+            target=target,
+            final_report=final_report,
+            assertion=assertion,
+            runtime=runtime,
+            source_truth=source_truth,
+        )
+    if _is_furucombo_proxy(address, source_truth):
+        return _furucombo_impact_review(
+            review_id=review_id,
+            run_id=manifest["run_id"],
+            target_id=target_id,
+            target=target,
+            final_report=final_report,
+            assertion=assertion,
+            runtime=runtime,
+            source_truth=source_truth,
+        )
+    if _is_alchemix_harvester(address, source_truth):
+        return _alchemix_impact_review(
             review_id=review_id,
             run_id=manifest["run_id"],
             target_id=target_id,
@@ -464,6 +488,186 @@ def _nomad_impact_review(
     }
 
 
+def _furucombo_impact_review(
+    *,
+    review_id: str,
+    run_id: str,
+    target_id: str,
+    target: dict[str, Any],
+    final_report: dict[str, Any],
+    assertion: dict[str, Any],
+    runtime: dict[str, Any],
+    source_truth: dict[str, Any],
+) -> dict[str, Any]:
+    runtime_status = str(runtime.get("status") or final_report.get("runtime_status") or "")
+    assertion_status = str(assertion.get("status") or "")
+    reproduced = runtime_status == "runtime_completed" and assertion_status == "passed"
+    return {
+        "status": "completed",
+        "impact_review_id": review_id,
+        "run_id": run_id,
+        "target_id": target_id,
+        "chain": str(target.get("chain") or final_report.get("chain") or "eth"),
+        "address": str(target.get("address") or final_report.get("address") or FURUCOMBO_VULNERABLE_PROXY),
+        "bug_class": "furucombo_delegatecall_proxy_storage_confusion",
+        "summary": {
+            "verdict": "historical_reproduced_critical" if reproduced else "historical_context_runtime_not_reproduced",
+            "severity_posture": "critical_historical_do_not_claim_live_without_current_state_review",
+            "reasoning": (
+                "The local historical fork replay proves the Furucombo double-delegatecall composition: public "
+                "batchExec delegates to a whitelisted Aave V2 proxy, initializes its implementation in the "
+                "Furucombo proxy storage context, then executes attacker code with proxy token allowance context. "
+                "This review does not claim current live exploitability."
+            ),
+        },
+        "historical_impact": {
+            "severity": "critical_historical",
+            "affected_system": "Furucombo proxy / whitelisted handler registry",
+            "reported_loss_context": "public reports describe roughly $15M drained in February 2021",
+            "impact_classes": [
+                "delegatecall_context_confusion",
+                "trusted_handler_registry_composition_failure",
+                "victim_token_allowance_drain_historical",
+            ],
+        },
+        "local_reproduction": {
+            "status": runtime_status,
+            "assertion_status": assertion_status,
+            "evidence_status": assertion.get("evidence_status"),
+            "predicate": assertion.get("predicate"),
+            "measured_delta": assertion.get("measured_delta"),
+            "final_status": final_report.get("final_status"),
+            "runtime_ready_count": final_report.get("runtime_ready_count"),
+            "source_truth_verified_count": final_report.get("source_truth_verified_count"),
+            "no_broadcast": bool(runtime.get("no_broadcast", True)),
+            "fork_block_number": 11_940_499,
+        },
+        "current_live_risk": {
+            "status": "not_claimed",
+            "reason": (
+                "Furucombo publicly redeployed its proxy after the incident. Current live severity requires fresh "
+                "registry state, handler allowlist, token approvals and code-hash review."
+            ),
+            "required_to_upgrade_to_live_severity": [
+                "current proxy address and code hash",
+                "current handler registry and whitelisted nested proxy handlers",
+                "current user token allowances to the active proxy",
+                "proof that nested delegatecall still reaches attacker-controlled code",
+            ],
+        },
+        "source_truth": {
+            "status": source_truth.get("status"),
+            "verified_count": source_truth.get("source_truth_verified_count"),
+            "evidence_kinds": sorted({str(item.get("evidence_kind")) for item in source_truth.get("reviews") or []}),
+        },
+        "external_context": {
+            "status": "public_historical_context",
+            "sources": [
+                {
+                    "name": "Replaying Ethereum Hacks - Furucombo",
+                    "url": "https://cmichel.io/replaying-ethereum-hacks-furucombo/",
+                },
+                {
+                    "name": "Furucombo post-mortem March 2021",
+                    "url": "https://medium.com/furucombo/furucombo-post-mortem-march-2021-ad19afd415e",
+                },
+            ],
+        },
+        "next_steps": [
+            "Keep this as historical reproduced critical unless current registry and approvals are revalidated.",
+            "Use this mapper for trusted-handler plus nested-delegatecall composition checks.",
+        ],
+    }
+
+
+def _alchemix_impact_review(
+    *,
+    review_id: str,
+    run_id: str,
+    target_id: str,
+    target: dict[str, Any],
+    final_report: dict[str, Any],
+    assertion: dict[str, Any],
+    runtime: dict[str, Any],
+    source_truth: dict[str, Any],
+) -> dict[str, Any]:
+    runtime_status = str(runtime.get("status") or final_report.get("runtime_status") or "")
+    assertion_status = str(assertion.get("status") or "")
+    reproduced = runtime_status == "runtime_completed" and assertion_status == "passed"
+    return {
+        "status": "completed",
+        "impact_review_id": review_id,
+        "run_id": run_id,
+        "target_id": target_id,
+        "chain": str(target.get("chain") or final_report.get("chain") or "eth"),
+        "address": str(target.get("address") or final_report.get("address") or ALCHEMIX_HARVESTER),
+        "bug_class": "alchemix_keeper_parameter_access_control",
+        "summary": {
+            "verdict": "historical_reproduced_high_context" if reproduced else "historical_context_runtime_not_reproduced",
+            "severity_posture": "historical_context_do_not_claim_live_without_current_state_review",
+            "reasoning": (
+                "The local fork probe checks that the harvester accepts the configured automation caller and "
+                "caller-supplied harvest parameters. The public report frames this as a keeper access-control "
+                "issue because generic automation could be abused to execute low minimumAmountOut harvests. "
+                "This artifact does not prove current live exploitability."
+            ),
+        },
+        "historical_impact": {
+            "severity": "high_historical_context",
+            "affected_system": "Alchemix Harvester / Gelato automation path",
+            "reported_loss_context": "public Immunefi review describes access-control issue remediated by redeploying harvesters",
+            "impact_classes": [
+                "generic_keeper_actor_confusion",
+                "attacker_chosen_harvest_parameters",
+                "slippage_sensitive_harvest_execution",
+            ],
+        },
+        "local_reproduction": {
+            "status": runtime_status,
+            "assertion_status": assertion_status,
+            "evidence_status": assertion.get("evidence_status"),
+            "predicate": assertion.get("predicate"),
+            "measured_delta": assertion.get("measured_delta"),
+            "final_status": final_report.get("final_status"),
+            "runtime_ready_count": final_report.get("runtime_ready_count"),
+            "source_truth_verified_count": final_report.get("source_truth_verified_count"),
+            "no_broadcast": bool(runtime.get("no_broadcast", True)),
+            "fork_block_number": 17_650_000,
+        },
+        "current_live_risk": {
+            "status": "not_claimed",
+            "reason": (
+                "Alchemix publicly remediated by moving away from the generic automation caller. Current live "
+                "severity requires fresh harvester, keeper, resolver and task-state review."
+            ),
+            "required_to_upgrade_to_live_severity": [
+                "current harvester address and gelatoPoker value",
+                "current resolver and task configuration",
+                "proof that a permissionless actor can still cause the keeper sender to call arbitrary harvest args",
+                "economic impact model for the current adapter/yield token",
+            ],
+        },
+        "source_truth": {
+            "status": source_truth.get("status"),
+            "verified_count": source_truth.get("source_truth_verified_count"),
+            "evidence_kinds": sorted({str(item.get("evidence_kind")) for item in source_truth.get("reviews") or []}),
+        },
+        "external_context": {
+            "status": "public_historical_context",
+            "sources": [
+                {
+                    "name": "Alchemix access-control issue bugfix review",
+                    "url": "https://immunefi.com/blog/bug-fix-reviews/alchemix-access-control-issue-bugfix-review/",
+                }
+            ],
+        },
+        "next_steps": [
+            "Keep this as historical context unless current keeper/task state is revalidated.",
+            "Use this mapper for generic-automation caller and attacker-controlled parameter checks.",
+        ],
+    }
+
+
 def _read_json(store: ArtifactStore, target_id: str, phase_id: str, name: str) -> dict[str, Any]:
     payload = store.read_artifact(store.uri(target_id, phase_id, name))
     if not isinstance(payload, dict):
@@ -494,5 +698,23 @@ def _is_nomad_replica(address: str, source_truth: dict[str, Any]) -> bool:
         return True
     return any(
         item.get("evidence_kind") == "nomad_root_proof_message_auth_bypass"
+        for item in source_truth.get("reviews") or []
+    )
+
+
+def _is_furucombo_proxy(address: str, source_truth: dict[str, Any]) -> bool:
+    if address.lower() == FURUCOMBO_VULNERABLE_PROXY:
+        return True
+    return any(
+        item.get("evidence_kind") == "furucombo_delegatecall_proxy_storage_confusion"
+        for item in source_truth.get("reviews") or []
+    )
+
+
+def _is_alchemix_harvester(address: str, source_truth: dict[str, Any]) -> bool:
+    if address.lower() == ALCHEMIX_HARVESTER:
+        return True
+    return any(
+        item.get("evidence_kind") == "alchemix_keeper_parameter_access_control"
         for item in source_truth.get("reviews") or []
     )

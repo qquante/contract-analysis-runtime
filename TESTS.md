@@ -1102,3 +1102,53 @@ Interpretation:
 - This is historical critical context, not a current live severity claim.
 - The current implementation source resolves as fixed; runtime proof depends
   on the pinned historical fork.
+
+## PT-027.T12/T13 Furucombo + Alchemix Historical Runtime Mappers
+
+Focused regression:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source
+```
+
+Observed:
+
+```text
+23 tests passed
+```
+
+Real smoke:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v22-furucombo-alchemix-runtime --source-cache-dir runs/source-cache-v20 --bootstrap-adapters --runtime-authorized
+python -m vassago_contract_runtime.cli impact-review --run runs/sc01-historical-6-v22-furucombo-alchemix-runtime --target-id CT-2964504f0811
+python -m vassago_contract_runtime.cli impact-review --run runs/sc01-historical-6-v22-furucombo-alchemix-runtime --target-id CT-4b5839bd1d37
+```
+
+Observed Furucombo:
+
+```text
+target_id=CT-2964504f0811
+compile_status=compile_only_passed
+runtime_status=runtime_completed
+assertion.status=passed
+Foundry=[PASS] testFurucomboWhitelistedProxyDelegatecallDrainsVictimAllowance()
+impact verdict=historical_reproduced_critical
+current live risk=not_claimed
+no_broadcast=true
+```
+
+Observed Alchemix:
+
+```text
+target_id=CT-4b5839bd1d37
+compile_status=compile_only_passed
+runtime_status=runtime_completed
+assertion.status=passed
+Foundry=[PASS] testAlchemixGenericKeeperCanTriggerLowMinHarvest()
+impact verdict=historical_reproduced_high_context
+current live risk=not_claimed
+no_broadcast=true
+```

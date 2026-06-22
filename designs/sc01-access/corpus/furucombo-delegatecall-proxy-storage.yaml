@@ -1,0 +1,34 @@
+id: sc01-furucombo-delegatecall-proxy-storage
+thesis_id: furucombo_delegatecall_proxy_storage
+bug_family: access_control
+missing_property: trusted handler registry entries must not allow nested delegatecall into user-controlled implementation under proxy authority
+violated_invariant: a whitelisted handler/proxy cannot be used to execute attacker code in the Furucombo proxy storage and allowance context
+entrypoint_type: public_batch_exec_delegatecall
+sensitive_sink: proxy-held token allowances, proxy storage and delegatecall authority
+attacker_capabilities:
+  - call batchExec with handler calldata
+  - use a historically whitelisted proxy handler
+exploit_preconditions:
+  - public batchExec reaches _execs
+  - _exec validates handler through registry
+  - _exec uses delegatecall to the handler
+  - whitelisted handler is itself an initializable proxy with fallback delegatecall
+search_motifs:
+  - batchExec
+  - execs
+  - delegatecall
+  - HANDLER_REGISTRY
+  - isValid
+  - IRegistry
+  - postProcess
+negative_signals:
+  - post-mortem redeployed proxy without historical victim allowances
+  - handler registry no longer whitelists nested initializable proxy
+  - target is not the historical vulnerable proxy
+required_evidence:
+  - Furucombo proxy source shape
+  - handler registry slot
+  - batchExec delegatecall path
+  - historical whitelisted Aave V2 proxy
+  - victim token allowance at fork block
+runtime_runner: furucombo_delegatecall_runtime

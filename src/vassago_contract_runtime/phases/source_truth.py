@@ -6,6 +6,8 @@ from typing import Any
 
 from vassago_contract_runtime.design_runtime.models import short_hash
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
+from vassago_contract_runtime.sc01_alchemix import evaluate_alchemix_keeper_state
+from vassago_contract_runtime.sc01_furucombo import evaluate_furucombo_delegatecall_proxy_storage
 from vassago_contract_runtime.sc01_nomad import evaluate_nomad_bridge_root_proof
 from vassago_contract_runtime.sc01_source import (
     evaluate_access_control_initializer,
@@ -151,6 +153,50 @@ def _review_queue_item(
             nomad,
             runtime_runner="nomad_bridge_root_proof_runtime",
             evidence_kind="nomad_root_proof_message_auth_bypass",
+        )
+    furucombo = evaluate_furucombo_delegatecall_proxy_storage(source_manifest)
+    if item.get("thesis_id") == "furucombo_delegatecall_proxy_storage":
+        if furucombo.get("verified") is True:
+            return _verified_runtime_specific_review(
+                item,
+                functions,
+                related_surface,
+                related_guards,
+                related_writes,
+                furucombo,
+                runtime_runner="furucombo_delegatecall_runtime",
+                evidence_kind="furucombo_delegatecall_proxy_storage_confusion",
+            )
+        return _runtime_specific_blocked_review(
+            item,
+            functions,
+            related_surface,
+            related_guards,
+            related_writes,
+            furucombo,
+            evidence_kind="furucombo_delegatecall_proxy_storage_candidate",
+        )
+    alchemix = evaluate_alchemix_keeper_state(source_manifest)
+    if item.get("thesis_id") == "alchemix_keeper_state":
+        if alchemix.get("verified") is True:
+            return _verified_runtime_specific_review(
+                item,
+                functions,
+                related_surface,
+                related_guards,
+                related_writes,
+                alchemix,
+                runtime_runner="alchemix_keeper_runtime",
+                evidence_kind="alchemix_keeper_parameter_access_control",
+            )
+        return _runtime_specific_blocked_review(
+            item,
+            functions,
+            related_surface,
+            related_guards,
+            related_writes,
+            alchemix,
+            evidence_kind="alchemix_keeper_state_candidate",
         )
     evaluation = evaluate_uninitialized_uups_initializer(source_manifest)
     if _is_verified_uninitialized_uups_initializer(item, related_surface, related_writes, evaluation):
@@ -323,6 +369,39 @@ def _verified_runtime_specific_review(
         "runtime_strategy": evaluation.get("runtime_strategy"),
         "runtime_components": list(evaluation.get("runtime_components") or []),
         "next_required_adapter": "compile_only_then_local_foundry" if complete else runtime_runner,
+        "evidence_refs": _refs(related_surface, related_guards, related_writes)
+        + list(evaluation.get("evidence_refs") or []),
+    }
+
+
+def _runtime_specific_blocked_review(
+    item: dict[str, Any],
+    functions: list[str],
+    related_surface: list[dict[str, Any]],
+    related_guards: list[dict[str, Any]],
+    related_writes: list[dict[str, Any]],
+    evaluation: dict[str, Any],
+    *,
+    evidence_kind: str,
+) -> dict[str, Any]:
+    return {
+        "source_truth_id": f"ST-{short_hash(str(item.get('queue_id')))}",
+        "queue_id": item.get("queue_id"),
+        "candidate_id": item.get("candidate_id"),
+        "thesis_id": item.get("thesis_id"),
+        "status": "source_truth_blocked_runtime_specific_mapper",
+        "source_truth_verified": False,
+        "evidence_kind": evidence_kind,
+        "matched_functions": functions,
+        "related_guard_classes": [guard.get("guard_class") for guard in related_guards],
+        "related_state_variables": [write.get("variable") for write in related_writes],
+        "missing_proof_pieces": list(evaluation.get("missing_proof_pieces") or []),
+        "blockers": list(evaluation.get("blockers") or []),
+        "actor_model": evaluation.get("actor_model"),
+        "measurable_reader": evaluation.get("measurable_reader"),
+        "measurable_delta": evaluation.get("measurable_delta"),
+        "explicit_predicate": evaluation.get("explicit_predicate"),
+        "next_required_adapter": evaluation.get("runtime_runner") or "runtime_specific_mapper",
         "evidence_refs": _refs(related_surface, related_guards, related_writes)
         + list(evaluation.get("evidence_refs") or []),
     }

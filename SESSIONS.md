@@ -1978,3 +1978,46 @@ Run final regression:
 `git diff --check`.
 If clean, commit with
 `feat(sc01): add nomad bridge root proof runtime`.
+
+## 2026-06-22 - PT-027.T12/T13 Furucombo + Alchemix Runtime Mappers
+
+Goal:
+
+- Implement the next two historical SC01 mappers:
+  Furucombo delegatecall/proxy-storage and Alchemix keeper-state.
+
+What was done:
+
+- Added:
+  - `src/vassago_contract_runtime/sc01_furucombo.py`;
+  - `src/vassago_contract_runtime/sc01_alchemix.py`;
+  - `designs/sc01-access/corpus/furucombo-delegatecall-proxy-storage.yaml`;
+  - `designs/sc01-access/corpus/alchemix-keeper-state.yaml`;
+  - `SC01_HISTORICAL_REPRODUCTION_REPORT.md`.
+- Integrated both mappers into source truth, compile-only, runtime Foundry,
+  on-chain state and impact review.
+- Corrected `tests/fixtures/targets-sc01-historical-6.json`:
+  - vulnerable historical Furucombo proxy:
+    `0x17e8Ca1b4798B97602895f63206afCd1Fc90Ca5f`;
+  - post-mortem redeployed proxy:
+    `0xA013AfbB9A92cEF49e898C87C060e6660E050569`.
+
+Observed:
+
+- unit: `python -m unittest tests.design_runtime.test_sc01_source` -> `23 OK`;
+- real run: `runs/sc01-historical-6-v22-furucombo-alchemix-runtime`;
+- Furucombo: `compile_only_passed`, `runtime_completed`, assertion `passed`,
+  `[PASS] testFurucomboWhitelistedProxyDelegatecallDrainsVictimAllowance()`;
+- Alchemix: `compile_only_passed`, `runtime_completed`, assertion `passed`,
+  `[PASS] testAlchemixGenericKeeperCanTriggerLowMinHarvest()`;
+- broadcast: no;
+- current live risk: `not_claimed`.
+
+RESUME FROM HERE:
+
+Run final regression:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`;
+`$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check`;
+`git diff --check`.
+If clean, commit with
+`feat(sc01): add furucombo and alchemix historical runtimes`.

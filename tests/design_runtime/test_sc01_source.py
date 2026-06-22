@@ -4,6 +4,8 @@ import json
 import unittest
 from pathlib import Path
 
+from vassago_contract_runtime.sc01_alchemix import evaluate_alchemix_keeper_state
+from vassago_contract_runtime.sc01_furucombo import evaluate_furucombo_delegatecall_proxy_storage
 from vassago_contract_runtime.sc01_nomad import evaluate_nomad_bridge_root_proof
 from vassago_contract_runtime.sc01_source import (
     evaluate_access_control_initializer,
@@ -538,6 +540,117 @@ class SC01SourceVerifierTests(unittest.TestCase):
         self.assertIn("testNomadProcessesUnprovenForgedMessageOnHistoricalFork", harness)
         self.assertIn("target.process(message)", harness)
         self.assertIn("target.acceptableRoot(defaultRoot)", harness)
+
+    def test_furucombo_delegatecall_proxy_storage_requires_historical_proxy(self) -> None:
+        fixture = {
+            "target": {"chain": "eth", "address": "0xA013AfbB9A92cEF49e898C87C060e6660E050569"},
+            "abi": [
+                {"type": "function", "name": "batchExec", "inputs": [], "outputs": [], "stateMutability": "payable"},
+                {"type": "function", "name": "execs", "inputs": [], "outputs": [], "stateMutability": "payable"},
+            ],
+            "source_files": {
+                "Proxy.sol": """
+                interface IRegistry { function isValid(address handler) external view returns (bool result); }
+                contract Proxy {
+                    bytes32 private constant HANDLER_REGISTRY = 0x6874162fd62902201ea0f4bf541086067b3b88bd802fac9e150fd2d1db584e19;
+                    function batchExec(address[] memory tos, bytes32[] memory configs, bytes[] memory datas) public payable {}
+                    function execs(address[] memory tos, bytes32[] memory configs, bytes[] memory datas) public payable {}
+                    function _getRegistry() internal view returns (address registry) {}
+                    function _isValid(address handler) internal view returns (bool result) {
+                        return IRegistry(_getRegistry()).isValid(handler);
+                    }
+                    function _exec(address _to, bytes memory _data) internal returns (bytes memory result) {
+                        require(_isValid(_to), "Invalid handler");
+                        assembly { let succeeded := delegatecall(sub(gas(), 5000), _to, add(_data, 0x20), mload(_data), 0, 0) }
+                    }
+                }
+                """,
+            },
+        }
+
+        result = evaluate_furucombo_delegatecall_proxy_storage(fixture)
+
+        self.assertFalse(result["verified"])
+        self.assertTrue(result["source_shape_verified"])
+        self.assertTrue(result["post_mortem_redeploy"])
+        self.assertIn("post_mortem_redeployed_proxy_no_historical_runtime_claim", result["blockers"])
+
+    def test_furucombo_historical_proxy_builds_runtime_harness(self) -> None:
+        fixture = {
+            "target": {"chain": "eth", "address": "0x17e8ca1b4798B97602895f63206afCd1Fc90Ca5f"},
+            "abi": [
+                {"type": "function", "name": "batchExec", "inputs": [], "outputs": [], "stateMutability": "payable"},
+                {"type": "function", "name": "execs", "inputs": [], "outputs": [], "stateMutability": "payable"},
+            ],
+            "source_files": {
+                "Proxy.sol": """
+                interface IRegistry { function isValid(address handler) external view returns (bool result); }
+                contract Proxy {
+                    bytes32 private constant HANDLER_REGISTRY = 0x6874162fd62902201ea0f4bf541086067b3b88bd802fac9e150fd2d1db584e19;
+                    function batchExec(address[] memory tos, bytes32[] memory configs, bytes[] memory datas) public payable {}
+                    function execs(address[] memory tos, bytes32[] memory configs, bytes[] memory datas) public payable {}
+                    function _getRegistry() internal view returns (address registry) {}
+                    function _isValid(address handler) internal view returns (bool result) {
+                        return IRegistry(_getRegistry()).isValid(handler);
+                    }
+                    function _exec(address _to, bytes memory _data) internal returns (bytes memory result) {
+                        require(_isValid(_to), "Invalid handler");
+                        assembly { let succeeded := delegatecall(sub(gas(), 5000), _to, add(_data, 0x20), mload(_data), 0, 0) }
+                    }
+                }
+                """,
+            },
+        }
+
+        result = evaluate_furucombo_delegatecall_proxy_storage(fixture)
+        harness = render_sc01_harness(fixture)
+
+        self.assertTrue(result["verified"], result["blockers"])
+        self.assertEqual(result["runtime_runner"], "furucombo_delegatecall_runtime")
+        self.assertEqual(result["fork_block_number"], 11_940_499)
+        self.assertIn("testFurucomboWhitelistedProxyDelegatecallDrainsVictimAllowance", harness)
+        self.assertIn("AAVE_V2_PROXY", harness)
+        self.assertIn("attackDelegated", harness)
+
+    def test_alchemix_keeper_state_builds_runtime_harness(self) -> None:
+        fixture = {
+            "target": {"chain": "eth", "address": "0x7879A9c464af7805712404Cf4A8366c475034F91"},
+            "abi": [
+                {"type": "function", "name": "gelatoPoker", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
+                {"type": "function", "name": "resolver", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
+                {"type": "function", "name": "maxGasPrice", "inputs": [], "outputs": [{"type": "uint256"}], "stateMutability": "view"},
+                {
+                    "type": "function",
+                    "name": "harvest",
+                    "inputs": [{"type": "address"}, {"type": "address"}, {"type": "uint256"}],
+                    "outputs": [],
+                    "stateMutability": "nonpayable",
+                },
+            ],
+            "source_files": {
+                "AlchemixHarvester.sol": """
+                contract AlchemixHarvester {
+                    address public gelatoPoker;
+                    address public resolver;
+                    function maxGasPrice() external view returns (uint256) {}
+                    function harvest(address alchemist, address yieldToken, uint256 minimumAmountOut) external {
+                        if (msg.sender != gelatoPoker) { revert Unauthorized(); }
+                        IAlchemistV2(alchemist).harvest(yieldToken, minimumAmountOut);
+                        IHarvestResolver(resolver).recordHarvest(yieldToken);
+                    }
+                }
+                """,
+            },
+        }
+
+        result = evaluate_alchemix_keeper_state(fixture)
+        harness = render_sc01_harness(fixture)
+
+        self.assertTrue(result["verified"], result["blockers"])
+        self.assertEqual(result["runtime_runner"], "alchemix_keeper_runtime")
+        self.assertEqual(result["codable_args"][2], "1")
+        self.assertIn("testAlchemixGenericKeeperCanTriggerLowMinHarvest", harness)
+        self.assertIn("vm.prank(keeper)", harness)
 
     def test_pool_initializer_is_protocol_initializer_not_admin_initializer(self) -> None:
         fixture = {

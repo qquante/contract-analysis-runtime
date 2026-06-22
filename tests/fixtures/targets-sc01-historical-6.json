@@ -17,8 +17,8 @@
     },
     {
       "chain": "eth",
-      "address": "0xA013AfbB9A92cEF49e898C87C060e6660E050569",
-      "label": "Furucombo Proxy - delegatecall privilege confusion"
+      "address": "0x17e8Ca1b4798B97602895f63206afCd1Fc90Ca5f",
+      "label": "Furucombo Proxy v1.0.0 - delegatecall privilege confusion"
     },
     {
       "chain": "eth",

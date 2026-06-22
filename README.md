@@ -216,3 +216,22 @@ designs/sc01-access/prompts/vassago-sc01-design.md
 The skill should call `mcp_vassago_contract_runtime_vassago_design_run` first
 and then read `sc01-final-report.json` with
 `mcp_vassago_contract_runtime_vassago_artifact_read`.
+
+## SC01 Historical Reproduction Report
+
+Current consolidated report:
+
+```text
+SC01_HISTORICAL_REPRODUCTION_REPORT.md
+```
+
+Historical local/fork reproductions currently tracked:
+
+- Audius governance proxy;
+- Wormhole core bridge;
+- Nomad Replica;
+- Furucombo proxy v1.0.0;
+- Alchemix Harvester.
+
+All are local/fork-only with no broadcast. The reports do not claim current
+live exploitability.

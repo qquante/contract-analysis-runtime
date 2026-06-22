@@ -103,3 +103,8 @@ Acceptance:
   source-truth knowledge and now has a dedicated VM/payload runtime harness.
 - Nomad-style bridge root/proof validation failure is represented as corpus
   knowledge and now has a dedicated historical fork runtime harness.
+- Furucombo-style trusted handler plus nested delegatecall proxy-storage
+  confusion is represented as corpus knowledge and has a dedicated historical
+  fork runtime harness.
+- Alchemix-style generic keeper parameter access-control is represented as
+  corpus knowledge and has a dedicated historical fork runtime harness.
