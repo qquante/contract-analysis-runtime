@@ -1328,3 +1328,76 @@ Current blockers for the other historical cases:
 - Furucombo needs delegatecall/proxy-storage mapper.
 - Alchemix needs keeper/actor model and measurable state delta.
 - Wormhole needs implementation initializer/UUPS context mapper.
+
+## PT-027.T06 - Audius proxy storage collision base
+
+Status: done, 2026-06-21.
+
+Added a dedicated SC01 thesis for the Audius-style proxy storage collision /
+reinitializer class:
+
+```text
+designs/sc01-access/corpus/proxy-storage-collision-reinitializer.yaml
+runs/sc01-historical-6-v9-audius-privileged-writes-live
+```
+
+Implemented:
+
+- `DossierAdapter` now resolves a related proxy implementation source when the
+  Explorer source context exposes `proxy_context.implementation`;
+- `evaluate_known_non_sc01_pattern()` rejects Audius `upgradeTo(address)` as
+  `custom_proxy_admin_path`, so it is not misclassified as weak UUPS auth;
+- `evaluate_proxy_storage_collision_reinitializer()` recognizes:
+  - proxy-side `proxyAdmin` slot-zero storage;
+  - fallback/delegatecall path;
+  - Explorer proxy implementation context;
+  - implementation source resolved as `Governance`;
+  - implementation `Initializable` slot-zero flags;
+  - `Governance.initialize(...)`;
+  - privileged initializer writes with readers:
+    `registry`, `votingPeriod`, `executionDelay`,
+    `maxInProgressProposals`, `votingQuorumPercent`,
+    `guardianAddress`.
+
+Validated run:
+
+```powershell
+# loaded ETHERSCAN_API_KEY from C:\Users\PC\Desktop\Vassago\.env without printing it
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v9-audius-privileged-writes-live --bootstrap-adapters --allow-solc-install --runtime-authorized
+```
+
+Result:
+
+- `executed_count=66`;
+- `failed_count=0`;
+- Audius source resolved through Etherscan V2;
+- Audius implementation source resolved:
+  `0x1c91af03a390b4c619b444425b3119e553b5b44b`, contract `Governance`;
+- Audius UUPS thesis rejected as `custom_proxy_admin_path`;
+- Audius proxy-storage-collision thesis status:
+  `source_truth_blocked_proxy_side_verified`;
+- remaining Audius blockers:
+  - `proxy_delegatecall_initializer_calldata_required`;
+  - `measurable_proxy_state_delta_required`;
+- Audius `foundry_allowed=false`;
+- Badger remains the only `runtime_local` reproduced case.
+
+This is not an Audius reproduction and not a live impact claim. It is a
+source-backed readiness improvement for the next mapper.
+
+## PT-027.T07 - proxy collision runtime mapper
+
+Status: next.
+
+Build the missing Audius-style mapper before any runtime:
+
+- derive callable initializer calldata for proxy fallback/delegatecall;
+- choose bounded local initializer arguments;
+- read or model proxy-side before/after readers for
+  `getGuardianAddress()`, `getRegistryAddress()`,
+  `getVotingPeriod()`, `getExecutionDelay()`,
+  `getVotingQuorumPercent()`, `getMaxInProgressProposals()`;
+- only mark runtime-ready if the local fork can measure at least one proxy
+  state delta from unauthorized initializer replay;
+- no broadcast and no live transaction.

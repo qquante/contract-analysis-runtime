@@ -379,3 +379,41 @@ Remaining historical blockers:
 - Furucombo: delegatecall/proxy-storage mapper.
 - Alchemix: keeper actor/state-delta mapper.
 - Wormhole: implementation initializer/UUPS context mapper.
+
+## Current Audius Proxy-Collision Readiness
+
+`PT-027.T06` current Audius baseline is:
+
+```text
+runs/sc01-historical-6-v9-audius-privileged-writes-live
+```
+
+The run was executed with `ETHERSCAN_API_KEY` loaded from
+`C:\Users\PC\Desktop\Vassago\.env` into the process without printing it.
+
+Current Audius status:
+
+- proxy source resolved through Etherscan V2;
+- proxy context reports implementation
+  `0x1c91af03a390b4c619b444425b3119e553b5b44b`;
+- related implementation source resolved as contract `Governance`;
+- `upgradeTo(address)` is rejected as `custom_proxy_admin_path`, not weak UUPS;
+- new thesis `proxy_storage_collision_reinitializer` reaches source truth;
+- source truth status:
+  `source_truth_blocked_proxy_side_verified`;
+- implementation Initializable flags and `initialize(...)` are detected;
+- initializer privileged writes are detected with readers:
+  - `registry` / `getRegistryAddress()`;
+  - `votingPeriod` / `getVotingPeriod()`;
+  - `executionDelay` / `getExecutionDelay()`;
+  - `maxInProgressProposals` / `getMaxInProgressProposals()`;
+  - `votingQuorumPercent` / `getVotingQuorumPercent()`;
+  - `guardianAddress` / `getGuardianAddress()`;
+- remaining proof pieces:
+  - `proxy_delegatecall_initializer_calldata_required`;
+  - `measurable_proxy_state_delta_required`;
+- `foundry_allowed=false` for Audius.
+
+This is source-backed readiness, not reproduction. The next mapper must derive
+delegated initializer calldata and measure a local/fork proxy-state delta before
+Foundry runtime is allowed for Audius.

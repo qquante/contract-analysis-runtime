@@ -18,14 +18,15 @@ class DossierAdapter:
     def run(self, context: PhaseContext) -> PhaseResult:
         target = ContractTargetRef.from_target(context.target)
         source = self.source_resolver.resolve(target)
-        function_index = _function_index(source.to_json())
-        protocol_fingerprint = _protocol_fingerprint(source.to_json())
-        compile_context = _compile_context(source.to_json())
+        source_json = _with_related_sources(source.to_json(), target, self.source_resolver)
+        function_index = _function_index(source_json)
+        protocol_fingerprint = _protocol_fingerprint(source_json)
+        compile_context = _compile_context(source_json)
         dossier = {
             "status": "skeleton",
             "phase_id": context.phase.phase_id,
             "target": target.to_json(),
-            "source_resolution": source.to_json(),
+            "source_resolution": source_json,
             "function_count": len(function_index["functions"]),
             "evidence_status": "static_only",
             "note": "Dossier skeleton. No Explorer/RPC/Slither/Foundry provider was used.",
@@ -34,11 +35,35 @@ class DossierAdapter:
             json_artifacts={
                 "scan-dossier.json": dossier,
                 "function-index.json": function_index,
-                "source-manifest.json": source.to_json(),
+                "source-manifest.json": source_json,
                 "compile-context.json": compile_context,
                 "protocol-fingerprint.json": protocol_fingerprint,
             }
         )
+
+
+def _with_related_sources(source: dict, target: ContractTargetRef, resolver: SourceResolver) -> dict:
+    proxy_context = dict(source.get("proxy_context") or {})
+    implementation = str(proxy_context.get("implementation") or "").strip()
+    if not implementation or implementation == target.address:
+        return source
+    if implementation.lower() in {"0x", "0x0000000000000000000000000000000000000000"}:
+        return source
+    related_target = ContractTargetRef(
+        target_id=f"{target.target_id}-implementation",
+        chain=target.chain,
+        address=implementation,
+        label=f"{target.label or target.address} implementation",
+        metadata={"relation": "proxy_implementation", "parent_target_id": target.target_id},
+    )
+    related = resolver.resolve(related_target).to_json()
+    enriched = dict(source)
+    enriched["related_sources"] = {"implementation": related}
+    metadata = dict(enriched.get("metadata") or {})
+    metadata["related_source_count"] = 1
+    metadata["implementation_source_status"] = related.get("status")
+    enriched["metadata"] = metadata
+    return enriched
 
 
 def _function_index(source: dict) -> dict:

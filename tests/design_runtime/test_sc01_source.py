@@ -7,6 +7,7 @@ from pathlib import Path
 from vassago_contract_runtime.sc01_source import (
     evaluate_access_control_initializer,
     evaluate_known_non_sc01_pattern,
+    evaluate_proxy_storage_collision_reinitializer,
     evaluate_public_normal_behavior,
     evaluate_uninitialized_uups_initializer,
 )
@@ -195,6 +196,132 @@ class SC01SourceVerifierTests(unittest.TestCase):
 
         self.assertTrue(result["rejected"])
         self.assertEqual(result["classification"], "transparent_proxy_admin_path")
+
+    def test_custom_proxy_admin_upgrade_is_not_uups_weak_auth(self) -> None:
+        fixture = {
+            "abi": [],
+            "source_files": {
+                "AudiusProxy.sol": """
+                pragma solidity ^0.5.0;
+                contract AudiusProxy {
+                    address private proxyAdmin;
+                    function _upgradeTo(address newImplementation) internal {}
+                    function implementation() external view returns (address) {}
+                    function upgradeTo(address _newImplementation) external {
+                        require(msg.sender == proxyAdmin, "only admin");
+                        _upgradeTo(_newImplementation);
+                    }
+                }
+                """,
+            },
+        }
+
+        result = evaluate_known_non_sc01_pattern(fixture, "uups_weak_auth", ["upgradeTo(address)"])
+
+        self.assertTrue(result["rejected"])
+        self.assertEqual(result["classification"], "custom_proxy_admin_path")
+
+    def test_audius_style_proxy_storage_collision_is_partial_candidate(self) -> None:
+        fixture = {
+            "abi": [
+                {"type": "function", "name": "getAudiusProxyAdminAddress", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
+                {"type": "function", "name": "implementation", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
+            ],
+            "proxy_context": {"proxy": "1", "implementation": "0x1111111111111111111111111111111111111111"},
+            "source_files": {
+                "AudiusProxy.sol": """
+                pragma solidity ^0.5.0;
+                contract Proxy {
+                    function () payable external { _fallback(); }
+                    function _implementation() internal view returns (address);
+                    function _delegate(address implementation) internal { assembly { let result := delegatecall(gas, implementation, 0, calldatasize, 0, 0) } }
+                    function _fallback() internal { _delegate(_implementation()); }
+                }
+                contract AudiusProxy is Proxy {
+                    bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+                    address private proxyAdmin;
+                    function getAudiusProxyAdminAddress() external view returns (address) { return proxyAdmin; }
+                    function implementation() external view returns (address) { return _implementation(); }
+                }
+                """,
+            },
+        }
+
+        result = evaluate_proxy_storage_collision_reinitializer(fixture)
+
+        self.assertTrue(result["proxy_side_verified"], result["blockers"])
+        self.assertFalse(result["verified"])
+        self.assertEqual(result["implementation_address"], "0x1111111111111111111111111111111111111111")
+        self.assertIn("implementation_source_required", result["missing_proof_pieces"])
+
+    def test_audius_style_proxy_storage_collision_detects_implementation_initializer_writes(self) -> None:
+        fixture = {
+            "abi": [
+                {"type": "function", "name": "getAudiusProxyAdminAddress", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
+                {"type": "function", "name": "implementation", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
+            ],
+            "proxy_context": {"proxy": "1", "implementation": "0x1111111111111111111111111111111111111111"},
+            "source_files": {
+                "AudiusProxy.sol": """
+                pragma solidity ^0.5.0;
+                contract Proxy {
+                    function () payable external { _fallback(); }
+                    function _implementation() internal view returns (address);
+                    function _delegate(address implementation) internal { assembly { let result := delegatecall(gas, implementation, 0, calldatasize, 0, 0) } }
+                    function _fallback() internal { _delegate(_implementation()); }
+                }
+                contract AudiusProxy is Proxy {
+                    bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+                    address private proxyAdmin;
+                    function getAudiusProxyAdminAddress() external view returns (address) { return proxyAdmin; }
+                    function implementation() external view returns (address) { return _implementation(); }
+                }
+                """,
+            },
+            "related_sources": {
+                "implementation": {
+                    "status": "resolved",
+                    "abi": [
+                        {"type": "function", "name": "initialize", "inputs": [], "outputs": [], "stateMutability": "nonpayable"},
+                        {"type": "function", "name": "getGuardianAddress", "inputs": [], "outputs": [{"type": "address"}], "stateMutability": "view"},
+                        {"type": "function", "name": "getExecutionDelay", "inputs": [], "outputs": [{"type": "uint256"}], "stateMutability": "view"},
+                    ],
+                    "metadata": {"contract_name": "Governance"},
+                    "source_files": {
+                        "Governance.sol": """
+                        pragma solidity ^0.5.0;
+                        contract InitializableV2 {
+                            bool private initialized;
+                            bool private initializing;
+                            modifier initializer() { _; }
+                        }
+                        contract Governance is InitializableV2 {
+                            address private guardianAddress;
+                            uint256 private executionDelay;
+                            function initialize(address _guardianAddress, uint256 _executionDelay) public initializer {
+                                guardianAddress = _guardianAddress;
+                                executionDelay = _executionDelay;
+                            }
+                            function getGuardianAddress() external view returns (address) { return guardianAddress; }
+                            function getExecutionDelay() external view returns (uint256) { return executionDelay; }
+                        }
+                        """,
+                    },
+                }
+            },
+        }
+
+        result = evaluate_proxy_storage_collision_reinitializer(fixture)
+
+        self.assertTrue(result["proxy_side_verified"], result["blockers"])
+        self.assertTrue(result["implementation_initializable"])
+        self.assertEqual(result["implementation_contract_name"], "Governance")
+        self.assertNotIn("initializer_privileged_write_required", result["missing_proof_pieces"])
+        self.assertEqual(
+            {item["variable"] for item in result["initializer_privileged_writes"]},
+            {"executionDelay", "guardianAddress"},
+        )
+        self.assertIn("proxy_delegatecall_initializer_calldata_required", result["missing_proof_pieces"])
 
     def test_pool_initializer_is_protocol_initializer_not_admin_initializer(self) -> None:
         fixture = {

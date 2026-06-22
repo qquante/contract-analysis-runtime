@@ -64,21 +64,26 @@ PT-027.T02 SC01 smoke 5 curated real contracts - done 2026-06-21, run baseline r
 PT-027.T03 SC01 smoke 20 curated contracts - done 2026-06-21, run baseline runs/sc01-curated-real-20-v8
 PT-027.T04 high-signal target acquisition before any larger batch
 PT-027.T05 historical SC01 curated runtime suite - done 2026-06-21, run baseline runs/sc01-historical-6-v4-runtime
+PT-027.T06 Audius proxy storage collision base - done 2026-06-21, run baseline runs/sc01-historical-6-v9-audius-privileged-writes-live
+PT-027.T07 Audius proxy collision runtime mapper - next
 ```
 
 ## Current Next Up
 
 1. Use `runs/sc01-historical-6-v4-runtime` as the current historical runtime
-   evidence baseline and `runs/sc01-curated-real-20-v8` as the current broad
-   curated false-positive baseline.
-2. Implement high-signal target acquisition instead of broad random expansion:
+   evidence baseline, `runs/sc01-historical-6-v9-audius-privileged-writes-live`
+   as the current Audius readiness baseline, and
+   `runs/sc01-curated-real-20-v8` as the broad curated false-positive baseline.
+2. Implement `PT-027.T07`: Audius proxy collision runtime mapper that derives
+   proxy fallback initializer calldata and measurable proxy-state deltas.
+3. Implement high-signal target acquisition instead of broad random expansion:
    weak `_authorizeUpgrade`, initialized proxy state impact, concrete
    role-admin graph, Safe/AA/module sidecars with measurable deltas.
-3. Build mappers for the remaining historical blockers: Audius governance,
+4. Build mappers for the remaining historical blockers: Audius governance,
    Nomad bridge root/proof, Furucombo delegatecall/proxy-storage, Alchemix
    keeper-state and Wormhole implementation/UUPS context.
-4. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
+5. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
    Safe/module, bridge endpoint/source and ERC4337 validator.
-5. Add per-target Slither/source summary only if a larger real smoke shows
+6. Add per-target Slither/source summary only if a larger real smoke shows
    repeated compiler/import misses.
-6. Implement PT-026.T04 A2A card after the design runtime remains stable.
+7. Implement PT-026.T04 A2A card after the design runtime remains stable.

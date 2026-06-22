@@ -1,0 +1,35 @@
+id: sc01-proxy-storage-collision-reinitializer
+thesis_id: proxy_storage_collision_reinitializer
+bug_family: access_control
+missing_property: proxy-owned storage must not collide with implementation initializer state
+violated_invariant: proxy delegatecall cannot make initializer guards permanently bypassable through slot collision
+entrypoint_type: proxy_delegatecall_initializer
+sensitive_sink: proxy admin, governance, initializer and delegated role/config storage
+attacker_capabilities:
+  - call proxy fallback with implementation initializer calldata
+exploit_preconditions:
+  - proxy delegates arbitrary user calldata to implementation
+  - proxy stores admin-like state in low storage slots
+  - implementation uses Initializable-style slot-zero flags
+  - initializer changes privileged governance/admin/role state
+search_motifs:
+  - proxyAdmin
+  - delegatecall
+  - _delegate
+  - fallback
+  - Initializable
+  - initialized
+  - initializing
+  - initialize
+negative_signals:
+  - EIP-1967 admin slot avoids slot-zero admin storage
+  - implementation source unavailable
+  - initializer does not write privileged state
+  - initializer cannot be called through proxy fallback
+required_evidence:
+  - proxy source storage layout
+  - implementation source storage layout
+  - delegatecall fallback path
+  - initializer calldata path
+  - reader or state delta
+runtime_runner: proxy_storage_collision_runtime

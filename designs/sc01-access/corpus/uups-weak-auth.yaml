@@ -20,6 +20,7 @@ negative_signals:
   - strong onlyOwner where owner is Safe/timelock
   - onlyProxy with strong authorization
   - initializer-only noise
+  - custom proxy-admin path where upgradeTo is guarded by proxyAdmin
 required_evidence:
   - proxy context
   - implementation slot reader

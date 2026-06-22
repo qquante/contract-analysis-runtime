@@ -1474,3 +1474,106 @@ Use `runs/sc01-historical-6-v4-runtime` as the current historical runtime
 baseline. Next implementation work should target one blocker mapper at a time:
 Audius governance/proxy, Nomad bridge root/proof, Furucombo delegatecall,
 Alchemix keeper, or Wormhole implementation/UUPS context.
+
+## S-20260621-025 - PT-027.T06 Audius proxy collision base
+
+Goal:
+
+- Investigate and prepare the Audius historical SC01 blocker without claiming
+  reproduction.
+
+Research summary:
+
+- Audius is not a weak UUPS `_authorizeUpgrade` case. The relevant class is
+  proxy storage collision plus delegatecall initializer replay: proxy-side
+  `proxyAdmin` storage collides with implementation-side `Initializable` flags,
+  allowing a delegated initializer path to mutate privileged governance state.
+- Wormhole remains a separate uninitialized implementation / UUPS-like context.
+
+Code changes:
+
+- Added
+  `designs/sc01-access/corpus/proxy-storage-collision-reinitializer.yaml`.
+- Updated `designs/sc01-access/corpus/uups-weak-auth.yaml` with a negative
+  signal for custom proxy-admin upgrade paths.
+- Updated `src/vassago_contract_runtime/phases/dossier.py`:
+  `DossierAdapter` now enriches `source-manifest.json` with
+  `related_sources.implementation` when Explorer reports
+  `proxy_context.implementation`.
+- Updated `src/vassago_contract_runtime/phases/corpus_motifs.py`:
+  the new proxy collision thesis requires function-level `proxyAdmin`
+  evidence, avoiding broad delegatecall matches.
+- Updated `src/vassago_contract_runtime/sc01_source.py`:
+  - `evaluate_known_non_sc01_pattern()` rejects Audius `upgradeTo(address)`
+    as `custom_proxy_admin_path`;
+  - `evaluate_proxy_storage_collision_reinitializer()` detects proxy-side
+    storage/delegatecall evidence, related implementation source,
+    Initializable slot-zero flags, `Governance.initialize(...)`, and
+    privileged initializer writes with readers.
+- Updated `src/vassago_contract_runtime/phases/source_truth.py`:
+  Audius emits `source_truth_blocked_proxy_side_verified` with implementation
+  fields and remaining blockers.
+- Updated `tests/design_runtime/test_sc01_source.py` with regression coverage
+  for custom proxy-admin paths and Audius-style privileged initializer writes.
+
+Focused tests:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source
+python -m unittest tests.design_runtime.test_phases
+```
+
+Observed:
+
+- `test_sc01_source`: 17 passed.
+- `test_phases`: 11 passed.
+
+Live historical run:
+
+```powershell
+# loaded ETHERSCAN_API_KEY from C:\Users\PC\Desktop\Vassago\.env without printing it
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v9-audius-privileged-writes-live --bootstrap-adapters --allow-solc-install --runtime-authorized
+```
+
+Observed:
+
+- `executed_count=66`;
+- `failed_count=0`;
+- Audius proxy source resolved through Etherscan V2;
+- Audius implementation source resolved as `Governance` at
+  `0x1c91af03a390b4c619b444425b3119e553b5b44b`;
+- UUPS review rejected as `custom_proxy_admin_path`;
+- proxy collision review status:
+  `source_truth_blocked_proxy_side_verified`;
+- `initializer_privileged_writes` include:
+  `registry`, `votingPeriod`, `executionDelay`,
+  `maxInProgressProposals`, `votingQuorumPercent`, `guardianAddress`;
+- remaining blockers:
+  `proxy_delegatecall_initializer_calldata_required` and
+  `measurable_proxy_state_delta_required`;
+- Audius `foundry_allowed=false`;
+- Badger remains the only runtime-local reproduced case.
+
+Decision:
+
+- Do not run Audius Foundry yet. The base is ready only up to
+  source/implementation/write readiness. Runtime needs a dedicated mapper for
+  delegatecall initializer calldata and measurable proxy-state delta.
+
+Blockers:
+
+- `ETHERSCAN_API_KEY` is not present in the repo-new shell by default. For live
+  runs, load it from `C:\Users\PC\Desktop\Vassago\.env` without printing it.
+- Audius needs `PT-027.T07` before compile/runtime.
+
+RESUME FROM HERE:
+
+Run full validation and commit this slice if not already committed:
+`python -m unittest discover -s tests`,
+`python -m vassago_contract_runtime.cli check`, and `git diff --check`.
+Use `runs/sc01-historical-6-v9-audius-privileged-writes-live` as the Audius
+readiness baseline. Next implementation: `PT-027.T07`, deriving proxy fallback
+initializer calldata and measurable reader deltas for Audius-style storage
+collision. Do not claim Audius reproduction until runtime-local evidence exists.

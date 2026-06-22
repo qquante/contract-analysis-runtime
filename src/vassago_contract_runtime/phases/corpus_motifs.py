@@ -68,6 +68,11 @@ def _candidate(match: object, context: PhaseContext, access_surface: dict) -> di
     matched_functions = _surface_functions_for_motifs(access_surface, payload["matched_motifs"], payload["matched_functions"])
     if not matched_functions:
         return None
+    if payload["thesis_id"] == "proxy_storage_collision_reinitializer" and not _has_proxy_admin_function_evidence(
+        access_surface,
+        matched_functions,
+    ):
+        return None
     return {
         "candidate_id": f"TC-{context.target.target_id[3:]}-{payload['thesis_id']}",
         "target_id": context.target.target_id,
@@ -104,3 +109,21 @@ def _surface_functions_for_motifs(access_surface: dict, motifs: list[str], exist
         if name.lower() in existing_names or any(motif in haystack for motif in motif_values):
             matches.append(signature or name)
     return sorted({item for item in matches if item})
+
+
+def _has_proxy_admin_function_evidence(access_surface: dict, matched_functions: list[str]) -> bool:
+    names = {str(item).split("(")[0] for item in matched_functions}
+    for function in access_surface.get("functions", []):
+        if str(function.get("name") or "") not in names and str(function.get("signature") or "") not in matched_functions:
+            continue
+        haystack = " ".join(
+            [
+                str(function.get("signature") or ""),
+                str(function.get("source_excerpt") or ""),
+                " ".join(str(item) for item in function.get("state_write_signals") or []),
+                " ".join(str(item) for item in function.get("call_signals") or []),
+            ]
+        )
+        if "proxyAdmin" in haystack:
+            return True
+    return False

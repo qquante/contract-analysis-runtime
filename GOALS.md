@@ -89,3 +89,7 @@ Acceptance:
   `role_admin_escalation` and `public_lifecycle_noise`.
 - remaining records still needed for Safe/module, bridge endpoint/source,
   ERC4337 validator and metamorphic guard edge cases.
+- Audius-style `proxy_storage_collision_reinitializer` is now represented as
+  corpus knowledge and reaches source-backed readiness through implementation
+  source/initializer/write evidence, but remains non-runtime until delegated
+  initializer calldata and proxy-state delta are measurable.
