@@ -76,6 +76,7 @@ python -m vassago_contract_runtime.cli run-design --design sc01-access --targets
 python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets_positive.json --source-fixture tests/fixtures/source_fixture_positive.json --output runs/sc01-positive-local-runtime --bootstrap-adapters --runtime-authorized
 python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets_adversarial.json --source-fixture tests/fixtures/source_fixture_adversarial.json --output runs/sc01-adversarial-local --bootstrap-adapters --runtime-authorized
 python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-curated-real-5.json --output runs/sc01-curated-real-5 --bootstrap-adapters
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-curated-real-20.json --output runs/sc01-curated-real-20 --bootstrap-adapters --allow-solc-install
 python -m vassago_contract_runtime.cli mcp --stdio
 ```
 
@@ -83,18 +84,19 @@ Current real curated baseline:
 
 ```powershell
 $env:PYTHONPATH='src'
-python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-curated-real-5.json --output runs/sc01-curated-real-5-v4 --bootstrap-adapters
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-curated-real-20.json --output runs/sc01-curated-real-20-v8 --bootstrap-adapters --allow-solc-install
 ```
 
 Expected current result:
 
 ```text
-executed_count=55
+executed_count=220
 failed_count=0
-all 5 source-manifest.json files resolved through etherscan_v2
-all 5 access-surface.json.slither.status values are completed
-all 5 final reports are blocked_no_runtime_ready
-all 5 foundry_allowed values are false
+all 20 source-manifest.json files resolved through etherscan_v2
+all 20 access-surface.json.slither.status values are completed
+13 source-truth reviews, all rejected by negative policy
+all 20 final reports are blocked_no_runtime_ready
+all 20 foundry_allowed values are false
 ```
 
 Hermes wrapper:

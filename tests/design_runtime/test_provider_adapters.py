@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -74,6 +75,40 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertEqual(first.abi[0]["name"], "initialize")
         self.assertIn("Fixture.sol", first.source_files)
         self.assertIn("Fixture", " ".join(first.source_files.values()))
+
+    def test_etherscan_v2_standard_json_normalizes_absolute_source_units(self) -> None:
+        source_json = {
+            "language": "Solidity",
+            "sources": {
+                "/Users/dev/project/contracts/v1/FiatTokenProxy.sol": {"content": "contract FiatTokenProxy {}"},
+                "/Users/dev/project/contracts/upgradeability/AdminUpgradeabilityProxy.sol": {
+                    "content": "contract AdminUpgradeabilityProxy {}"
+                },
+            },
+        }
+
+        def transport(url: str) -> dict:
+            return {
+                "status": "1",
+                "message": "OK",
+                "result": [
+                    {
+                        "ContractName": "FiatTokenProxy",
+                        "CompilerVersion": "v0.6.12",
+                        "ABI": "[]",
+                        "SourceCode": json.dumps(source_json),
+                        "Proxy": "0",
+                        "Implementation": "",
+                    }
+                ],
+            }
+
+        target = ContractTargetRef.from_target(ContractTarget("base", "0x1111111111111111111111111111111111111111"))
+        result = EtherscanV2ExplorerAdapter("test-key", min_interval_seconds=0, transport=transport).get_contract_context(target)
+
+        self.assertEqual(result.status, "resolved")
+        self.assertIn("v1/FiatTokenProxy.sol", result.source_files)
+        self.assertIn("upgradeability/AdminUpgradeabilityProxy.sol", result.source_files)
 
     def test_etherscan_v2_logs_are_read_only_and_structured(self) -> None:
         def transport(url: str) -> dict:

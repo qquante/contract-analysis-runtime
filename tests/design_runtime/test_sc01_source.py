@@ -4,7 +4,11 @@ import json
 import unittest
 from pathlib import Path
 
-from vassago_contract_runtime.sc01_source import evaluate_public_normal_behavior, evaluate_uninitialized_uups_initializer
+from vassago_contract_runtime.sc01_source import (
+    evaluate_known_non_sc01_pattern,
+    evaluate_public_normal_behavior,
+    evaluate_uninitialized_uups_initializer,
+)
 
 
 class SC01SourceVerifierTests(unittest.TestCase):
@@ -81,6 +85,187 @@ class SC01SourceVerifierTests(unittest.TestCase):
 
         self.assertFalse(result["rejected"])
         self.assertIn("admin_variable_write_present", result["blockers"])
+
+    def test_transparent_proxy_admin_upgrade_is_not_uups_weak_auth(self) -> None:
+        fixture = {
+            "abi": [],
+            "source_files": {
+                "Proxy.sol": """
+                pragma solidity ^0.4.24;
+                contract Proxy {
+                    bytes32 private constant IMPLEMENTATION_SLOT = 0x0;
+                    bytes32 private constant ADMIN_SLOT = 0x0;
+                    modifier ifAdmin() { if (msg.sender == _admin()) { _; } else { _fallback(); } }
+                    function _admin() internal view returns (address adm) {}
+                    function _setImplementation(address newImplementation) internal {}
+                    function _upgradeTo(address newImplementation) internal { _setImplementation(newImplementation); }
+                    function upgradeTo(address newImplementation) external ifAdmin { _upgradeTo(newImplementation); }
+                    function upgradeToAndCall(address newImplementation, bytes data) payable external ifAdmin {
+                        _upgradeTo(newImplementation);
+                        require(address(this).call.value(msg.value)(data));
+                    }
+                    function _fallback() internal {}
+                }
+                """,
+            },
+        }
+
+        result = evaluate_known_non_sc01_pattern(fixture, "uups_weak_auth", ["upgradeTo", "upgradeToAndCall"])
+
+        self.assertTrue(result["rejected"])
+        self.assertEqual(result["classification"], "transparent_proxy_admin_path")
+
+    def test_immutable_admin_proxy_upgrade_is_not_uups_weak_auth(self) -> None:
+        fixture = {
+            "abi": [],
+            "source_files": {
+                "Proxy.sol": """
+                pragma solidity ^0.8.10;
+                contract Proxy {
+                    address immutable _admin;
+                    modifier ifAdmin() { if (msg.sender == _admin) { _; } else { _fallback(); } }
+                    function _setImplementation(address newImplementation) internal {}
+                    function _upgradeTo(address newImplementation) internal { _setImplementation(newImplementation); }
+                    function admin() external ifAdmin returns (address) { return _admin; }
+                    function upgradeTo(address newImplementation) external ifAdmin { _upgradeTo(newImplementation); }
+                    function _fallback() internal {}
+                }
+                """,
+            },
+        }
+
+        result = evaluate_known_non_sc01_pattern(fixture, "uups_weak_auth", ["upgradeTo"])
+
+        self.assertTrue(result["rejected"])
+        self.assertEqual(result["classification"], "transparent_proxy_admin_path")
+
+    def test_pool_initializer_is_protocol_initializer_not_admin_initializer(self) -> None:
+        fixture = {
+            "abi": [],
+            "source_files": {
+                "PoolManager.sol": """
+                pragma solidity ^0.8.26;
+                struct PoolKey { address currency0; address currency1; uint24 fee; int24 tickSpacing; address hooks; }
+                contract PoolManager {
+                    event Initialize(bytes32 id, address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks, uint160 sqrtPriceX96, int24 tick);
+                    function initialize(PoolKey memory key, uint160 sqrtPriceX96) external returns (int24 tick) {
+                        bytes32 id = keccak256(abi.encode(key));
+                        emit Initialize(id, key.currency0, key.currency1, key.fee, key.tickSpacing, key.hooks, sqrtPriceX96, tick);
+                    }
+                }
+                """,
+            },
+        }
+
+        result = evaluate_known_non_sc01_pattern(fixture, "uninitialized_implementation_proxy", ["initialize"])
+
+        self.assertTrue(result["rejected"])
+        self.assertEqual(result["classification"], "protocol_pool_initializer")
+
+    def test_public_factory_creation_is_not_proxy_initializer(self) -> None:
+        fixture = {
+            "abi": [],
+            "source_files": {
+                "Factory.sol": """
+                pragma solidity ^0.5.16;
+                contract Factory {
+                    mapping(address => mapping(address => address)) public getPair;
+                    address[] public allPairs;
+                    event PairCreated(address indexed token0, address indexed token1, address pair, uint256);
+                    function createPair(address tokenA, address tokenB) external returns (address pair) {
+                        bytes memory bytecode = hex"00";
+                        bytes32 salt = keccak256(abi.encodePacked(tokenA, tokenB));
+                        assembly { pair := create2(0, add(bytecode, 32), mload(bytecode), salt) }
+                        getPair[tokenA][tokenB] = pair;
+                        allPairs.push(pair);
+                        emit PairCreated(tokenA, tokenB, pair, allPairs.length);
+                    }
+                }
+                """,
+            },
+        }
+
+        result = evaluate_known_non_sc01_pattern(fixture, "uninitialized_implementation_proxy", ["createPair"])
+
+        self.assertTrue(result["rejected"])
+        self.assertEqual(result["classification"], "public_factory_or_pool_creation")
+
+    def test_initialized_eip1967_proxy_is_not_uninitialized_initializer_candidate(self) -> None:
+        fixture = {
+            "abi": [],
+            "proxy_context": {
+                "proxy": "1",
+                "implementation": "0x728a138a4823392c2efa55e028d434f526fe03cf",
+            },
+            "source_files": {
+                "InitializableUpgradeabilityProxy.sol": """
+                pragma solidity 0.8.10;
+                contract InitializableUpgradeabilityProxy {
+                    bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+                    function _implementation() internal view returns (address impl) {}
+                    function _setImplementation(address _logic) internal {}
+                    function initialize(address _logic, bytes memory _data) public payable {
+                        require(_implementation() == address(0));
+                        _setImplementation(_logic);
+                        if (_data.length > 0) {
+                            (bool success,) = _logic.delegatecall(_data);
+                            require(success);
+                        }
+                    }
+                }
+                """,
+            },
+        }
+
+        result = evaluate_known_non_sc01_pattern(
+            fixture,
+            "uninitialized_implementation_proxy",
+            ["initialize(address,bytes)"],
+        )
+
+        self.assertTrue(result["rejected"])
+        self.assertEqual(result["classification"], "initialized_eip1967_proxy")
+
+    def test_token_approval_operator_is_not_role_admin_escalation(self) -> None:
+        fixture = {"abi": [], "source_files": {"Token.sol": "contract Token {}"}}
+
+        result = evaluate_known_non_sc01_pattern(
+            fixture,
+            "role_admin_escalation",
+            [
+                "getApproved(uint256)",
+                "isApprovedForAll(address,address)",
+                "positions(uint256)",
+                "setApprovalForAll(address,bool)",
+            ],
+        )
+
+        self.assertTrue(result["rejected"])
+        self.assertEqual(result["classification"], "token_approval_operator")
+
+    def test_caller_scoped_operator_is_public_normal_behavior(self) -> None:
+        fixture = {
+            "abi": [],
+            "source_files": {
+                "ERC6909Like.sol": """
+                pragma solidity ^0.8.20;
+                contract ERC6909Like {
+                    mapping(address => mapping(address => bool)) public isOperator;
+                    event OperatorSet(address indexed owner, address indexed operator, bool approved);
+                    function setOperator(address operator, bool approved) public returns (bool) {
+                        isOperator[msg.sender][operator] = approved;
+                        emit OperatorSet(msg.sender, operator, approved);
+                        return true;
+                    }
+                }
+                """,
+            },
+        }
+
+        result = evaluate_public_normal_behavior(fixture, ["setOperator"])
+
+        self.assertTrue(result["rejected"])
+        self.assertEqual(result["classification"], "caller_scoped_operator")
 
 
 if __name__ == "__main__":

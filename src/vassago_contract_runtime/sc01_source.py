@@ -87,6 +87,12 @@ def evaluate_public_normal_behavior(source_manifest: dict[str, Any], matched_fun
         if _is_user_funded_accounting(content):
             classifications.append("caller_funded_accounting")
             refs.extend(["source:msg.value", "source:caller-indexed accounting"])
+        elif _is_protocol_lock_accounting(content):
+            classifications.append("protocol_lock_accounting")
+            refs.extend(["source:onlyWhenUnlocked", "source:protocol delta accounting"])
+        elif _is_caller_scoped_operator(content):
+            classifications.append("caller_scoped_operator")
+            refs.extend(["source:msg.sender scoped operator mapping", "source:OperatorSet"])
         elif _is_public_lifecycle(content):
             classifications.append("public_lifecycle")
             refs.extend(["source:lifecycle condition", "source:lifecycle state write"])
@@ -102,6 +108,67 @@ def evaluate_public_normal_behavior(source_manifest: dict[str, Any], matched_fun
 
 def should_use_uups_initializer_harness(source_manifest: dict[str, Any]) -> bool:
     return bool(evaluate_uninitialized_uups_initializer(source_manifest).get("verified"))
+
+
+def evaluate_known_non_sc01_pattern(
+    source_manifest: dict[str, Any],
+    thesis_id: str,
+    matched_functions: list[str],
+) -> dict[str, Any]:
+    """Reject common protocol/proxy patterns that are not SC01 gaps by themselves."""
+
+    source_text = _source_text(source_manifest)
+    if not matched_functions:
+        return {
+            "rejected": True,
+            "classification": "no_function_level_evidence",
+            "reason": "Corpus motif matched global source text but no concrete function-level evidence.",
+            "evidence_refs": ["source-truth:no matched function"],
+        }
+    if thesis_id == "uups_weak_auth" and _is_transparent_proxy_admin_path(source_text, matched_functions):
+        return {
+            "rejected": True,
+            "classification": "transparent_proxy_admin_path",
+            "reason": "Upgrade functions are gated by proxy admin context, not an unguarded UUPS authorize path.",
+            "evidence_refs": ["source:ifAdmin", "source:_admin", "source:_setImplementation"],
+        }
+    if thesis_id == "role_admin_escalation" and _is_token_approval_operator(matched_functions):
+        return {
+            "rejected": True,
+            "classification": "token_approval_operator",
+            "reason": "Matched functions are token approval/operator APIs scoped to token owner, not contract role-admin mutation.",
+            "evidence_refs": ["abi:approval/operator standard"],
+        }
+    if thesis_id == "uninitialized_implementation_proxy" and _is_initialized_eip1967_proxy(
+        source_manifest,
+        source_text,
+        matched_functions,
+    ):
+        return {
+            "rejected": True,
+            "classification": "initialized_eip1967_proxy",
+            "reason": "Initializer is guarded by empty implementation slot and explorer context already reports a live implementation.",
+            "evidence_refs": [
+                "source:require _implementation() == address(0)",
+                "source:IMPLEMENTATION_SLOT",
+                "explorer:proxy implementation",
+            ],
+        }
+    if thesis_id == "uninitialized_implementation_proxy" and _is_public_factory_or_pool_creation(source_text, matched_functions):
+        return {
+            "rejected": True,
+            "classification": "public_factory_or_pool_creation",
+            "reason": "Matched initializer-like function creates/configures user-requested protocol resources, not proxy admin ownership.",
+            "evidence_refs": ["source:create2 or pool initializer", "source:no admin write"],
+        }
+    if thesis_id == "uninitialized_implementation_proxy" and _is_protocol_pool_initializer(source_text, matched_functions):
+        return {
+            "rejected": True,
+            "classification": "protocol_pool_initializer",
+            "reason": "initialize configures a protocol pool and does not assign owner/admin/governor authority.",
+            "evidence_refs": ["source:PoolKey", "source:Initialize event", "source:no admin write"],
+        }
+    return {"rejected": False, "blockers": ["no_known_non_sc01_pattern_matched"]}
 
 
 def render_initializer_call(source_manifest: dict[str, Any]) -> str:
@@ -144,6 +211,93 @@ def _is_public_lifecycle(body: str) -> bool:
     has_lifecycle_marker = any(marker in lowered for marker in ("status", "state", "round", "epoch", "day", "settle", "expire"))
     has_write = bool(re.search(r"\b\w+\s*(?:=|\+=|-=)", body))
     return has_public_condition and has_lifecycle_marker and has_write
+
+
+def _is_protocol_lock_accounting(body: str) -> bool:
+    lowered = body.lower()
+    if "onlywhenunlocked" not in lowered and "nonzerodeltacount" not in lowered and "_accountdelta" not in lowered:
+        return False
+    return any(marker in lowered for marker in ("settle", "_settle", "currency", "delta", "msg.sender"))
+
+
+def _is_caller_scoped_operator(body: str) -> bool:
+    lowered = body.lower()
+    return (
+        "operator" in lowered
+        and "msg.sender" in lowered
+        and ("isoperator[msg.sender]" in lowered or "allowance[msg.sender]" in lowered)
+    )
+
+
+def _is_transparent_proxy_admin_path(source_text: str, matched_functions: list[str]) -> bool:
+    names = {str(item).split("(")[0] for item in matched_functions}
+    if not names.intersection({"upgradeTo", "upgradeToAndCall"}):
+        return False
+    if "_authorizeUpgrade" in source_text or "onlyProxy" in source_text:
+        return False
+    bodies = [_function_body(source_text, name).get("body", "") for name in names]
+    headers = [_function_body(source_text, name).get("header", "") for name in names]
+    joined = "\n".join(headers + bodies)
+    has_admin_reader = "_admin()" in source_text or "_admin" in source_text or "function admin()" in source_text
+    return "ifAdmin" in joined and "_upgradeTo" in joined and "_setImplementation" in source_text and has_admin_reader
+
+
+def _is_token_approval_operator(matched_functions: list[str]) -> bool:
+    names = {str(item).split("(")[0] for item in matched_functions}
+    token_approval_names = {
+        "allowance",
+        "approve",
+        "getApproved",
+        "isApprovedForAll",
+        "positions",
+        "setApprovalForAll",
+        "setOperator",
+    }
+    return bool(names) and names.issubset(token_approval_names)
+
+
+def _is_initialized_eip1967_proxy(
+    source_manifest: dict[str, Any],
+    source_text: str,
+    matched_functions: list[str],
+) -> bool:
+    names = {str(item).split("(")[0] for item in matched_functions}
+    if "initialize" not in names:
+        return False
+    proxy_context = dict(source_manifest.get("proxy_context") or {})
+    implementation = str(proxy_context.get("implementation") or "").lower()
+    is_proxy = str(proxy_context.get("proxy") or "").lower() in {"1", "true", "yes"}
+    if not is_proxy or implementation in {"", "0x", "0x0000000000000000000000000000000000000000"}:
+        return False
+    body = _function_body(source_text, "initialize").get("body", "")
+    has_empty_impl_guard = "_implementation() == address(0)" in body or "_implementation()==address(0)" in body
+    return has_empty_impl_guard and "IMPLEMENTATION_SLOT" in source_text
+
+
+def _is_public_factory_or_pool_creation(source_text: str, matched_functions: list[str]) -> bool:
+    names = {str(item).split("(")[0] for item in matched_functions}
+    if names.intersection({"createPair", "createAndInitializePoolIfNecessary"}):
+        return True
+    bodies = "\n".join(_function_body(source_text, name).get("body", "") for name in names)
+    if _writes_admin_variable(bodies):
+        return False
+    lowered = bodies.lower()
+    return ("create2" in lowered and "initialize" in lowered) or "poolinitializer" in source_text.lower()
+
+
+def _is_protocol_pool_initializer(source_text: str, matched_functions: list[str]) -> bool:
+    names = {str(item).split("(")[0] for item in matched_functions}
+    if "initialize" not in names:
+        return False
+    body = _function_body(source_text, "initialize")
+    content = body.get("body", "")
+    header = body.get("header", "")
+    if not content:
+        return False
+    if _writes_admin_variable(content):
+        return False
+    has_pool_key_context = "PoolKey" in source_text or "key.currency0" in content or "key.toId" in content
+    return has_pool_key_context and "emit Initialize" in content
 
 
 def _source_text(source_manifest: dict[str, Any]) -> str:

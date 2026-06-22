@@ -112,6 +112,8 @@ class BootstrapPhaseTests(unittest.TestCase):
                                 "source_files": {
                                     "@openzeppelin/Context.sol": "abstract contract Context {}",
                                     "lib/v4-core/lib/solmate/src/auth/Owned.sol": "contract Owned {}",
+                                    "src/pkgs/universal-router/lib/v4-periphery/src/libraries/Actions.sol": "library Actions {}",
+                                    "src/pkgs/permit2/src/interfaces/IPermit2.sol": "interface IPermit2 {}",
                                     "contracts/Target.sol": "contract Target { function run() external {} }",
                                 },
                                 "compiler": {"language": "Solidity", "version": "v0.8.20"},
@@ -136,6 +138,11 @@ class BootstrapPhaseTests(unittest.TestCase):
             self.assertEqual(compile_context["selected_source_file"], "contracts/Target.sol")
             self.assertEqual(compile_context["target_contract"], "Target")
             self.assertIn("solmate/=lib/v4-core/lib/solmate/", compile_context["solc_remaps"])
+            self.assertIn("permit2/=src/pkgs/permit2/", compile_context["solc_remaps"])
+            self.assertIn(
+                "@uniswap/v4-periphery/=src/pkgs/universal-router/lib/v4-periphery/",
+                compile_context["solc_remaps"],
+            )
 
     def test_intake_and_dossier_adapters_write_real_bootstrap_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -61,16 +61,18 @@ PT-026.T04 A2A card for SC01 design runner
 PT-027.T01 local SC01 adversarial fixture expansion - done first slice 2026-06-21
 PT-027.T01B remaining adversarial/metamorphic fixtures
 PT-027.T02 SC01 smoke 5 curated real contracts - done 2026-06-21, run baseline runs/sc01-curated-real-5-v4
-PT-027.T03 SC01 smoke 20 curated contracts
-PT-027.T04 only then larger batch
+PT-027.T03 SC01 smoke 20 curated contracts - done 2026-06-21, run baseline runs/sc01-curated-real-20-v8
+PT-027.T04 high-signal target acquisition before any larger batch
 ```
 
 ## Current Next Up
 
-1. Inspect `runs/sc01-curated-real-5-v4` source-truth/proof-piece blockers and
-   decide whether to improve source-truth policies or corpus records.
-2. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
+1. Use `runs/sc01-curated-real-20-v8` as the current curated real baseline.
+2. Implement high-signal target acquisition instead of broad random expansion:
+   weak `_authorizeUpgrade`, initialized proxy state impact, concrete
+   role-admin graph, Safe/AA/module sidecars with measurable deltas.
+3. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
    Safe/module, bridge endpoint/source and ERC4337 validator.
-3. Add per-target Slither/source summary only if a larger real smoke shows
+4. Add per-target Slither/source summary only if a larger real smoke shows
    repeated compiler/import misses.
-4. Implement PT-026.T04 A2A card after the design runtime remains stable.
+5. Implement PT-026.T04 A2A card after the design runtime remains stable.

@@ -1259,3 +1259,111 @@ these 5 real targets and add targeted source-truth policies or stronger corpus
 records. If continuing validation, expand `PT-027.T01B` adversarial/metamorphic
 fixtures. Do not run Foundry runtime unless a fresh report has
 `foundry_allowed=true`.
+
+## S-20260621-023 - PT-027.T03 20-contract curated SC01 smoke
+
+Goal:
+
+- Commit the first validated runtime/source/Slither slice.
+- Analyze blockers from the 5 real curated contracts.
+- Harden the correct mappers/source-truth policies.
+- Run 20 curated real contracts across ETH/BSC/Base and record real results.
+
+What was committed first:
+
+- Commit `e30a5af` with message
+  `feat(runtime): validate real explorer source and slither smoke`.
+- Pre-commit validation:
+  - `$env:PYTHONPATH='src'; python -m unittest discover -s tests`:
+    63 passed;
+  - `$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check`:
+    passed 5/5;
+  - `git diff --check`: passed with CRLF warnings only;
+  - staged added-line secret scan: no added secret-like lines.
+
+Blocker analysis from 5 real targets:
+
+- Broad corpus matches were too noisy because phase 03 matched global source
+  text. EntryPoint, GnosisSafe and other targets could emit candidates without
+  function-level evidence.
+- Uniswap v4 PoolManager `initialize(tuple,uint160)` is a protocol pool
+  initializer, not proxy/admin initialization.
+- PoolManager `settle/settleFor` and MasterChef-like flows are public
+  accounting/lifecycle behavior, not authorization gaps.
+- `setOperator`/approval APIs are caller-scoped token/operator behavior, not
+  role-admin escalation.
+- USDC/Aave-style transparent proxy upgrade functions are admin-gated proxy
+  paths, not weak UUPS authorization.
+
+Code changes in the second slice:
+
+- `src/vassago_contract_runtime/phases/corpus_motifs.py` now builds thesis
+  candidates from function-level evidence in `access-surface.json`.
+- `src/vassago_contract_runtime/sc01_source.py` now rejects:
+  - no function-level evidence;
+  - transparent proxy admin path;
+  - initialized EIP-1967 proxy with explorer implementation context;
+  - protocol pool initializer;
+  - public factory/pool creation;
+  - token approval/operator APIs;
+  - caller-funded accounting, protocol lock accounting and caller-scoped
+    operator behavior.
+- `src/vassago_contract_runtime/phases/source_truth.py` consumes those
+  negative policies and emits terminal `source_truth_rejected` records.
+- `src/vassago_contract_runtime/explorer/adapter.py` normalizes Etherscan
+  standard JSON absolute source-unit names.
+- `src/vassago_contract_runtime/phases/dossier.py` improves remapping inference
+  for Uniswap/OpenZeppelin nested package layouts.
+- `tests/fixtures/targets-curated-real-20.json` adds 20 curated ETH/BSC/Base
+  targets.
+
+Real command:
+
+```powershell
+$envFile='C:\Users\PC\Desktop\Vassago\.env'
+# loaded ETHERSCAN_API_KEY into process without printing it
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-curated-real-20.json --output runs/sc01-curated-real-20-v8 --bootstrap-adapters --allow-solc-install
+```
+
+Result:
+
+- `executed_count=220`;
+- `failed_count=0`;
+- `status=completed`;
+- all 20 source bundles resolved through `etherscan_v2`;
+- all 20 Slither Python runs completed;
+- 13 SC01 thesis candidates reached source-truth review;
+- all 13 were `source_truth_rejected`;
+- all 20 final reports are `blocked_no_runtime_ready`;
+- all 20 have `foundry_allowed=false`;
+- `runtime_ready_total=0`.
+
+Source-truth rejection classes in v8:
+
+- `transparent_proxy_admin_path`: 3;
+- `public_lifecycle`: 2;
+- `caller_funded_accounting`: 2;
+- `public_factory_or_pool_creation`: 2;
+- `caller_scoped_operator`: 1;
+- `token_approval_operator`: 1;
+- `protocol_pool_initializer`: 1;
+- `initialized_eip1967_proxy`: 1.
+
+Decisions:
+
+- Treat `runs/sc01-curated-real-20-v8` as the current curated real baseline.
+- Do not run Foundry from this baseline. The correct result is terminal
+  rejection of broad false candidates.
+- Next productive work is high-signal acquisition, not larger random batches:
+  weak/ambiguous `_authorizeUpgrade`, initialized proxy state impact, concrete
+  role-admin graph, Safe/AA/module sidecars with measurable deltas.
+
+RESUME FROM HERE:
+
+Run the final validation and commit the second slice if not already committed:
+`python -m unittest discover -s tests`, `python -m vassago_contract_runtime.cli check`,
+and `git diff --check`. Use `runs/sc01-curated-real-20-v8` as the current
+20-target baseline. Do not run Foundry unless a fresh final report has
+`foundry_allowed=true`. Next feature work should implement high-signal target
+acquisition, not another random contract batch.

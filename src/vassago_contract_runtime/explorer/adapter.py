@@ -345,8 +345,29 @@ def _parse_standard_json_source(source: str) -> dict[str, str]:
     files: dict[str, str] = {}
     for name, item in sources.items():
         if isinstance(item, dict) and isinstance(item.get("content"), str):
-            files[str(name)] = item["content"]
+            files[_normalize_source_unit_name(str(name))] = item["content"]
     return files
+
+
+def _normalize_source_unit_name(name: str) -> str:
+    text = name.replace("\\", "/").strip()
+    if not text:
+        return "Contract.sol"
+    parts = [part for part in text.split("/") if part not in {"", ".", ".."}]
+    if not parts:
+        return Path(text).name or "Contract.sol"
+    if text.startswith("/") and "contracts" in parts:
+        index = parts.index("contracts")
+        tail = parts[index + 1 :]
+        if tail:
+            return "/".join(tail)
+    if len(parts) >= 2 and re_match_drive_root(parts[0]):
+        return "/".join(parts[1:])
+    return "/".join(parts)
+
+
+def re_match_drive_root(value: str) -> bool:
+    return len(value) == 2 and value[1] == ":"
 
 
 def _metadata(response: dict[str, Any]) -> dict[str, Any]:

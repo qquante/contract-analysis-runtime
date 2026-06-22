@@ -24,6 +24,7 @@ class CorpusMotifsAdapter:
         function_index = _read_json(context, "01_dossier", "function-index.json")
         source_manifest = _read_json(context, "01_dossier", "source-manifest.json")
         protocol_fingerprint = _read_json(context, "01_dossier", "protocol-fingerprint.json")
+        access_surface = _read_json(context, "02_semantic_surface", "access-surface.json")
         scan_context = CorpusScanContext(
             design_id=context.design.design_id,
             target_id=context.target.target_id,
@@ -34,7 +35,11 @@ class CorpusMotifsAdapter:
             protocol_fingerprint=protocol_fingerprint,
         )
         result = self.corpus_adapter.scan(scan_context)
-        candidates = [_candidate(match, context) for match in result.matches]
+        candidates = [
+            candidate
+            for candidate in (_candidate(match, context, access_surface) for match in result.matches)
+            if candidate is not None
+        ]
         return PhaseResult.completed(
             json_artifacts={
                 "sc01-corpus-matches.json": result.to_json(),
@@ -42,8 +47,9 @@ class CorpusMotifsAdapter:
                     "status": "candidate_only" if candidates else "no_matches",
                     "candidate_count": len(candidates),
                     "candidates": candidates,
+                    "dropped_match_count": len(result.matches) - len(candidates),
                     "evidence_status": "static_only",
-                    "note": "Corpus motif candidates are routing hints only; they do not prove vulnerability.",
+                    "note": "Corpus motif candidates require function-level evidence and remain routing hints only.",
                 },
             }
         )
@@ -57,8 +63,11 @@ def _read_json(context: PhaseContext, phase_id: str, name: str) -> dict:
     return payload
 
 
-def _candidate(match: object, context: PhaseContext) -> dict:
+def _candidate(match: object, context: PhaseContext, access_surface: dict) -> dict | None:
     payload = match.to_json()
+    matched_functions = _surface_functions_for_motifs(access_surface, payload["matched_motifs"], payload["matched_functions"])
+    if not matched_functions:
+        return None
     return {
         "candidate_id": f"TC-{context.target.target_id[3:]}-{payload['thesis_id']}",
         "target_id": context.target.target_id,
@@ -69,7 +78,29 @@ def _candidate(match: object, context: PhaseContext) -> dict:
         "bug_family": payload["bug_family"],
         "status": "candidate_only",
         "matched_motifs": payload["matched_motifs"],
-        "matched_functions": payload["matched_functions"],
-        "evidence_refs": payload["evidence_refs"],
+        "matched_functions": matched_functions,
+        "evidence_refs": sorted(set(payload["evidence_refs"] + [f"access-surface:{item}" for item in matched_functions])),
         "blockers": ["source_truth_not_run", "onchain_state_not_read", "proof_pieces_not_built"],
     }
+
+
+def _surface_functions_for_motifs(access_surface: dict, motifs: list[str], existing: list[str]) -> list[str]:
+    motif_values = [str(item).lower() for item in motifs if str(item).strip()]
+    existing_names = {str(item).split("(")[0].lower() for item in existing}
+    matches: list[str] = []
+    for function in access_surface.get("functions", []):
+        signature = str(function.get("signature") or "")
+        name = str(function.get("name") or "")
+        haystack = " ".join(
+            [
+                signature,
+                name,
+                str(function.get("source_excerpt") or ""),
+                " ".join(str(item) for item in function.get("guard_signals") or []),
+                " ".join(str(item) for item in function.get("call_signals") or []),
+                " ".join(str(item) for item in function.get("state_write_signals") or []),
+            ]
+        ).lower()
+        if name.lower() in existing_names or any(motif in haystack for motif in motif_values):
+            matches.append(signature or name)
+    return sorted({item for item in matches if item})

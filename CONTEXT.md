@@ -268,33 +268,37 @@ real contracts still need proxy/state impact before runtime.
 
 ## Current Real Curated Smoke
 
-`PT-027.T02` current baseline is:
+`PT-027.T03` current curated real baseline is:
 
 ```text
-runs/sc01-curated-real-5-v4
+runs/sc01-curated-real-20-v8
 ```
-
-Targets:
-
-- ETH EntryPoint v0.6;
-- BSC PancakeSwap MasterChefV2;
-- Base Uniswap v4 PoolManager;
-- ETH Safe Singleton 1.3.0;
-- ETH USDC FiatTokenProxy.
 
 Current result:
 
-- all 5 source bundles resolved through Etherscan V2;
-- all 5 compile contexts selected the correct target source file;
-- all 5 Slither Python runs completed;
-- PoolManager required inferred remapping
-  `solmate/=lib/v4-core/lib/solmate/`;
-- all 5 final reports are `blocked_no_runtime_ready`;
-- all 5 have `foundry_allowed=false`.
+- 20 curated ETH/BSC/Base targets;
+- all 20 source bundles resolved through Etherscan V2;
+- all 20 compile contexts selected usable target source;
+- all 20 Slither Python runs completed;
+- 13 SC01 thesis candidates reached source-truth review;
+- all 13 were source-truth rejected by negative policy;
+- all 20 final reports are `blocked_no_runtime_ready`;
+- all 20 have `foundry_allowed=false`;
+- `runtime_ready_total=0`.
+
+Rejection classes:
+
+- transparent proxy admin path;
+- initialized EIP-1967 proxy with known implementation context;
+- protocol pool initializer;
+- public factory/pool creation;
+- token approval/operator APIs;
+- caller-funded accounting/lifecycle/operator behavior.
 
 This means the read-only Explorer/source/Slither path works for the curated
-sample. It does not mean SC01 found a vulnerability. Runtime Foundry remains
-blocked until a fresh report has complete proof pieces and
+sample and broad false candidates are terminalized before Foundry. It does not
+mean SC01 found a vulnerability. Runtime Foundry remains blocked until a fresh
+report has complete proof pieces and
 `foundry_allowed=true`.
 
 ## Current Adversarial Fixture Slice

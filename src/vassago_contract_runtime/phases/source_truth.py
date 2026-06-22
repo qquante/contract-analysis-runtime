@@ -6,7 +6,11 @@ from typing import Any
 
 from vassago_contract_runtime.design_runtime.models import short_hash
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
-from vassago_contract_runtime.sc01_source import evaluate_public_normal_behavior, evaluate_uninitialized_uups_initializer
+from vassago_contract_runtime.sc01_source import (
+    evaluate_known_non_sc01_pattern,
+    evaluate_public_normal_behavior,
+    evaluate_uninitialized_uups_initializer,
+)
 
 
 class SourceTruthAdapter:
@@ -88,6 +92,17 @@ def _review_queue_item(
     related_guards = _guards(functions, guard_map)
     related_writes = _writes(functions, state_map)
     has_source = any(function.get("source_status") == "found" for function in related_surface)
+    known_non_sc01 = evaluate_known_non_sc01_pattern(source_manifest, str(item.get("thesis_id") or ""), functions)
+    if known_non_sc01.get("rejected") is True:
+        return _rejected_review(
+            item,
+            functions,
+            related_surface,
+            related_guards,
+            related_writes,
+            known_non_sc01,
+            "terminal_no_foundry_known_non_sc01_pattern",
+        )
     evaluation = evaluate_uninitialized_uups_initializer(source_manifest)
     if _is_verified_uninitialized_uups_initializer(item, related_surface, related_writes, evaluation):
         return {
@@ -113,29 +128,15 @@ def _review_queue_item(
         }
     normal_behavior = evaluate_public_normal_behavior(source_manifest, functions)
     if normal_behavior.get("rejected") is True:
-        return {
-            "source_truth_id": f"ST-{short_hash(str(item.get('queue_id')))}",
-            "queue_id": item.get("queue_id"),
-            "candidate_id": item.get("candidate_id"),
-            "thesis_id": item.get("thesis_id"),
-            "status": "source_truth_rejected",
-            "source_truth_verified": False,
-            "matched_functions": functions,
-            "classification": normal_behavior.get("classification"),
-            "reason": normal_behavior.get("reason"),
-            "related_guard_classes": [guard.get("guard_class") for guard in related_guards],
-            "related_state_variables": [write.get("variable") for write in related_writes],
-            "missing_proof_pieces": [
-                "source_truth_guard_gap",
-                "actor_model",
-                "measurable_reader",
-                "measurable_delta",
-                "explicit_predicate",
-            ],
-            "next_required_adapter": "terminal_no_foundry_public_normal_behavior",
-            "evidence_refs": _refs(related_surface, related_guards, related_writes)
-            + list(normal_behavior.get("evidence_refs") or []),
-        }
+        return _rejected_review(
+            item,
+            functions,
+            related_surface,
+            related_guards,
+            related_writes,
+            normal_behavior,
+            "terminal_no_foundry_public_normal_behavior",
+        )
     return {
         "source_truth_id": f"ST-{short_hash(str(item.get('queue_id')))}",
         "queue_id": item.get("queue_id"),
@@ -156,6 +157,40 @@ def _review_queue_item(
         ],
         "next_required_adapter": "slither_or_manual_source_truth",
         "evidence_refs": _refs(related_surface, related_guards, related_writes),
+    }
+
+
+def _rejected_review(
+    item: dict[str, Any],
+    functions: list[str],
+    related_surface: list[dict[str, Any]],
+    related_guards: list[dict[str, Any]],
+    related_writes: list[dict[str, Any]],
+    classification: dict[str, Any],
+    next_required_adapter: str,
+) -> dict[str, Any]:
+    return {
+        "source_truth_id": f"ST-{short_hash(str(item.get('queue_id')))}",
+        "queue_id": item.get("queue_id"),
+        "candidate_id": item.get("candidate_id"),
+        "thesis_id": item.get("thesis_id"),
+        "status": "source_truth_rejected",
+        "source_truth_verified": False,
+        "matched_functions": functions,
+        "classification": classification.get("classification"),
+        "reason": classification.get("reason"),
+        "related_guard_classes": [guard.get("guard_class") for guard in related_guards],
+        "related_state_variables": [write.get("variable") for write in related_writes],
+        "missing_proof_pieces": [
+            "source_truth_guard_gap",
+            "actor_model",
+            "measurable_reader",
+            "measurable_delta",
+            "explicit_predicate",
+        ],
+        "next_required_adapter": next_required_adapter,
+        "evidence_refs": _refs(related_surface, related_guards, related_writes)
+        + list(classification.get("evidence_refs") or []),
     }
 
 
@@ -202,7 +237,7 @@ def _is_verified_uninitialized_uups_initializer(
     writes: list[dict[str, Any]],
     evaluation: dict[str, Any],
 ) -> bool:
-    if item.get("thesis_id") not in {"uninitialized_implementation_proxy", "uups_weak_auth"}:
+    if item.get("thesis_id") != "uninitialized_implementation_proxy":
         return False
     if evaluation.get("verified") is not True:
         return False

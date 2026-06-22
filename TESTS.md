@@ -600,3 +600,75 @@ Important interpretation:
 - No target produced `runtime_ready_count > 0`.
 - No target produced `foundry_allowed=true`.
 - This is not vulnerability evidence; it is pipeline validation.
+
+## PT-027.T03 20-Contract Curated Real Smoke
+
+Command:
+
+```powershell
+$envFile='C:\Users\PC\Desktop\Vassago\.env'
+# loaded ETHERSCAN_API_KEY into process without printing it
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-curated-real-20.json --output runs/sc01-curated-real-20-v8 --bootstrap-adapters --allow-solc-install
+```
+
+Result:
+
+```text
+executed_count=220
+failed_count=0
+status=completed
+```
+
+Artifact checks from `runs/sc01-curated-real-20-v8`:
+
+```text
+targets=20
+source_resolved=20
+slither_completed=20
+final_blocked_no_runtime_ready=20
+foundry_allowed=0
+runtime_ready_total=0
+queue_total=13
+source_truth_reviews_total=13
+source_truth_rejected=13
+```
+
+Source-truth rejection classifications:
+
+```text
+transparent_proxy_admin_path=3
+public_lifecycle=2
+caller_funded_accounting=2
+public_factory_or_pool_creation=2
+caller_scoped_operator=1
+token_approval_operator=1
+protocol_pool_initializer=1
+initialized_eip1967_proxy=1
+```
+
+Focused tests run before the v8 smoke:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source -v
+python -m unittest tests.design_runtime.test_phases -v
+python -m unittest tests.design_runtime.test_provider_adapters -v
+```
+
+Observed result:
+
+```text
+test_sc01_source: 13 tests passed.
+test_phases: 11 tests passed.
+test_provider_adapters: 16 tests passed.
+```
+
+Interpretation:
+
+- The 20-contract smoke validates source resolution, compile context,
+  remapping inference and Slither for the curated sample.
+- It also validates that broad SC01 candidates are terminalized before
+  Foundry when source truth shows normal proxy/protocol/token behavior.
+- It does not prove a vulnerability and intentionally produced no runtime
+  evidence.

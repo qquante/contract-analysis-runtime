@@ -163,8 +163,34 @@ def _first_pragma_version(constraints: list[str]) -> str:
 
 def _infer_solc_remaps(source_files: dict[str, str]) -> list[str]:
     remaps: set[str] = set()
+    top_level_packages = _top_level_source_packages(source_files)
+    has_oz_package = _has_oz_package(source_files)
     for name in source_files:
         parts = Path(name).as_posix().split("/")
+        if len(parts) >= 3 and parts[0] == "src" and parts[1] == "pkgs":
+            package = parts[2]
+            remaps.add(f"{package}/=src/pkgs/{package}/")
+            if package in {"v2-core", "v3-core", "v3-periphery", "v4-core", "v4-periphery"}:
+                remaps.add(f"@uniswap/{package}/=src/pkgs/{package}/")
+        for index in range(0, max(len(parts) - 2, 0)):
+            if parts[index] == "lib" and index + 2 < len(parts) and parts[index + 1].startswith("oz-"):
+                prefix = "/".join(parts[: index + 3])
+                if parts[index + 2] == "contracts":
+                    remaps.add(f"@openzeppelin/contracts/={prefix}/")
+            if parts[index : index + 2] == ["src", "pkgs"] and index + 2 < len(parts):
+                package = parts[index + 2]
+                remaps.add(f"{package}/={'/'.join(parts[: index + 3])}/")
+            if parts[index] == "lib" and index + 1 < len(parts):
+                package = parts[index + 1]
+                prefix = "/".join(parts[: index + 2])
+                remaps.add(f"{package}/={prefix}/")
+                if package in {"v3-periphery", "v4-core", "v4-periphery"} and package not in top_level_packages:
+                    remaps.add(f"@uniswap/{package}/={prefix}/")
+                if package == "openzeppelin-contracts":
+                    if not has_oz_package:
+                        remaps.add(f"@openzeppelin/contracts/={prefix}/contracts/")
+                    else:
+                        remaps.add(f"@openzeppelin/contracts/token/ERC20/={prefix}/contracts/token/ERC20/")
         for index, part in enumerate(parts[:-1]):
             if part != "lib" or index + 1 >= len(parts):
                 continue
@@ -174,3 +200,21 @@ def _infer_solc_remaps(source_files: dict[str, str]) -> list[str]:
             prefix = "/".join(parts[: index + 2])
             remaps.add(f"{package}/={prefix}/")
     return sorted(remaps)
+
+
+def _top_level_source_packages(source_files: dict[str, str]) -> set[str]:
+    packages = set()
+    for name in source_files:
+        parts = Path(name).as_posix().split("/")
+        if len(parts) >= 3 and parts[0] == "src" and parts[1] == "pkgs":
+            packages.add(parts[2])
+    return packages
+
+
+def _has_oz_package(source_files: dict[str, str]) -> bool:
+    for name in source_files:
+        parts = Path(name).as_posix().split("/")
+        for index in range(0, max(len(parts) - 2, 0)):
+            if parts[index] == "lib" and parts[index + 1].startswith("oz-") and parts[index + 2] == "contracts":
+                return True
+    return False

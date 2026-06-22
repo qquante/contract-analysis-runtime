@@ -49,9 +49,13 @@ Acceptance:
 - real Slither Python API can fill static IR, select installed solc versions
   through compile context, and inspect/provision the solc-select cache behind
   explicit opt-in.
-- curated real smoke `runs/sc01-curated-real-5-v4` validates read-only
-  Etherscan V2 source resolution plus Slither Python on 5 real contracts
+- curated real smoke `runs/sc01-curated-real-20-v8` validates read-only
+  Etherscan V2 source resolution plus Slither Python on 20 real contracts
   without promoting any candidate to runtime evidence.
+- source-truth now terminalizes broad non-SC01 candidates before Foundry:
+  transparent proxy admin paths, initialized EIP-1967 proxy context, protocol
+  pool/factory creation, token approval/operator APIs and caller-funded
+  accounting/lifecycle behavior.
 
 ## G-004 - Small top-level agent Interface
 

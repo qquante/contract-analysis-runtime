@@ -1196,3 +1196,65 @@ Limit:
   sample. It does not prove an SC01 vulnerability. Foundry runtime remains
   gated until source truth, actor, args, reader, delta and predicate are all
   complete.
+
+## PT-027.T03 - SC01 smoke 20 curated real contracts
+
+Status: done, 2026-06-21.
+
+Run twenty curated ETH/BSC/Base contracts through the real read-only bootstrap
+pipeline after mapper/source-truth hardening.
+
+Command:
+
+```powershell
+$envFile='C:\Users\PC\Desktop\Vassago\.env'
+# loaded ETHERSCAN_API_KEY into process without printing it
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-curated-real-20.json --output runs/sc01-curated-real-20-v8 --bootstrap-adapters --allow-solc-install
+```
+
+Result:
+
+- `executed_count=220`;
+- `failed_count=0`;
+- all 20 source bundles resolved through `etherscan_v2`;
+- all 20 Slither Python runs completed;
+- 13 SC01 thesis candidates reached source-truth review;
+- all 13 were rejected by source-backed negative policy;
+- all 20 final reports are `blocked_no_runtime_ready`;
+- all 20 have `foundry_allowed=false`;
+- `runtime_ready_total=0`.
+
+Implemented during the 20-contract smoke:
+
+- phase 03 now emits thesis candidates only when there is function-level
+  evidence from `access-surface.json`, instead of global source text matches;
+- source-truth rejects common non-SC01 patterns:
+  - transparent proxy admin upgrade paths;
+  - initialized EIP-1967 proxies with live implementation context;
+  - protocol pool initializers;
+  - public factory/pool creation;
+  - token/operator approval APIs;
+  - caller-funded accounting/lifecycle/operator behavior;
+- Etherscan standard JSON absolute source unit names are normalized;
+- compile context remapping inference covers Uniswap/OpenZeppelin nested
+  package layouts seen in the curated sample.
+
+Interpretation:
+
+- This is a pipeline-quality result, not vulnerability evidence.
+- The correct behavior for this curated sample is terminal rejection of broad
+  false candidates and no Foundry runtime.
+
+## PT-027.T04 - next high-signal acquisition
+
+Status: next.
+
+Use the 20-contract smoke result to avoid random expansion. The next useful
+step is acquiring targets with stronger SC01 signal:
+
+- UUPS implementations with source-backed weak or ambiguous `_authorizeUpgrade`;
+- proxies where implementation state impact can be proven from chain state;
+- role-admin graphs with real role reader/effect;
+- Safe/AA/module targets with initialized state sidecars and measurable
+  deltas.
