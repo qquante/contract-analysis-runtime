@@ -83,7 +83,8 @@ PT-028.T04 Blind benchmark over targets-blind-100 - done 2026-06-22, run runs/sc
 PT-028.T05 Post-run scoring against hidden_ground_truth - done implementation 2026-06-22
 PT-028.T05B Score blind benchmark output - done 2026-06-22
 PT-028.T05C Runtime follow-up for actionable HEC-031 - done 2026-06-22
-PT-028.T07 Blind score triage - next
+PT-028.T07 Blind score triage - done first slice 2026-06-22
+PT-028.T08 Proxy/upgrade historical mapper hardening - next
 PT-028.T06 Expand corpus beyond 100 - queued
 ```
 
@@ -119,11 +120,16 @@ PT-028.T06 Expand corpus beyond 100 - queued
 10. Use `runs/sc01-historical-blind-100-v1/historical-corpus-score/historical-corpus-score.json`
    as the current blind benchmark score. It has `67` candidate-only cases,
    `32` none cases and `1` runtime-ready case.
-11. Use `runs/sc01-historical-blind-hec031-runtime-v1` as the runtime follow-up
+11. Use `runs/sc01-historical-blind-100-v1/historical-stage-failure/historical-stage-failure-report.json`
+   as the current stage failure report. It has `32` no-thesis cases,
+   `67` source-truth-not-verified cases and `1` runtime-authorization-pending
+   case. Candidate priority is proxy/upgrade, oracle/accounting,
+   reentrancy/token, SC01 access-control, then bridge/message-auth.
+12. Use `runs/sc01-historical-blind-hec031-runtime-v1` as the runtime follow-up
    for HEC-031/Nomad. It has `runtime_completed` and `runtime_local`, still
    historical/fork-only.
-12. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
+13. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
    Safe/module, bridge endpoint/source and ERC4337 validator.
-13. Add per-target Slither/source summary only if a larger real smoke shows
+14. Add per-target Slither/source summary only if a larger real smoke shows
    repeated compiler/import misses.
-14. Implement PT-026.T04 A2A card after the design runtime remains stable.
+15. Implement PT-026.T04 A2A card after the design runtime remains stable.

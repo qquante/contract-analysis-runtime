@@ -11,6 +11,7 @@ from .design_runtime.design_loader import DesignLoadError
 from .design_runtime.models import ModelValidationError
 from .historical_corpus import build_historical_corpus_report, write_historical_blind_targets
 from .historical_scoring import write_historical_score
+from .historical_stage_report import write_historical_stage_report
 from .mcp import run_stdio
 from .quality import run_checks
 from .runtime_api import read_artifact_from_payload, resume_design_from_payload, run_design_from_payload
@@ -122,6 +123,21 @@ def main(argv: list[str] | None = None) -> int:
     historical_score.add_argument("--limit", type=int, help="Optional maximum case count.")
     historical_score.add_argument("--output-dir", help="Output directory. Defaults to <run>/historical-corpus-score.")
 
+    historical_stage = sub.add_parser(
+        "historical-stage-report",
+        help="Explain where each historical blind benchmark case stopped.",
+    )
+    historical_stage.add_argument("--run", required=True, help="Run directory to inspect.")
+    historical_stage.add_argument(
+        "--manifest",
+        default="designs/historical-exploits/manifest.json",
+        help="Historical corpus manifest.",
+    )
+    historical_stage.add_argument("--family", help="Optional family filter.")
+    historical_stage.add_argument("--benchmark-id", help="Optional benchmark id filter, for example HEC-031.")
+    historical_stage.add_argument("--limit", type=int, help="Optional maximum case count.")
+    historical_stage.add_argument("--output-dir", help="Output directory. Defaults to <run>/historical-stage-failure.")
+
     mcp = sub.add_parser("mcp", help="Run the local MCP server.")
     mcp.add_argument("--stdio", action="store_true", help="Use stdio transport.")
 
@@ -147,6 +163,8 @@ def main(argv: list[str] | None = None) -> int:
             return _historical_corpus_report_command(args)
         if args.command == "historical-corpus-score":
             return _historical_corpus_score_command(args)
+        if args.command == "historical-stage-report":
+            return _historical_stage_report_command(args)
         if args.command == "mcp":
             if not args.stdio:
                 raise ValueError("Only local stdio MCP is supported. Pass --stdio.")
@@ -234,6 +252,19 @@ def _historical_corpus_report_command(args: argparse.Namespace) -> int:
 
 def _historical_corpus_score_command(args: argparse.Namespace) -> int:
     payload = write_historical_score(
+        args.run,
+        args.manifest,
+        output_dir=args.output_dir,
+        family=args.family,
+        benchmark_id=args.benchmark_id,
+        limit=args.limit,
+    )
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0 if payload["status"] == "completed" else 1
+
+
+def _historical_stage_report_command(args: argparse.Namespace) -> int:
+    payload = write_historical_stage_report(
         args.run,
         args.manifest,
         output_dir=args.output_dir,

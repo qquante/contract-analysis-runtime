@@ -2009,7 +2009,7 @@ Boundary:
 
 ## PT-028.T07 - Blind score triage
 
-Status: next.
+Status: done first slice, 2026-06-22.
 
 Input:
 
@@ -2017,11 +2017,74 @@ Input:
 
 Tasks:
 
-- inspect the `67` candidate-only cases by family;
-- inspect the `32` none cases by family;
-- separate source-resolution/compiler/import misses from real detector misses;
-- create mapper tasks for the highest-value misses;
-- keep HEC-031 as known runtime proof, not as a rule.
+- inspect the `67` candidate-only cases by family - done;
+- inspect the `32` none cases by family - done at stage level;
+- separate stage misses from runtime-ready evidence - done first slice;
+- create mapper tasks for the highest-value misses - done as priority plan;
+- keep HEC-031 as known runtime proof, not as a rule - done.
+
+Implemented:
+
+- `src/vassago_contract_runtime/historical_stage_report.py`;
+- CLI command:
+  `python -m vassago_contract_runtime.cli historical-stage-report`;
+- tests:
+  `tests/design_runtime/test_historical_stage_report.py`.
+
+Command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-stage-report --run runs/sc01-historical-blind-100-v1 --manifest designs/historical-exploits/manifest.json --output-dir runs/sc01-historical-blind-100-v1/historical-stage-failure
+```
+
+Observed:
+
+- `case_count=100`;
+- `candidate_count=67`;
+- `runtime_ready_count=1`;
+- `runtime_count=0`;
+- `04_no_thesis_candidate=32`;
+- `05_source_truth_not_verified=67`;
+- `09_runtime_authorization_pending=1`.
+
+Candidate priority:
+
+1. `proxy_upgrade_signature`: `17` candidates.
+2. `oracle_accounting`: `15` candidates.
+3. `reentrancy_token`: `14` candidates.
+4. `sc01_access_control`: `11` candidates.
+5. `bridge_message_auth`: `10` candidates.
+
+Artifacts:
+
+- `runs/sc01-historical-blind-100-v1/historical-stage-failure/historical-stage-failure-report.json`;
+- `runs/sc01-historical-blind-100-v1/historical-stage-failure/historical-stage-failure-report.md`.
+
+## PT-028.T08 - Proxy/upgrade historical mapper hardening
+
+Status: next.
+
+Input:
+
+- `historical-stage-failure-report.json`;
+- candidate family: `proxy_upgrade_signature`;
+- top candidates: `HEC-081`, `HEC-082`, `HEC-083`, `HEC-084`,
+  `HEC-085`, `HEC-086`, `HEC-088`, `HEC-089`, `HEC-090`, `HEC-091`.
+
+Goal:
+
+- turn source-truth candidates into source-backed findings without using
+  case ids, addresses or hidden labels as detection rules.
+
+Needed pieces:
+
+- proxy/implementation context;
+- initializer/reinitializer source truth;
+- UUPS `_authorizeUpgrade` source truth;
+- signature/replay and owner/admin reader mapping;
+- implementation-slot or privileged-storage delta;
+- compile-only harness only after source truth is verified.
 
 ## PT-028.T06 - Corpus expansion to 100+
 

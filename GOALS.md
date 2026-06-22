@@ -142,6 +142,12 @@ Current state:
   `67` candidate-only, `32` none and `1` runtime-ready.
 - Current runtime follow-up `runs/sc01-historical-blind-hec031-runtime-v1`
   reproduced HEC-031/Nomad locally on a historical fork.
+- `historical-stage-report` now explains where the blind cases stopped:
+  `32` no-thesis, `67` source-truth-not-verified and `1`
+  runtime-authorization-pending.
+- Current candidate priority is proxy/upgrade/signature first, then
+  oracle/accounting, reentrancy/token, SC01 access control and bridge/message
+  auth.
 
 Non-goal:
 

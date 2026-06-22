@@ -2438,3 +2438,76 @@ Run full regression and check:
 Then commit the scoring/benchmark slice. Next task: `PT-028.T07`, cluster
 `runs/sc01-historical-blind-100-v1/historical-corpus-score/historical-corpus-score.json`
 by family and missing mapper.
+
+## 2026-06-22 - PT-028.T07 Historical Stage Failure Report
+
+Goal:
+
+- Explain exactly where the 100-case historical blind benchmark stopped and
+  prioritize the `67` candidate-only cases without using hidden labels as
+  detector logic.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/historical_stage_report.py`.
+- Added CLI command:
+  `python -m vassago_contract_runtime.cli historical-stage-report`.
+- Added tests:
+  `tests/design_runtime/test_historical_stage_report.py`.
+- Generated real report for the completed blind run:
+  `runs/sc01-historical-blind-100-v1/historical-stage-failure`.
+
+Commands:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_historical_stage_report tests.design_runtime.test_historical_scoring
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-blind-100-v1 --manifest designs\historical-exploits\manifest.json --output-dir runs\sc01-historical-blind-100-v1\historical-stage-failure
+```
+
+Observed:
+
+```text
+stage tests=4 OK
+case_count=100
+candidate_count=67
+runtime_ready_count=1
+runtime_count=0
+04_no_thesis_candidate=32
+05_source_truth_not_verified=67
+09_runtime_authorization_pending=1
+```
+
+Candidate priority:
+
+```text
+proxy_upgrade_signature=17
+oracle_accounting=15
+reentrancy_token=14
+sc01_access_control=11
+bridge_message_auth=10
+```
+
+Decisions and reasoning:
+
+- The main current blocker is source-truth, not Foundry.
+- The next mapper work should start with `proxy_upgrade_signature` because it
+  has the largest candidate bucket and concrete upgrade/init/signature motifs.
+- The report is post-run only. It may read hidden ground truth after the blind
+  run, but detectors and phases must not consume it.
+- HEC-031/Nomad remains the only runtime-local blind-100 reproduction so far.
+
+Blockers:
+
+- `67` candidates still need source-backed verification, actor model, args,
+  reader, delta and predicate.
+- `32` cases need better semantic/thesis acquisition before source-truth.
+
+RESUME FROM HERE:
+
+Run full regression:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`.
+Run `python -m vassago_contract_runtime.cli check` and `git diff --check`.
+Then commit this stage-report slice. Next implementation: `PT-028.T08`,
+starting with `proxy_upgrade_signature` candidates from
+`runs/sc01-historical-blind-100-v1/historical-stage-failure/historical-stage-failure-report.json`.

@@ -1433,6 +1433,56 @@ python -m vassago_contract_runtime.cli run-design --design sc01-access --targets
 python -m vassago_contract_runtime.cli historical-corpus-score --run runs\sc01-historical-blind-hec031-runtime-v1 --manifest designs\historical-exploits\manifest.json --benchmark-id HEC-031 --output-dir runs\sc01-historical-blind-hec031-runtime-v1\historical-corpus-score-hec031
 ```
 
+## PT-028.T07 stage-failure report
+
+Focused validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_historical_stage_report tests.design_runtime.test_historical_scoring
+```
+
+Observed:
+
+```text
+Ran 4 tests
+OK
+```
+
+Real report command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-blind-100-v1 --manifest designs\historical-exploits\manifest.json --output-dir runs\sc01-historical-blind-100-v1\historical-stage-failure
+```
+
+Observed summary:
+
+```text
+case_count=100
+candidate_count=67
+runtime_ready_count=1
+runtime_count=0
+04_no_thesis_candidate=32
+05_source_truth_not_verified=67
+09_runtime_authorization_pending=1
+```
+
+Artifacts:
+
+- `runs/sc01-historical-blind-100-v1/historical-stage-failure/historical-stage-failure-report.json`
+- `runs/sc01-historical-blind-100-v1/historical-stage-failure/historical-stage-failure-report.md`
+
+Candidate priority:
+
+```text
+proxy_upgrade_signature=17
+oracle_accounting=15
+reentrancy_token=14
+sc01_access_control=11
+bridge_message_auth=10
+```
+
 Observed:
 
 ```text

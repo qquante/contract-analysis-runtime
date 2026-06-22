@@ -752,3 +752,47 @@ Interpretation:
   scan.
 - It is not proof that Vassago catches those cases yet; it is the blind
   benchmark input for proving or falsifying that.
+
+## Current stage-failure report
+
+Generated with:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-stage-report --run runs/sc01-historical-blind-100-v1 --manifest designs/historical-exploits/manifest.json --output-dir runs/sc01-historical-blind-100-v1/historical-stage-failure
+```
+
+Artifacts:
+
+- `runs/sc01-historical-blind-100-v1/historical-stage-failure/historical-stage-failure-report.json`
+- `runs/sc01-historical-blind-100-v1/historical-stage-failure/historical-stage-failure-report.md`
+
+Observed:
+
+```text
+case_count=100
+candidate_count=67
+runtime_ready_count=1
+runtime_count=0
+04_no_thesis_candidate=32
+05_source_truth_not_verified=67
+09_runtime_authorization_pending=1
+```
+
+Candidate priority:
+
+```text
+proxy_upgrade_signature=17
+oracle_accounting=15
+reentrancy_token=14
+sc01_access_control=11
+bridge_message_auth=10
+```
+
+Operational meaning:
+
+- The primary current blocker is source-truth, not Foundry.
+- The next implementation should start with `proxy_upgrade_signature` because
+  it has the largest candidate bucket.
+- Do not turn historical labels, case ids or addresses into detector rules.
+  The historical report is post-run scoring and triage only.
