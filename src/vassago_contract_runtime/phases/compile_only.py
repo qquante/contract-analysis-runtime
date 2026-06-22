@@ -5,8 +5,12 @@ from __future__ import annotations
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
 from vassago_contract_runtime.foundry import FoundryAdapter, FoundryHarnessInput, NullFoundryAdapter
 from vassago_contract_runtime.sc01_source import (
+    contract_name_for_source,
     contract_name_for_harness,
+    render_access_control_initializer_call,
+    render_access_control_initializer_setup,
     render_initializer_call,
+    should_use_access_control_initializer_harness,
     should_use_uups_initializer_harness,
 )
 
@@ -86,6 +90,8 @@ def _sentinel_harness() -> str:
 def render_sc01_harness(source_manifest: dict) -> str:
     if should_use_uups_initializer_harness(source_manifest):
         return _uups_initializer_harness(source_manifest)
+    if should_use_access_control_initializer_harness(source_manifest):
+        return _access_control_initializer_harness(source_manifest)
     return _sentinel_harness()
 
 
@@ -104,6 +110,33 @@ def _uups_initializer_harness(source_manifest: dict) -> str:
             f"        {contract_name} target = new {contract_name}();",
             f"        {init_call}",
             "        require(target.owner() == address(this), \"owner not seized\");",
+            "    }",
+            "}",
+            "",
+        ]
+    )
+
+
+def _access_control_initializer_harness(source_manifest: dict) -> str:
+    contract_name = contract_name_for_source(source_manifest)
+    setup = [f"        {line}" for line in render_access_control_initializer_setup(source_manifest)]
+    init_call = render_access_control_initializer_call(source_manifest)
+    return "\n".join(
+        [
+            "// SPDX-License-Identifier: MIT",
+            "pragma solidity >=0.6.0 <0.9.0;",
+            "",
+            f'import "../src/{contract_name}.sol";',
+            "",
+            "contract VassagoSC01Harness {",
+            "    function testUnauthorizedCallerCanInitializeAccessControl() external {",
+            f"        {contract_name} target = new {contract_name}();",
+            *setup,
+            f"        {init_call}",
+            "        require(",
+            "            target.hasRole(target.DEFAULT_ADMIN_ROLE(), address(this)),",
+            '            "default admin role not seized"',
+            "        );",
             "    }",
             "}",
             "",

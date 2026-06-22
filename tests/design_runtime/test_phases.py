@@ -293,6 +293,8 @@ class BootstrapPhaseTests(unittest.TestCase):
             self.assertEqual(compile_result["status"], "compile_only_passed")
             self.assertEqual(runtime_result["status"], "runtime_completed")
             self.assertEqual(assertion["status"], "passed")
+            self.assertEqual(assertion["predicate"], source_truth["reviews"][0]["explicit_predicate"])
+            self.assertEqual(assertion["measured_delta"], source_truth["reviews"][0]["measurable_delta"])
             self.assertEqual(final_report["final_status"], "runtime_completed")
             self.assertEqual(final_report["evidence_status"], "runtime_local")
 

@@ -672,3 +672,60 @@ Interpretation:
   Foundry when source truth shows normal proxy/protocol/token behavior.
 - It does not prove a vulnerability and intentionally produced no runtime
   evidence.
+
+## PT-027.T05 Historical SC01 Curated Runtime
+
+Focused tests before the historical runtime smoke:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source tests.design_runtime.test_phases
+python -m unittest tests.design_runtime.test_provider_adapters
+```
+
+Observed result:
+
+```text
+test_sc01_source + test_phases: 25 passed
+test_provider_adapters: 16 passed
+```
+
+Runtime smoke:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v4-runtime --bootstrap-adapters --allow-solc-install --runtime-authorized
+```
+
+Observed result:
+
+```text
+executed_count=66
+failed_count=0
+source_resolved=6
+slither_completed=5
+source_truth_verified_total=1
+runtime_ready_total=1
+foundry_allowed=1
+compile_passed=1
+runtime_completed=1
+runtime_failed=0
+```
+
+Reproduced local case:
+
+```text
+target=BadgerDAO WarRoomGatedProxy
+predicate=After an unauthorized caller invokes initialize(), hasRole(DEFAULT_ADMIN_ROLE, caller) is true.
+measured_delta=hasRole(DEFAULT_ADMIN_ROLE, unauthorized caller) changes false to true
+evidence_status=runtime_local
+no_broadcast=true
+```
+
+Blocked cases:
+
+- Audius: proxy/governance implementation-state mapper missing.
+- Nomad: bridge root/proof mapper missing; Slither failed for this source.
+- Furucombo: delegatecall/proxy-storage mapper missing.
+- Alchemix: keeper actor/delta mapper missing.
+- Wormhole: implementation initializer/UUPS context mapper missing.

@@ -5,10 +5,12 @@ import unittest
 from pathlib import Path
 
 from vassago_contract_runtime.sc01_source import (
+    evaluate_access_control_initializer,
     evaluate_known_non_sc01_pattern,
     evaluate_public_normal_behavior,
     evaluate_uninitialized_uups_initializer,
 )
+from vassago_contract_runtime.phases.compile_only import render_sc01_harness
 
 
 class SC01SourceVerifierTests(unittest.TestCase):
@@ -22,6 +24,61 @@ class SC01SourceVerifierTests(unittest.TestCase):
         self.assertEqual(result["admin_variable"], "owner")
         self.assertEqual(result["codable_args"], [])
         self.assertNotIn("disable_initializers_present", result["blockers"])
+
+    def test_access_control_initializer_with_address_array_is_source_verified(self) -> None:
+        fixture = {
+            "abi": [
+                {
+                    "type": "function",
+                    "name": "DEFAULT_ADMIN_ROLE",
+                    "inputs": [],
+                    "outputs": [{"type": "bytes32"}],
+                    "stateMutability": "view",
+                },
+                {
+                    "type": "function",
+                    "name": "hasRole",
+                    "inputs": [{"type": "bytes32"}, {"type": "address"}],
+                    "outputs": [{"type": "bool"}],
+                    "stateMutability": "view",
+                },
+                {
+                    "type": "function",
+                    "name": "initialize",
+                    "inputs": [{"name": "admin", "type": "address"}, {"name": "accounts", "type": "address[]"}],
+                    "outputs": [],
+                    "stateMutability": "nonpayable",
+                },
+            ],
+            "metadata": {"contract_name": "GatedProxyLike"},
+            "source_files": {
+                "GatedProxyLike.sol": """
+                pragma solidity 0.6.12;
+                contract GatedProxyLike {
+                    bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
+                    bytes32 public constant APPROVED_ACCOUNT_ROLE = keccak256("APPROVED_ACCOUNT_ROLE");
+                    modifier initializer() { _; }
+                    function hasRole(bytes32 role, address account) public view returns (bool) {}
+                    function _setupRole(bytes32 role, address account) internal {}
+                    function initialize(address admin, address[] memory accounts) external initializer {
+                        _setupRole(DEFAULT_ADMIN_ROLE, admin);
+                        for (uint256 i = 0; i < accounts.length; i++) {
+                            _setupRole(APPROVED_ACCOUNT_ROLE, accounts[i]);
+                        }
+                    }
+                }
+                """,
+            },
+        }
+
+        result = evaluate_access_control_initializer(fixture)
+        harness = render_sc01_harness(fixture)
+
+        self.assertTrue(result["verified"], result["blockers"])
+        self.assertEqual(result["codable_args"], ["address(this)", "vassagoAccounts1"])
+        self.assertIn("address[] memory vassagoAccounts1 = new address[](1);", harness)
+        self.assertIn("target.initialize(address(this), vassagoAccounts1);", harness)
+        self.assertIn("target.hasRole(target.DEFAULT_ADMIN_ROLE(), address(this))", harness)
 
     def test_disable_initializers_blocks_verification(self) -> None:
         fixture = json.loads(Path("tests/fixtures/source_fixture_positive.json").read_text())["targets"][0]

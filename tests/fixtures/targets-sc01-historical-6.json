@@ -1,0 +1,34 @@
+{
+  "targets": [
+    {
+      "chain": "eth",
+      "address": "0x16EaA9f54ACD904cA22873DB2c1E39e76b128Be9",
+      "label": "BadgerDAO WarRoomGatedProxy - uninitialized access-control"
+    },
+    {
+      "chain": "eth",
+      "address": "0x4DEcA517D6817B6510798b7328F2314d3003AbAC",
+      "label": "Audius Governance Proxy - governance initializer takeover"
+    },
+    {
+      "chain": "eth",
+      "address": "0x5d94309e5a0090b165fa4181519701637b6daeba",
+      "label": "Nomad Replica - bridge root validation"
+    },
+    {
+      "chain": "eth",
+      "address": "0xA013AfbB9A92cEF49e898C87C060e6660E050569",
+      "label": "Furucombo Proxy - delegatecall privilege confusion"
+    },
+    {
+      "chain": "eth",
+      "address": "0x7879A9c464af7805712404Cf4A8366c475034F91",
+      "label": "Alchemix Harvester - keeper actor access-control"
+    },
+    {
+      "chain": "eth",
+      "address": "0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B",
+      "label": "Wormhole Core Bridge - uninitialized UUPS implementation"
+    }
+  ]
+}

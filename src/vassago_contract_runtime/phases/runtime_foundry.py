@@ -18,6 +18,7 @@ class RuntimeFoundryAdapter:
         ready = _read_json(context, "07_proof_pieces", "sc01-runtime-ready.json")
         compile_result = _read_json(context, "08_compile_only", "compile-result.json")
         source_manifest = _read_json(context, "01_dossier", "source-manifest.json")
+        source_truth = _read_json(context, "05_source_truth", "sc01-source-truth.json")
         if ready.get("foundry_allowed") is not True:
             return _blocked(context, "blocked_no_runtime_ready", ["foundry_allowed_false"])
         if compile_result.get("status") != "compile_only_passed":
@@ -34,6 +35,8 @@ class RuntimeFoundryAdapter:
         )
         result = self.foundry.run_local_fork(item)
         assertion_status = "passed" if result.status == "runtime_completed" else "failed"
+        predicate = _runtime_predicate(source_truth)
+        measured_delta = _runtime_delta(source_truth)
         return PhaseResult(
             json_artifacts={
                 "foundry-runtime-result.json": {
@@ -47,8 +50,8 @@ class RuntimeFoundryAdapter:
                 "assertion-result.json": {
                     "status": assertion_status,
                     "target_id": context.target.target_id,
-                    "predicate": "unauthorized initialize() changes owner() to caller",
-                    "measured_delta": "owner() moved from deployment default to unauthorized caller",
+                    "predicate": predicate,
+                    "measured_delta": measured_delta,
                     "evidence_status": "runtime_local" if assertion_status == "passed" else "inconclusive",
                 },
             },
@@ -85,6 +88,23 @@ def _blocked(context: PhaseContext, status: str, blockers: list[str]) -> PhaseRe
         },
         text_artifacts={"evidence.md": f"# Runtime Not Run\n\nStatus: `{status}`.\n"},
     )
+
+
+def _verified_review(source_truth: dict) -> dict:
+    for review in source_truth.get("reviews") or []:
+        if review.get("source_truth_verified") is True:
+            return review
+    return {}
+
+
+def _runtime_predicate(source_truth: dict) -> str:
+    review = _verified_review(source_truth)
+    return str(review.get("explicit_predicate") or "SC01 local runtime predicate passed")
+
+
+def _runtime_delta(source_truth: dict) -> str:
+    review = _verified_review(source_truth)
+    return str(review.get("measurable_delta") or "SC01 measurable authorization delta observed locally")
 
 
 def _evidence_md(runtime_status: str, assertion_status: str) -> str:

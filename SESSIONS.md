@@ -1367,3 +1367,110 @@ and `git diff --check`. Use `runs/sc01-curated-real-20-v8` as the current
 20-target baseline. Do not run Foundry unless a fresh final report has
 `foundry_allowed=true`. Next feature work should implement high-signal target
 acquisition, not another random contract batch.
+
+## S-20260621-024 - PT-027.T05 historical SC01 runtime suite
+
+Goal:
+
+- Add a small curated historical SC01 suite and verify whether the new design
+  runtime can reach local Foundry evidence on a known access-control class.
+
+What was added:
+
+- `tests/fixtures/targets-sc01-historical-6.json` with:
+  - BadgerDAO `WarRoomGatedProxy`;
+  - Audius `AudiusAdminUpgradeabilityProxy`;
+  - Nomad `UpgradeBeaconProxy` / Replica context;
+  - Furucombo `Proxy`;
+  - Alchemix `AlchemixHarvester`;
+  - Wormhole `Wormhole`.
+
+Code changes:
+
+- `src/vassago_contract_runtime/sc01_source.py`:
+  - added `evaluate_access_control_initializer()`;
+  - recognizes external/public `initialize` with `initializer` modifier and
+    `_setupRole(DEFAULT_ADMIN_ROLE, ...)`;
+  - supports codable `address` and `address[]` initializer args.
+- `src/vassago_contract_runtime/phases/source_truth.py`:
+  - verifies `access_control_uninitialized_initializer` for the
+    `uninitialized_implementation_proxy` thesis.
+- `src/vassago_contract_runtime/phases/onchain_state.py`:
+  - emits local initializer state sidecars without provider blockers when
+    source truth is verified;
+  - explicitly marks this as local reproduction state, not live impact.
+- `src/vassago_contract_runtime/phases/compile_only.py`:
+  - renders an AccessControl initializer harness that asserts
+    `hasRole(DEFAULT_ADMIN_ROLE, address(this))`.
+- `src/vassago_contract_runtime/phases/runtime_foundry.py`:
+  - reads predicate and measured delta from the verified source-truth review
+    instead of hardcoded `owner()` wording.
+
+Focused tests:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source tests.design_runtime.test_phases
+python -m unittest tests.design_runtime.test_provider_adapters
+```
+
+Observed:
+
+- 25 tests passed in source/phases.
+- 16 tests passed in provider adapters.
+
+Historical run:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v4-runtime --bootstrap-adapters --allow-solc-install --runtime-authorized
+```
+
+Observed:
+
+- `executed_count=66`;
+- `failed_count=0`;
+- `source_resolved=6/6`;
+- `slither_completed=5/6`;
+- `source_truth_verified_total=1`;
+- `runtime_ready_total=1`;
+- `foundry_allowed=1`;
+- `compile_passed=1`;
+- `runtime_completed=1`.
+
+Concrete local runtime evidence:
+
+- Target: BadgerDAO `WarRoomGatedProxy`.
+- Predicate:
+  `After an unauthorized caller invokes initialize(), hasRole(DEFAULT_ADMIN_ROLE, caller) is true.`
+- Delta:
+  `hasRole(DEFAULT_ADMIN_ROLE, unauthorized caller) changes false to true`.
+- Evidence status: `runtime_local`.
+- Broadcast: no.
+
+Decisions:
+
+- This is the first real historical SC01 target in the new design runtime that
+  reaches local Foundry execution.
+- It is not a live impact claim. Live funds-at-risk needs separate chain state,
+  proxy/state and asset analysis.
+- Do not broaden this into generic initializer promotion. The verifier requires
+  role setup, role reader, codable args and a concrete predicate.
+
+Blockers left:
+
+- Audius needs a proxy/governance implementation-state mapper.
+- Nomad needs bridge root/proof mapper and Slither failure triage.
+- Furucombo needs delegatecall/proxy-storage mapper.
+- Alchemix needs keeper actor/delta mapper.
+- Wormhole needs implementation initializer/UUPS context mapper.
+
+RESUME FROM HERE:
+
+Commit PT-027.T05 after running the full gate:
+`python -m unittest discover -s tests`,
+`python -m vassago_contract_runtime.cli check`, and `git diff --check`.
+Use `runs/sc01-historical-6-v4-runtime` as the current historical runtime
+baseline. Next implementation work should target one blocker mapper at a time:
+Audius governance/proxy, Nomad bridge root/proof, Furucombo delegatecall,
+Alchemix keeper, or Wormhole implementation/UUPS context.

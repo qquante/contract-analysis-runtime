@@ -336,3 +336,46 @@ python -m unittest tests.design_runtime.test_phases -v
 
 This is anti-hardcode coverage. It is not live-chain evidence and does not prove
 severity.
+
+## Current Historical SC01 Runtime Evidence
+
+`PT-027.T05` adds a small historical curated suite:
+
+```text
+tests/fixtures/targets-sc01-historical-6.json
+runs/sc01-historical-6-v4-runtime
+```
+
+The suite contains BadgerDAO, Audius, Nomad, Furucombo, Alchemix and Wormhole
+targets. The current result is:
+
+```text
+source_resolved=6/6
+slither_completed=5/6
+source_truth_verified_total=1
+runtime_ready_total=1
+foundry_allowed=1
+compile_passed=1
+runtime_completed=1
+```
+
+The one reproduced local runtime case is BadgerDAO `WarRoomGatedProxy`:
+
+```text
+predicate=After an unauthorized caller invokes initialize(), hasRole(DEFAULT_ADMIN_ROLE, caller) is true.
+measured_delta=hasRole(DEFAULT_ADMIN_ROLE, unauthorized caller) changes false to true
+evidence_status=runtime_local
+no_broadcast=true
+```
+
+This is local Foundry reproduction of an uninitialized AccessControl initializer
+pattern. It is not a live funds-at-risk claim. Live impact still requires
+separate state/proxy/asset analysis for any target.
+
+Remaining historical blockers:
+
+- Audius: governance/proxy implementation-state mapper.
+- Nomad: bridge root/proof mapper plus Slither failure triage.
+- Furucombo: delegatecall/proxy-storage mapper.
+- Alchemix: keeper actor/state-delta mapper.
+- Wormhole: implementation initializer/UUPS context mapper.

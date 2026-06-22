@@ -7,6 +7,7 @@ from typing import Any
 from vassago_contract_runtime.design_runtime.models import short_hash
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
 from vassago_contract_runtime.sc01_source import (
+    evaluate_access_control_initializer,
     evaluate_known_non_sc01_pattern,
     evaluate_public_normal_behavior,
     evaluate_uninitialized_uups_initializer,
@@ -105,27 +106,28 @@ def _review_queue_item(
         )
     evaluation = evaluate_uninitialized_uups_initializer(source_manifest)
     if _is_verified_uninitialized_uups_initializer(item, related_surface, related_writes, evaluation):
-        return {
-            "source_truth_id": f"ST-{short_hash(str(item.get('queue_id')))}",
-            "queue_id": item.get("queue_id"),
-            "candidate_id": item.get("candidate_id"),
-            "thesis_id": item.get("thesis_id"),
-            "status": "source_truth_verified",
-            "source_truth_verified": True,
-            "matched_functions": functions,
-            "related_guard_classes": [guard.get("guard_class") for guard in related_guards],
-            "related_state_variables": [write.get("variable") for write in related_writes],
-            "missing_proof_pieces": [],
-            "runtime_runner": "initializer_runtime",
-            "actor_model": "any_external_caller",
-            "codable_args": list(evaluation.get("codable_args") or []),
-            "measurable_reader": evaluation.get("admin_reader"),
-            "measurable_delta": evaluation.get("measurable_delta"),
-            "explicit_predicate": evaluation.get("explicit_predicate"),
-            "next_required_adapter": "compile_only_then_local_foundry",
-            "evidence_refs": _refs(related_surface, related_guards, related_writes)
-            + list(evaluation.get("evidence_refs") or []),
-        }
+        return _verified_initializer_review(
+            item,
+            functions,
+            related_surface,
+            related_guards,
+            related_writes,
+            evaluation,
+            runtime_runner="initializer_runtime",
+            evidence_kind="uups_uninitialized_initializer",
+        )
+    access_control = evaluate_access_control_initializer(source_manifest)
+    if _is_verified_access_control_initializer(item, related_surface, access_control):
+        return _verified_initializer_review(
+            item,
+            functions,
+            related_surface,
+            related_guards,
+            related_writes,
+            access_control,
+            runtime_runner="access_control_initializer_runtime",
+            evidence_kind="access_control_uninitialized_initializer",
+        )
     normal_behavior = evaluate_public_normal_behavior(source_manifest, functions)
     if normal_behavior.get("rejected") is True:
         return _rejected_review(
@@ -157,6 +159,42 @@ def _review_queue_item(
         ],
         "next_required_adapter": "slither_or_manual_source_truth",
         "evidence_refs": _refs(related_surface, related_guards, related_writes),
+    }
+
+
+def _verified_initializer_review(
+    item: dict[str, Any],
+    functions: list[str],
+    related_surface: list[dict[str, Any]],
+    related_guards: list[dict[str, Any]],
+    related_writes: list[dict[str, Any]],
+    evaluation: dict[str, Any],
+    *,
+    runtime_runner: str,
+    evidence_kind: str,
+) -> dict[str, Any]:
+    return {
+        "source_truth_id": f"ST-{short_hash(str(item.get('queue_id')))}",
+        "queue_id": item.get("queue_id"),
+        "candidate_id": item.get("candidate_id"),
+        "thesis_id": item.get("thesis_id"),
+        "status": "source_truth_verified",
+        "source_truth_verified": True,
+        "evidence_kind": evidence_kind,
+        "matched_functions": functions,
+        "related_guard_classes": [guard.get("guard_class") for guard in related_guards],
+        "related_state_variables": [write.get("variable") for write in related_writes],
+        "missing_proof_pieces": [],
+        "runtime_runner": runtime_runner,
+        "actor_model": "any_external_caller",
+        "codable_args": list(evaluation.get("codable_args") or []),
+        "harness_setup": list(evaluation.get("harness_setup") or []),
+        "measurable_reader": evaluation.get("admin_reader"),
+        "measurable_delta": evaluation.get("measurable_delta"),
+        "explicit_predicate": evaluation.get("explicit_predicate"),
+        "next_required_adapter": "compile_only_then_local_foundry",
+        "evidence_refs": _refs(related_surface, related_guards, related_writes)
+        + list(evaluation.get("evidence_refs") or []),
     }
 
 
@@ -246,3 +284,16 @@ def _is_verified_uninitialized_uups_initializer(
         return False
     variables = {str(item.get("variable") or "") for item in writes}
     return str(evaluation.get("admin_variable") or "") in variables
+
+
+def _is_verified_access_control_initializer(
+    item: dict[str, Any],
+    functions: list[dict[str, Any]],
+    evaluation: dict[str, Any],
+) -> bool:
+    if item.get("thesis_id") != "uninitialized_implementation_proxy":
+        return False
+    if evaluation.get("verified") is not True:
+        return False
+    names = {str(function.get("name") or "") for function in functions}
+    return "initialize" in names

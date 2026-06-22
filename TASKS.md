@@ -1258,3 +1258,73 @@ step is acquiring targets with stronger SC01 signal:
 - role-admin graphs with real role reader/effect;
 - Safe/AA/module targets with initialized state sidecars and measurable
   deltas.
+
+## PT-027.T05 - SC01 historical curated targets
+
+Status: done, 2026-06-21.
+
+Add six historical SC01-adjacent targets and run them through the real
+Explorer/source/Slither/design flow:
+
+```text
+tests/fixtures/targets-sc01-historical-6.json
+runs/sc01-historical-6-v4-runtime
+```
+
+Targets:
+
+- BadgerDAO `WarRoomGatedProxy`;
+- Audius `AudiusAdminUpgradeabilityProxy`;
+- Nomad `UpgradeBeaconProxy` / Replica context;
+- Furucombo `Proxy`;
+- Alchemix `AlchemixHarvester`;
+- Wormhole `Wormhole`.
+
+Implemented during this slice:
+
+- source-backed AccessControl initializer verifier:
+  `_setupRole(DEFAULT_ADMIN_ROLE, ...)` inside external/public `initialize`;
+- codable initializer args for `address` and `address[]`;
+- local readiness for verified initializer patterns without claiming live
+  chain impact;
+- AccessControl Foundry harness that asserts
+  `hasRole(DEFAULT_ADMIN_ROLE, caller)`;
+- runtime assertion wording now comes from `sc01-source-truth.json`, not fixed
+  `owner()` text.
+
+Validated command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v4-runtime --bootstrap-adapters --allow-solc-install --runtime-authorized
+```
+
+Result:
+
+- `executed_count=66`;
+- `failed_count=0`;
+- `source_resolved=6/6`;
+- `slither_completed=5/6`;
+- `source_truth_verified_total=1`;
+- `runtime_ready_total=1`;
+- `foundry_allowed=1`;
+- `compile_passed=1`;
+- `runtime_completed=1`.
+
+Concrete reproduced local evidence:
+
+- BadgerDAO `WarRoomGatedProxy`;
+- predicate: unauthorized caller invokes `initialize` and obtains
+  `DEFAULT_ADMIN_ROLE`;
+- measured delta:
+  `hasRole(DEFAULT_ADMIN_ROLE, unauthorized caller)` changes false to true;
+- evidence status: `runtime_local`;
+- broadcast: no.
+
+Current blockers for the other historical cases:
+
+- Audius needs governance/proxy implementation-state mapper.
+- Nomad needs bridge root/proof mapper and Slither failure triage.
+- Furucombo needs delegatecall/proxy-storage mapper.
+- Alchemix needs keeper/actor model and measurable state delta.
+- Wormhole needs implementation initializer/UUPS context mapper.

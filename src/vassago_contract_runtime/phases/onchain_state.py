@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
-from vassago_contract_runtime.sc01_source import evaluate_uninitialized_uups_initializer
-
-
 class OnChainStateAdapter:
     """Prepare on-chain state sidecars without doing RPC by default."""
 
@@ -14,36 +11,41 @@ class OnChainStateAdapter:
         role_graph = _read_json(context, "02_semantic_surface", "role-graph.json")
         source_truth = _read_json(context, "05_source_truth", "sc01-source-truth.json")
         proxy_context = dict(source_manifest.get("proxy_context") or {})
-        if _is_local_positive_fixture(source_manifest, source_truth):
+        verified_initializer = _verified_initializer_review(source_truth)
+        if verified_initializer:
             return PhaseResult.completed(
                 json_artifacts={
                     "admin-state.json": {
-                        "status": "fixture_state_ready",
+                        "status": "local_initializer_state_ready",
                         "target_id": context.target.target_id,
                         "admin_candidates": _admin_candidates(role_graph),
                         "source_truth_review_count": source_truth.get("review_count", 0),
-                        "reader": "owner()",
-                        "initial_value": "address(0)",
-                        "post_condition": "owner() == unauthorized caller after initialize()",
+                        "reader": verified_initializer.get("measurable_reader"),
+                        "initial_value": "deployment default",
+                        "post_condition": verified_initializer.get("explicit_predicate"),
                         "evidence_status": "static_only",
+                        "note": "Local reproduction state. This does not claim live on-chain impact.",
                         "blockers": [],
                     },
                     "proxy-state.json": {
-                        "status": "fixture_proxy_context_ready",
+                        "status": "local_initializer_proxy_context_not_required",
                         "target_id": context.target.target_id,
                         "proxy_context": proxy_context,
                         "has_proxy_hint": False,
-                        "note": "Local fixture models implementation-local initialization impact; no live proxy is claimed.",
+                        "note": "Initializer reproduction is local deployment based; live proxy/state impact remains separate.",
                         "evidence_status": "static_only",
                         "blockers": [],
                     },
                     "role-state.json": {
-                        "status": "fixture_role_state_ready",
+                        "status": "local_initializer_role_state_ready",
                         "target_id": context.target.target_id,
                         "role_graph_nodes": list(role_graph.get("nodes") or []),
                         "role_graph_edges": list(role_graph.get("edges") or []),
                         "actor_model": "any_external_caller",
+                        "reader": verified_initializer.get("measurable_reader"),
+                        "delta": verified_initializer.get("measurable_delta"),
                         "evidence_status": "static_only",
+                        "note": "Role state is asserted only for local Foundry reproduction.",
                         "blockers": [],
                     },
                 }
@@ -91,9 +93,10 @@ def _admin_candidates(role_graph: dict) -> list[dict]:
     return [node for node in nodes if node.get("kind") in {"owner_like", "role_like"}]
 
 
-def _is_local_positive_fixture(source_manifest: dict, source_truth: dict) -> bool:
-    return (
-        source_manifest.get("provider") == "fixture"
-        and evaluate_uninitialized_uups_initializer(source_manifest).get("verified") is True
-        and int(source_truth.get("source_truth_verified_count") or 0) > 0
-    )
+def _verified_initializer_review(source_truth: dict) -> dict | None:
+    for review in source_truth.get("reviews") or []:
+        if review.get("source_truth_verified") is not True:
+            continue
+        if review.get("runtime_runner") in {"initializer_runtime", "access_control_initializer_runtime"}:
+            return review
+    return None

@@ -68,6 +68,71 @@ def evaluate_uninitialized_uups_initializer(source_manifest: dict[str, Any]) -> 
     }
 
 
+def evaluate_access_control_initializer(source_manifest: dict[str, Any]) -> dict[str, Any]:
+    """Return source-backed evidence for an uninitialized AccessControl setup.
+
+    This covers upgradeable contracts that seed `DEFAULT_ADMIN_ROLE` or an
+    execution role inside an external/public initializer. It is intentionally
+    scoped to local reproduction of the authorization takeover; live impact is
+    a later state/proxy question.
+    """
+
+    source_text = _source_text(source_manifest)
+    abi = list(source_manifest.get("abi") or [])
+    contract_name = _contract_name(source_manifest, source_text)
+    initializer = _function_body(source_text, "initialize")
+    init_abi = _abi_function(abi, "initialize")
+    body = initializer.get("body", "")
+    header = initializer.get("header", "")
+    blockers = []
+
+    default_admin_arg = _role_setup_argument(body, "DEFAULT_ADMIN_ROLE")
+    role_setups = _role_setup_calls(body)
+    has_role_reader = _abi_function(abi, "hasRole") is not None
+    default_role_reader = _abi_function(abi, "DEFAULT_ADMIN_ROLE") is not None or "DEFAULT_ADMIN_ROLE" in source_text
+
+    if "pragma solidity" not in source_text:
+        blockers.append("source_not_compile_context")
+    if not initializer:
+        blockers.append("initialize_function_missing")
+    if initializer and initializer.get("visibility") not in {"external", "public"}:
+        blockers.append("initialize_not_external_or_public")
+    if "initializer" not in header and "initializer" not in body:
+        blockers.append("initializer_modifier_missing")
+    if "_disableInitializers" in source_text:
+        blockers.append("disable_initializers_present")
+    if not default_admin_arg:
+        blockers.append("default_admin_setup_missing")
+    if not has_role_reader:
+        blockers.append("hasRole_reader_missing")
+    if not default_role_reader:
+        blockers.append("default_admin_role_reader_missing")
+
+    init_inputs = list((init_abi or {}).get("inputs") or [])
+    codable = _codable_access_control_initializer_args(init_inputs, default_admin_arg, body)
+    if codable is None:
+        blockers.append("initializer_args_not_codable")
+
+    verified = not blockers
+    return {
+        "verified": verified,
+        "blockers": blockers,
+        "contract_name": contract_name,
+        "initializer_signature": _signature(init_abi, "initialize"),
+        "admin_variable": "_roles[DEFAULT_ADMIN_ROLE]",
+        "admin_reader": "hasRole(DEFAULT_ADMIN_ROLE,address)",
+        "codable_args": list((codable or {}).get("args") or []),
+        "harness_setup": list((codable or {}).get("setup") or []),
+        "role_setups": role_setups,
+        "measurable_delta": "hasRole(DEFAULT_ADMIN_ROLE, unauthorized caller) changes false to true",
+        "explicit_predicate": (
+            "After an unauthorized caller invokes initialize(), "
+            "hasRole(DEFAULT_ADMIN_ROLE, caller) is true."
+        ),
+        "evidence_refs": _access_control_evidence_refs(verified, role_setups),
+    }
+
+
 def evaluate_public_normal_behavior(source_manifest: dict[str, Any], matched_functions: list[str]) -> dict[str, Any]:
     """Classify source-backed safe public behavior that should not become SC01 proof."""
 
@@ -108,6 +173,10 @@ def evaluate_public_normal_behavior(source_manifest: dict[str, Any], matched_fun
 
 def should_use_uups_initializer_harness(source_manifest: dict[str, Any]) -> bool:
     return bool(evaluate_uninitialized_uups_initializer(source_manifest).get("verified"))
+
+
+def should_use_access_control_initializer_harness(source_manifest: dict[str, Any]) -> bool:
+    return bool(evaluate_access_control_initializer(source_manifest).get("verified"))
 
 
 def evaluate_known_non_sc01_pattern(
@@ -177,6 +246,22 @@ def render_initializer_call(source_manifest: dict[str, Any]) -> str:
     if not args:
         return "target.initialize();"
     return f"target.initialize({', '.join(args)});"
+
+
+def render_access_control_initializer_setup(source_manifest: dict[str, Any]) -> list[str]:
+    return list(evaluate_access_control_initializer(source_manifest).get("harness_setup") or [])
+
+
+def render_access_control_initializer_call(source_manifest: dict[str, Any]) -> str:
+    evaluation = evaluate_access_control_initializer(source_manifest)
+    args = list(evaluation.get("codable_args") or [])
+    if not args:
+        return "target.initialize();"
+    return f"target.initialize({', '.join(args)});"
+
+
+def contract_name_for_source(source_manifest: dict[str, Any]) -> str:
+    return _contract_name(source_manifest, _source_text(source_manifest))
 
 
 def contract_name_for_harness(source_manifest: dict[str, Any]) -> str:
@@ -387,6 +472,60 @@ def _codable_initializer_args(inputs: list[dict[str, Any]], owner_write: dict[st
         if value and value not in {"msg.sender", "_msgSender()"}:
             return ["address(this)"]
     return None
+
+
+def _codable_access_control_initializer_args(
+    inputs: list[dict[str, Any]],
+    default_admin_arg: str,
+    body: str,
+) -> dict[str, list[str]] | None:
+    if not inputs:
+        return {"setup": [], "args": []}
+    setup: list[str] = []
+    args: list[str] = []
+    for index, item in enumerate(inputs):
+        arg_type = str(item.get("type") or "")
+        arg_name = str(item.get("name") or f"arg{index}")
+        if arg_type == "address":
+            if default_admin_arg and default_admin_arg == arg_name:
+                args.append("address(this)")
+            else:
+                args.append("address(this)")
+        elif arg_type == "address[]":
+            variable = f"vassagoAccounts{index}"
+            length = "1" if arg_name in body else "0"
+            setup.append(f"address[] memory {variable} = new address[]({length});")
+            if length == "1":
+                setup.append(f"{variable}[0] = address(this);")
+            args.append(variable)
+        else:
+            return None
+    return {"setup": setup, "args": args}
+
+
+def _role_setup_calls(body: str) -> list[dict[str, str]]:
+    calls = []
+    pattern = re.compile(
+        r"\b_(?:setupRole|grantRole)\s*\(\s*(?P<role>[A-Za-z_][A-Za-z0-9_]*)\s*,\s*(?P<account>[^)]+?)\s*\)"
+    )
+    for match in pattern.finditer(body):
+        calls.append({"role": match.group("role"), "account": match.group("account").strip()})
+    return calls
+
+
+def _role_setup_argument(body: str, role_name: str) -> str:
+    for call in _role_setup_calls(body):
+        if call.get("role") == role_name:
+            return str(call.get("account") or "")
+    return ""
+
+
+def _access_control_evidence_refs(verified: bool, role_setups: list[dict[str, str]]) -> list[str]:
+    refs = ["source:function initialize", "source:AccessControl role readers"]
+    refs.extend(f"source:initializer role setup {item['role']}" for item in role_setups if item.get("role"))
+    if verified:
+        refs.append("source:no _disableInitializers")
+    return sorted(set(refs))
 
 
 def _measurable_delta(variable: str | None) -> str:
