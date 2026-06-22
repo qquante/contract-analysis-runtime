@@ -78,6 +78,8 @@ def evaluate_proxy_upgrade_signature(
             )
 
     if thesis_id == "uninitialized_implementation_proxy":
+        if not proxy_like and not implementation_source and "proxyInitialize" not in names:
+            return {"applicable": False, "status": "not_applicable"}
         return _evaluate_initializer_context(
             proxy_like=proxy_like,
             implementation_source_missing=implementation_source_missing,

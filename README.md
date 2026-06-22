@@ -356,6 +356,18 @@ Current proxy-upgrade mapper state:
   therefore the next blocker is `PT-028.T09` proxy thesis acquisition/routing,
   not Foundry.
 
+Current proxy acquisition state:
+
+- `PT-028.T09` adds `src/vassago_contract_runtime/sc01_proxy_acquisition.py`
+  and dynamic candidates inside phase `03_corpus_motifs`.
+- It routes initializer, UUPS and role-admin theses from ABI/source/proxy
+  context, not from historical labels.
+- It validated over resolved blind-100 proxy artifacts with dynamic candidates
+  in `9/20` cases.
+- Fresh family-only reruns still need resolver/cache reliability:
+  `source-manifest.status=unresolved` prevents acquisition from seeing
+  source/ABI/proxy context.
+
 Runtime follow-up baseline:
 
 ```text

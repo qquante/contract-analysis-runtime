@@ -197,6 +197,8 @@ class BootstrapPhaseTests(unittest.TestCase):
                 "00_intake": IntakeAdapter(),
                 "01_dossier": DossierAdapter(FixtureSourceResolver.from_file(source_fixture)),
                 "02_semantic_surface": SemanticSurfaceAdapter(),
+                "03_corpus_motifs": CorpusMotifsAdapter.from_design_dir("designs/sc01-access"),
+                "04_thesis_acquisition": ThesisAcquisitionAdapter(),
             }
 
             run_design(design, [target], Path(tmp) / "run", adapters, RunOptions(resume=True))
@@ -204,12 +206,16 @@ class BootstrapPhaseTests(unittest.TestCase):
             target_dir = Path(tmp) / "run" / "targets" / target.target_id / "phases"
             function_index = json.loads((target_dir / "01_dossier" / "function-index.json").read_text())
             surface = json.loads((target_dir / "02_semantic_surface" / "access-surface.json").read_text())
+            candidates = json.loads((target_dir / "03_corpus_motifs" / "sc01-thesis-candidates.json").read_text())
+            queue = json.loads((target_dir / "04_thesis_acquisition" / "sc01-thesis-queue.json").read_text())
             initialize_index = next(item for item in function_index["functions"] if item["name"] == "initialize")
             initialize_surface = next(item for item in surface["functions"] if item["name"] == "initialize")
             self.assertEqual(initialize_index["source_relation"], "proxy_implementation")
             self.assertEqual(initialize_index["execution_context"], "proxy_delegatecall")
             self.assertEqual(initialize_surface["source_status"], "found")
             self.assertEqual(initialize_surface["source_relation"], "proxy_implementation")
+            self.assertIn("uninitialized_implementation_proxy", {item["thesis_id"] for item in candidates["candidates"]})
+            self.assertIn("uninitialized_implementation_proxy", {item["thesis_id"] for item in queue["queue"]})
 
     def test_intake_and_dossier_adapters_write_real_bootstrap_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

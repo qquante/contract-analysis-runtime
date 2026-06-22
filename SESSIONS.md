@@ -2584,3 +2584,84 @@ Commit the PT-028.T08 mapper slice if green.
 Next implementation is `PT-028.T09`: make proxy-upgrade thesis acquisition
 route fresh targets into source-truth using source/ABI/proxy context only, not
 historical labels.
+
+## 2026-06-22 - PT-028.T09 Proxy Thesis Acquisition/Routing
+
+Goal:
+
+- Route proxy-upgrade targets into source-truth automatically from
+  ABI/source/proxy context: `TransparentUpgradeableProxy`, EIP-1967,
+  `initialize`, `upgradeTo`, `upgradeToAndCall`, `_authorizeUpgrade`,
+  `hasRole/getRoleAdmin`.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/sc01_proxy_acquisition.py`.
+- Updated `src/vassago_contract_runtime/phases/corpus_motifs.py` to merge
+  dynamic proxy/upgrade candidates with YAML corpus candidates.
+- Added tests in
+  `tests/design_runtime/test_sc01_proxy_acquisition.py`.
+- Expanded `tests/design_runtime/test_phases.py` to prove proxy related
+  implementation functions route to `uninitialized_implementation_proxy`
+  without historical labels.
+
+Rules implemented:
+
+- `initialize` routes only when proxy/implementation context exists.
+- `initializeMarket` is not treated as initializer evidence.
+- `upgradeTo`/`upgradeToAndCall` route to `uups_weak_auth` only with
+  `_authorizeUpgrade`, EIP-1967, transparent proxy or proxy-context evidence.
+- `hasRole/getRoleAdmin/grantRole` route to `role_admin_escalation`.
+- Same-thesis candidates are merged before phase 04.
+
+Commands:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_acquisition tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_phases
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t09-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t09-v1 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t09-v1\historical-stage-failure
+```
+
+Observed:
+
+```text
+focused tests: Ran 24 tests, OK
+fresh family run: executed_count=220 failed_count=0 target_count=20
+fresh family stage report: 04_no_thesis_candidate=20
+sampled source-manifest.status=unresolved
+```
+
+Additional validation:
+
+- Replayed `build_proxy_upgrade_candidates()` over resolved artifacts from
+  `runs/sc01-historical-blind-100-v1` for the 20
+  `proxy_upgrade_signature` cases.
+- Dynamic acquisition candidates appeared in `9/20` cases:
+  `uninitialized_implementation_proxy=8`, `uups_weak_auth=4`,
+  `role_admin_escalation=2`.
+
+Decisions and reasoning:
+
+- T09 fixed acquisition logic for resolved artifacts.
+- Fresh family-only reruns are still blocked earlier by source resolver/cache
+  reliability.
+- Do not compensate by reading hidden labels or case ids. The next step must
+  improve source/cache hydration or explicit operator-provided previous-run
+  source artifacts.
+
+Blockers:
+
+- `runs\source-cache-historical-100` did not hydrate the family-only proxy run.
+- Source resolver returned `status=unresolved`, so acquisition had no ABI/source
+  context to inspect.
+
+RESUME FROM HERE:
+
+Run focused regression and check:
+`$env:PYTHONPATH='src'; python -m unittest tests.design_runtime.test_sc01_proxy_acquisition tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_phases`.
+Run `python -m vassago_contract_runtime.cli check` and `git diff --check`.
+Commit T09 if green.
+Next implementation is `PT-028.T10`: diagnose source resolver/cache reliability
+for family-only reruns so fresh runs receive the same source/proxy context as
+the original blind-100 resolved artifacts.

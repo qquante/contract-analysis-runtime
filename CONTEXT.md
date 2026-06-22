@@ -851,3 +851,62 @@ Fresh isolated rerun note:
   family-only run did not route those targets into proxy-upgrade theses.
 - Therefore the next blocker is `PT-028.T09` thesis acquisition/routing for
   proxy family, not Foundry.
+
+## PT-028.T09 Proxy Thesis Acquisition State
+
+`PT-028.T09` adds dynamic source/ABI/proxy-context acquisition for
+proxy-upgrade cases.
+
+Files:
+
+- `src/vassago_contract_runtime/sc01_proxy_acquisition.py`
+- `src/vassago_contract_runtime/phases/corpus_motifs.py`
+- `tests/design_runtime/test_sc01_proxy_acquisition.py`
+- `tests/design_runtime/test_phases.py`
+
+What it does:
+
+- creates `uninitialized_implementation_proxy` candidates from
+  `initialize`/`reinitialize` only when proxy or related implementation context
+  exists;
+- creates `uups_weak_auth` candidates from `upgradeTo`/`upgradeToAndCall` only
+  when `_authorizeUpgrade`, EIP-1967, transparent proxy or proxy context exists;
+- creates `role_admin_escalation` candidates from `grantRole`,
+  `hasRole/getRoleAdmin`, `_setRoleAdmin`-style evidence;
+- merges candidates by thesis before phase 04 to avoid duplicate reviews.
+
+Anti-hardcode rule:
+
+- no `benchmark_id`, case id, address or hidden label is used by the detector;
+- the historical report remains scoring-only.
+
+Observed validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_acquisition tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_phases
+```
+
+Result:
+
+```text
+Ran 24 tests
+OK
+```
+
+Direct replay over resolved blind-100 proxy-upgrade artifacts:
+
+```text
+dynamic acquisition candidates in 9/20 cases
+uninitialized_implementation_proxy=8
+uups_weak_auth=4
+role_admin_escalation=2
+```
+
+Remaining blocker:
+
+- fresh family-only run `runs/sc01-historical-proxy-upgrade-t09-v1` still
+  produced `04_no_thesis_candidate=20` because `source-manifest.json` was
+  `status=unresolved` for those targets.
+- Therefore the next task is `PT-028.T10`: source resolver/cache reliability
+  for family reruns.

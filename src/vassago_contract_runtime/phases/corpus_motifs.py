@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from vassago_contract_runtime.corpus import CorpusAdapter, CorpusScanContext, DesignCorpusAdapter, NullCorpusAdapter
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
+from vassago_contract_runtime.sc01_proxy_acquisition import build_proxy_upgrade_candidates
 
 
 class CorpusMotifsAdapter:
@@ -40,6 +41,17 @@ class CorpusMotifsAdapter:
             for candidate in (_candidate(match, context, access_surface) for match in result.matches)
             if candidate is not None
         ]
+        candidates = _dedupe_candidates(
+            candidates
+            + build_proxy_upgrade_candidates(
+                target_id=context.target.target_id,
+                chain=context.target.chain,
+                address=context.target.address,
+                function_index=function_index,
+                source_manifest=source_manifest,
+                access_surface=access_surface,
+            )
+        )
         return PhaseResult.completed(
             json_artifacts={
                 "sc01-corpus-matches.json": result.to_json(),
@@ -87,6 +99,35 @@ def _candidate(match: object, context: PhaseContext, access_surface: dict) -> di
         "evidence_refs": sorted(set(payload["evidence_refs"] + [f"access-surface:{item}" for item in matched_functions])),
         "blockers": ["source_truth_not_run", "onchain_state_not_read", "proof_pieces_not_built"],
     }
+
+
+def _dedupe_candidates(candidates: list[dict]) -> list[dict]:
+    merged: dict[str, dict] = {}
+    for candidate in candidates:
+        key = str(candidate.get("thesis_id") or "")
+        if key not in merged:
+            merged[key] = dict(candidate)
+            continue
+        existing = merged[key]
+        for field in ("matched_functions", "matched_motifs", "evidence_refs", "blockers"):
+            existing[field] = sorted(
+                {
+                    *(str(item) for item in existing.get(field) or []),
+                    *(str(item) for item in candidate.get(field) or []),
+                }
+            )
+        existing["acquisition_source"] = "+".join(
+            sorted(
+                {
+                    str(existing.get("acquisition_source") or "design_corpus"),
+                    str(candidate.get("acquisition_source") or "design_corpus"),
+                }
+            )
+        )
+    return sorted(
+        merged.values(),
+        key=lambda item: (str(item.get("thesis_id") or ""), str(item.get("candidate_id") or "")),
+    )
 
 
 def _surface_functions_for_motifs(access_surface: dict, motifs: list[str], existing: list[str]) -> list[str]:

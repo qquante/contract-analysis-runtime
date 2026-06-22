@@ -1540,6 +1540,61 @@ Interpretation:
 - the isolated fresh run exposed a routing/acquisition gap before source-truth;
 - next task is `PT-028.T09`, not Foundry.
 
+## PT-028.T09 proxy thesis acquisition
+
+Focused regression:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_acquisition tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_phases
+```
+
+Observed:
+
+```text
+Ran 24 tests
+OK
+```
+
+Dynamic acquisition replay over resolved blind-100 proxy-upgrade artifacts:
+
+```powershell
+$env:PYTHONPATH='src'
+# Python one-shot script imported build_proxy_upgrade_candidates and replayed
+# it over runs/sc01-historical-blind-100-v1 for the 20 proxy_upgrade_signature cases.
+```
+
+Observed:
+
+```text
+dynamic acquisition candidates in 9/20 cases
+uninitialized_implementation_proxy=8
+uups_weak_auth=4
+role_admin_escalation=2
+```
+
+Fresh family-only run:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t09-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t09-v1 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t09-v1\historical-stage-failure
+```
+
+Observed:
+
+```text
+run-design executed_count=220 failed_count=0 target_count=20
+source-manifest.status=unresolved on sampled target
+stage report: 04_no_thesis_candidate=20
+```
+
+Interpretation:
+
+- T09 works when source/ABI/proxy context exists;
+- fresh family reruns still need resolver/cache reliability work;
+- next task is `PT-028.T10`.
+
 Observed:
 
 ```text

@@ -141,17 +141,37 @@ class SC01ProxyUpgradeMapperTests(unittest.TestCase):
                     },
                     {"type": "function", "name": "owner", "inputs": []},
                 ],
+                "proxy_context": {
+                    "proxy": "1",
+                    "implementation": "0x2222222222222222222222222222222222222222",
+                },
                 "source_files": {
-                    "Impl.sol": """
-                    pragma solidity ^0.8.20;
-                    contract Impl {
-                        address public owner;
-                        struct InitConfig { address owner; }
-                        function initialize(InitConfig memory cfg, address registry) external {
-                            owner = cfg.owner;
-                        }
+                    "Proxy.sol": "contract Proxy { fallback() external payable {} }",
+                },
+                "related_sources": {
+                    "implementation": {
+                        "status": "resolved",
+                        "abi": [
+                            {
+                                "type": "function",
+                                "name": "initialize",
+                                "inputs": [{"type": "tuple"}, {"type": "address"}],
+                            },
+                            {"type": "function", "name": "owner", "inputs": []},
+                        ],
+                        "source_files": {
+                            "Impl.sol": """
+                            pragma solidity ^0.8.20;
+                            contract Impl {
+                                address public owner;
+                                struct InitConfig { address owner; }
+                                function initialize(InitConfig memory cfg, address registry) external {
+                                    owner = cfg.owner;
+                                }
+                            }
+                            """,
+                        },
                     }
-                    """,
                 },
             },
             "uninitialized_implementation_proxy",

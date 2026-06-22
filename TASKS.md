@@ -2129,7 +2129,7 @@ Important limitation:
 
 ## PT-028.T09 - Proxy family thesis acquisition/routing
 
-Status: next.
+Status: done first slice 2026-06-22.
 
 Goal:
 
@@ -2144,6 +2144,64 @@ Needed:
   `initialize`, `upgradeTo`, `upgradeToAndCall`, `_authorizeUpgrade`,
   `getRoleAdmin/hasRole`;
 - no use of `benchmark_id`, case id, address or hidden label as detector rule.
+
+Implemented:
+
+- Added `src/vassago_contract_runtime/sc01_proxy_acquisition.py`.
+- `src/vassago_contract_runtime/phases/corpus_motifs.py` now appends dynamic
+  proxy/upgrade/role candidates from `function-index.json`,
+  `source-manifest.json` and `access-surface.json`.
+- Added tests in
+  `tests/design_runtime/test_sc01_proxy_acquisition.py`.
+- Expanded `tests/design_runtime/test_phases.py` so proxy related
+  implementation functions route into `uninitialized_implementation_proxy`
+  without historical labels.
+
+Rules:
+
+- `initialize` routes only when proxy/implementation context exists.
+- `initializeMarket` and similar public market setup names do not count as
+  initializer evidence.
+- `upgradeTo`/`upgradeToAndCall` route to `uups_weak_auth` only with
+  `_authorizeUpgrade`, EIP-1967, transparent proxy or proxy-context evidence.
+- `hasRole/getRoleAdmin/grantRole` route to `role_admin_escalation`.
+- Same-thesis candidates are merged before phase 04 to avoid duplicate
+  source-truth reviews.
+
+Validation:
+
+- focused tests:
+  `python -m unittest tests.design_runtime.test_sc01_proxy_acquisition tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_phases`
+  -> `24` tests OK.
+- direct replay over resolved blind-100 proxy-upgrade artifacts produced
+  dynamic acquisition candidates in `9/20` cases:
+  `uninitialized_implementation_proxy=8`, `uups_weak_auth=4`,
+  `role_admin_escalation=2`.
+
+Remaining limitation:
+
+- a fresh family-only run still showed `04_no_thesis_candidate=20` because
+  the resolver returned `source-manifest.status=unresolved` for those targets
+  in that run. The acquisition path is fixed for resolved artifacts; the next
+  blocker is source resolver/cache reliability for family-only reruns.
+
+## PT-028.T10 - Source resolver/cache reliability for family reruns
+
+Status: next.
+
+Goal:
+
+- make fresh family-only historical runs reproduce the resolved source/proxy
+  context already present in the original blind-100 run, without relying on
+  hidden labels.
+
+Needed:
+
+- inspect why `--source-cache-dir runs\source-cache-historical-100` did not
+  hydrate the family-only proxy run;
+- add cache key/reporting for unresolved resolver outputs;
+- optionally add read-through from previous run artifacts only as explicit
+  operator input, not as detector logic.
 
 ## PT-028.T06 - Corpus expansion to 100+
 
