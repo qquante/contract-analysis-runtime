@@ -364,9 +364,17 @@ Current proxy acquisition state:
   context, not from historical labels.
 - It validated over resolved blind-100 proxy artifacts with dynamic candidates
   in `9/20` cases.
-- Fresh family-only reruns still need resolver/cache reliability:
-  `source-manifest.status=unresolved` prevents acquisition from seeing
-  source/ABI/proxy context.
+
+Current source-cache reliability state:
+
+- `PT-028.T10` makes the Etherscan V2 adapter cache-first, so fresh family-only
+  reruns can hydrate source/proxy context from
+  `runs/source-cache-historical-100` without a live API call when cache exists.
+- The T10 proxy-upgrade family rerun resolved `20/20` sources with
+  `cache_hit=true` and `failed_count=0`.
+- The remaining proxy-upgrade blocker is source-truth/proof-piece quality:
+  `05_source_truth_not_verified=16`, `07_proof_pieces_incomplete=1`,
+  `runtime_ready_count=0`.
 
 Runtime follow-up baseline:
 

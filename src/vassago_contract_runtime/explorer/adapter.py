@@ -144,13 +144,6 @@ class EtherscanV2ExplorerAdapter:
         self._last_request_at = 0.0
 
     def get_contract_context(self, target: ContractTargetRef) -> ExplorerContractContext:
-        if not self.api_token:
-            return ExplorerContractContext(
-                status="unresolved",
-                provider="etherscan_v2",
-                target=target,
-                error={"code": "etherscan_api_key_missing", "message": "ETHERSCAN_API_KEY is not configured."},
-            )
         source = self._api(
             target,
             {
@@ -164,7 +157,10 @@ class EtherscanV2ExplorerAdapter:
                 status="unresolved",
                 provider="etherscan_v2",
                 target=target,
-                error={"code": "etherscan_getsourcecode_failed", "message": str(source.get("message") or source.get("result"))},
+                error={
+                    "code": str(source.get("error_code") or "etherscan_getsourcecode_failed"),
+                    "message": str(source.get("message") or source.get("result")),
+                },
                 metadata=_metadata(source),
             )
         record = _first_result(source)
@@ -205,15 +201,6 @@ class EtherscanV2ExplorerAdapter:
         to_block: int,
         topics: dict[str, str] | None = None,
     ) -> ExplorerLogsResult:
-        if not self.api_token:
-            return ExplorerLogsResult(
-                status="unresolved",
-                provider="etherscan_v2",
-                target=target,
-                from_block=from_block,
-                to_block=to_block,
-                error={"code": "etherscan_api_key_missing", "message": "ETHERSCAN_API_KEY is not configured."},
-            )
         params = {
             "module": "logs",
             "action": "getLogs",
@@ -231,7 +218,10 @@ class EtherscanV2ExplorerAdapter:
                 target=target,
                 from_block=from_block,
                 to_block=to_block,
-                error={"code": "etherscan_getlogs_failed", "message": str(response.get("message") or response.get("result"))},
+                error={
+                    "code": str(response.get("error_code") or "etherscan_getlogs_failed"),
+                    "message": str(response.get("message") or response.get("result")),
+                },
                 metadata=_metadata(response),
             )
         result = response.get("result") if isinstance(response.get("result"), list) else []
@@ -247,13 +237,22 @@ class EtherscanV2ExplorerAdapter:
 
     def _api(self, target: ContractTargetRef, params: dict[str, str]) -> dict[str, Any]:
         chainid = _chain_id(target.chain)
-        request_params = {"chainid": chainid, **params, "apikey": self.api_token or ""}
-        cache_key = _cache_key({key: value for key, value in request_params.items() if key != "apikey"})
+        cache_params = {"chainid": chainid, **params}
+        cache_key = _cache_key(cache_params)
         cached = self._cache_read(cache_key)
         if cached is not None:
             cached["cache"] = {"hit": True, "key": cache_key}
             return cached
+        if not self.api_token:
+            return {
+                "status": "0",
+                "message": "ETHERSCAN_API_KEY is not configured.",
+                "result": "ETHERSCAN_API_KEY is not configured.",
+                "error_code": "etherscan_api_key_missing",
+                "cache": {"hit": False, "key": cache_key, "miss_reason": "not_found"},
+            }
         self._throttle()
+        request_params = {**cache_params, "apikey": self.api_token}
         url = f"{self.base_url}?{urlencode(request_params)}"
         payload = self.transport(url)
         payload["cache"] = {"hit": False, "key": cache_key}

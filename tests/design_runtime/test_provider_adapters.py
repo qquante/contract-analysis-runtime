@@ -76,6 +76,70 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertIn("Fixture.sol", first.source_files)
         self.assertIn("Fixture", " ".join(first.source_files.values()))
 
+    def test_etherscan_v2_contract_context_reads_cache_without_api_key(self) -> None:
+        calls: list[str] = []
+
+        def transport(url: str) -> dict:
+            calls.append(url)
+            return {
+                "status": "1",
+                "message": "OK",
+                "result": [
+                    {
+                        "ContractName": "CachedFixture",
+                        "CompilerVersion": "v0.8.24",
+                        "ABI": '[{"type":"function","name":"upgradeTo","inputs":[{"type":"address"}],"outputs":[]}]',
+                        "SourceCode": "contract CachedFixture { function upgradeTo(address) external {} }",
+                        "Proxy": "1",
+                        "Implementation": "0x2222222222222222222222222222222222222222",
+                    }
+                ],
+            }
+
+        def fail_transport(url: str) -> dict:
+            raise AssertionError("Cache hit should not require network transport.")
+
+        target = ContractTargetRef.from_target(ContractTarget("polygon", "0x1111111111111111111111111111111111111111"))
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_dir = Path(tmp)
+            first = EtherscanV2ExplorerAdapter(
+                "test-key",
+                cache_dir=cache_dir,
+                min_interval_seconds=0,
+                transport=transport,
+            ).get_contract_context(target)
+            old_key = os.environ.pop("ETHERSCAN_API_KEY", None)
+            try:
+                second = EtherscanV2ExplorerAdapter(
+                    None,
+                    cache_dir=cache_dir,
+                    min_interval_seconds=0,
+                    transport=fail_transport,
+                ).get_contract_context(target)
+            finally:
+                if old_key is not None:
+                    os.environ["ETHERSCAN_API_KEY"] = old_key
+
+        self.assertEqual(first.status, "resolved")
+        self.assertEqual(second.status, "resolved")
+        self.assertEqual(second.metadata["cache_hit"], True)
+        self.assertEqual(second.proxy_context["proxy"], "1")
+        self.assertEqual(len(calls), 1)
+
+    def test_etherscan_v2_cache_miss_without_api_key_is_explicit(self) -> None:
+        old_key = os.environ.pop("ETHERSCAN_API_KEY", None)
+        try:
+            target = ContractTargetRef.from_target(ContractTarget("polygon", "0x1111111111111111111111111111111111111111"))
+            with tempfile.TemporaryDirectory() as tmp:
+                result = EtherscanV2ExplorerAdapter(None, cache_dir=Path(tmp)).get_contract_context(target)
+        finally:
+            if old_key is not None:
+                os.environ["ETHERSCAN_API_KEY"] = old_key
+
+        self.assertEqual(result.status, "unresolved")
+        self.assertEqual(result.error["code"], "etherscan_api_key_missing")
+        self.assertEqual(result.metadata["cache_hit"], False)
+
     def test_etherscan_v2_maps_historical_corpus_chains(self) -> None:
         expected = {
             "ethereum": "1",

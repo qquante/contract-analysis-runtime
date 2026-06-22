@@ -86,7 +86,8 @@ PT-028.T05C Runtime follow-up for actionable HEC-031 - done 2026-06-22
 PT-028.T07 Blind score triage - done first slice 2026-06-22
 PT-028.T08 Proxy/upgrade historical mapper hardening - done first slice 2026-06-22
 PT-028.T09 Proxy family thesis acquisition/routing - done first slice 2026-06-22
-PT-028.T10 Source resolver/cache reliability for family reruns - next
+PT-028.T10 Source resolver/cache reliability for family reruns - done first slice 2026-06-22, run runs/sc01-historical-proxy-upgrade-t10-v1
+PT-028.T11 Proxy source-truth/proof-piece hardening - next
 PT-028.T06 Expand corpus beyond 100 - queued
 ```
 
@@ -134,4 +135,11 @@ PT-028.T06 Expand corpus beyond 100 - queued
    Safe/module, bridge endpoint/source and ERC4337 validator.
 14. Add per-target Slither/source summary only if a larger real smoke shows
    repeated compiler/import misses.
-15. Implement PT-026.T04 A2A card after the design runtime remains stable.
+15. Use `runs/sc01-historical-proxy-upgrade-t10-v1` as the proxy-upgrade
+   family rerun baseline. It resolved `20/20` sources from
+   `runs/source-cache-historical-100` with `cache_hit=true`, so the remaining
+   proxy blocker is source-truth/proof-piece quality, not resolver/cache.
+16. Implement `PT-028.T11` by inspecting the `16`
+   `05_source_truth_not_verified` proxy-upgrade candidates and the one
+   `07_proof_pieces_incomplete` case from the T10 stage report.
+17. Implement PT-026.T04 A2A card after the design runtime remains stable.

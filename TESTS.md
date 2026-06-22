@@ -1595,6 +1595,55 @@ Interpretation:
 - fresh family reruns still need resolver/cache reliability work;
 - next task is `PT-028.T10`.
 
+## PT-028.T10 source resolver/cache reliability
+
+Focused regression:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_provider_adapters
+```
+
+Observed:
+
+```text
+Ran 19 tests
+OK
+```
+
+Coverage added:
+
+- Etherscan V2 source context can be read from cache without an API key and
+  without invoking the network transport.
+- Cache miss without an API key reports `etherscan_api_key_missing` and
+  `cache_hit=false` instead of silently losing source/proxy context.
+
+Fresh proxy-upgrade family rerun:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t10-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t10-v1 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t10-v1\historical-stage-failure
+```
+
+Observed:
+
+```text
+run-design executed_count=220 failed_count=0 target_count=20
+source_resolved=20 source_unresolved=0 cache_hits=20
+stage report:
+  04_no_thesis_candidate=3
+  05_source_truth_not_verified=16
+  07_proof_pieces_incomplete=1
+  runtime_ready_count=0
+```
+
+Interpretation:
+
+- T10 fixes the resolver/cache blocker from T09;
+- no Foundry/runtime is implied: the remaining blockers are source-truth and
+  proof-piece completeness for proxy-upgrade candidates.
+
 Observed:
 
 ```text

@@ -148,6 +148,12 @@ Current state:
 - Current candidate priority is proxy/upgrade/signature first, then
   oracle/accounting, reentrancy/token, SC01 access control and bridge/message
   auth.
+- Proxy/upgrade family reruns now hydrate source/proxy context from
+  `runs/source-cache-historical-100`: `20/20` sources resolved with
+  `cache_hit=true` in `runs/sc01-historical-proxy-upgrade-t10-v1`.
+- The current proxy/upgrade blocker is source-truth/proof-piece quality:
+  `16` `05_source_truth_not_verified`, `1` `07_proof_pieces_incomplete`,
+  `runtime_ready_count=0`.
 
 Non-goal:
 

@@ -2187,7 +2187,7 @@ Remaining limitation:
 
 ## PT-028.T10 - Source resolver/cache reliability for family reruns
 
-Status: next.
+Status: done first slice 2026-06-22.
 
 Goal:
 
@@ -2195,13 +2195,64 @@ Goal:
   context already present in the original blind-100 run, without relying on
   hidden labels.
 
+Implemented:
+
+- `src/vassago_contract_runtime/explorer/adapter.py` is now cache-first for
+  Etherscan V2 source and log calls.
+- Cache lookup happens before API-key enforcement, so a family rerun can hydrate
+  source/proxy context from `runs\source-cache-historical-100` without a live
+  API call.
+- Cache miss without an API key is explicit:
+  `etherscan_api_key_missing` with `cache.hit=false` and the cache key.
+- Added regression coverage in
+  `tests/design_runtime/test_provider_adapters.py`.
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_provider_adapters
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t10-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t10-v1 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t10-v1\historical-stage-failure
+```
+
+Observed:
+
+```text
+provider adapter tests: Ran 19 tests, OK
+family rerun: executed_count=220 failed_count=0 target_count=20
+source manifests: source_resolved=20 source_unresolved=0 cache_hits=20
+stage report: 04_no_thesis_candidate=3, 05_source_truth_not_verified=16,
+07_proof_pieces_incomplete=1, runtime_ready_count=0
+```
+
+Result:
+
+- resolver/cache reliability is no longer the blocker for proxy-upgrade family
+  reruns;
+- the next blocker is source-truth/proof-piece hardening for the 16
+  `proxy_upgrade_signature` candidates that now reach the correct stages.
+
+## PT-028.T11 - Proxy source-truth/proof-piece hardening
+
+Status: next.
+
+Goal:
+
+- inspect `runs\sc01-historical-proxy-upgrade-t10-v1\historical-stage-failure`
+  and reduce the `16` `05_source_truth_not_verified` proxy candidates without
+  using historical labels, case ids or addresses.
+
 Needed:
 
-- inspect why `--source-cache-dir runs\source-cache-historical-100` did not
-  hydrate the family-only proxy run;
-- add cache key/reporting for unresolved resolver outputs;
-- optionally add read-through from previous run artifacts only as explicit
-  operator input, not as detector logic.
+- classify why each proxy candidate fails source-truth;
+- strengthen proxy source-truth only where source/ABI/proxy context proves
+  `initialize`, `upgradeTo`, `_authorizeUpgrade`, EIP-1967, role graph or
+  proxy-impact semantics;
+- keep transparent admin paths, `_disableInitializers()` and missing role/state
+  evidence terminal or blocked, not runtime-ready;
+- move the one `07_proof_pieces_incomplete` case only if proxy impact, reader,
+  delta and codable args become concrete.
 
 ## PT-028.T06 - Corpus expansion to 100+
 

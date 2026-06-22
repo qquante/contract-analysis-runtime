@@ -910,3 +910,53 @@ Remaining blocker:
   `status=unresolved` for those targets.
 - Therefore the next task is `PT-028.T10`: source resolver/cache reliability
   for family reruns.
+
+## PT-028.T10 Source Resolver/Cache Reliability State
+
+`PT-028.T10` makes Etherscan V2 source/log access cache-first. A family rerun
+can now reuse `runs/source-cache-historical-100` without a live API key or
+network request when the cache entry exists.
+
+Files:
+
+- `src/vassago_contract_runtime/explorer/adapter.py`
+- `tests/design_runtime/test_provider_adapters.py`
+
+Behavior:
+
+- `_api()` computes the Etherscan V2 cache key from `chainid` and request
+  params before checking `ETHERSCAN_API_KEY`;
+- cache hit returns the cached payload with `cache.hit=true`;
+- cache miss without an API key returns explicit
+  `etherscan_api_key_missing`, `cache.hit=false` and the cache key;
+- source and log adapter errors preserve that specific error code.
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_provider_adapters
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t10-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t10-v1 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t10-v1\historical-stage-failure
+```
+
+Observed:
+
+```text
+provider adapter tests: Ran 19 tests, OK
+fresh family run: executed_count=220 failed_count=0 target_count=20
+source_resolved=20 source_unresolved=0 cache_hits=20
+stage report:
+  04_no_thesis_candidate=3
+  05_source_truth_not_verified=16
+  07_proof_pieces_incomplete=1
+  runtime_ready_count=0
+```
+
+Current interpretation:
+
+- source/proxy context hydration is fixed for this family rerun;
+- the proxy-upgrade family now reaches acquisition/source-truth again;
+- the next blocker is `PT-028.T11`: explain and harden the `16`
+  `05_source_truth_not_verified` candidates and the one incomplete proof-piece
+  case without using labels, addresses or case ids.

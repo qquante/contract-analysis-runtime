@@ -2665,3 +2665,68 @@ Commit T09 if green.
 Next implementation is `PT-028.T10`: diagnose source resolver/cache reliability
 for family-only reruns so fresh runs receive the same source/proxy context as
 the original blind-100 resolved artifacts.
+
+## 2026-06-22 - PT-028.T10 Source Resolver/Cache Reliability
+
+Goal:
+
+- Make fresh family-only historical reruns receive the same source/proxy
+  context that the original blind-100 run already resolved, without using
+  hidden labels, case ids or addresses.
+
+What was done:
+
+- Updated `src/vassago_contract_runtime/explorer/adapter.py` so Etherscan V2
+  `_api()` checks the local cache before requiring `ETHERSCAN_API_KEY`.
+- Preserved explicit cache-miss behavior:
+  `etherscan_api_key_missing`, `cache.hit=false`, `miss_reason=not_found`.
+- Preserved specific error codes in source/log result objects.
+- Added tests in `tests/design_runtime/test_provider_adapters.py` for:
+  cache hit without API key and explicit cache miss without API key.
+
+Commands:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_provider_adapters
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t10-v1 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t10-v1 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t10-v1\historical-stage-failure
+```
+
+Observed:
+
+```text
+focused tests: Ran 19 tests, OK
+family rerun: executed_count=220 failed_count=0 target_count=20
+source manifests: source_resolved=20 source_unresolved=0 cache_hits=20
+stage report:
+  04_no_thesis_candidate=3
+  05_source_truth_not_verified=16
+  07_proof_pieces_incomplete=1
+  runtime_ready_count=0
+```
+
+Decisions and reasoning:
+
+- This is not a detector shortcut. It only restores the already cached
+  source/proxy context needed by normal source-backed detectors.
+- The family rerun is now blocked in the intended later stages, not at source
+  resolution.
+- No Foundry/runtime should run from this result because `runtime_ready_count`
+  is still `0`.
+
+Blockers:
+
+- `16` proxy-upgrade candidates still fail source-truth.
+- `1` proxy-upgrade candidate has incomplete proof pieces.
+
+RESUME FROM HERE:
+
+Run the focused provider/proxy regression and `check`.
+Commit T10 if green.
+Next implementation is `PT-028.T11`: inspect
+`runs\sc01-historical-proxy-upgrade-t10-v1\historical-stage-failure`,
+classify the `16` `05_source_truth_not_verified` proxy candidates, and move
+only source-backed cases forward. Do not use hidden labels or addresses as
+detector logic. Do not run Foundry unless a fresh report has
+`runtime_ready_count > 0`.
