@@ -938,3 +938,89 @@ Interpretation:
 - Wormhole implementation context is now recognized and source-truth verified.
 - Wormhole runtime remains blocked until VM payload, malicious initializer
   implementation and dedicated runner exist.
+
+## PT-027.T10 Wormhole Runtime Runner
+
+Focused regression:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source tests.design_runtime.test_phases
+```
+
+Observed:
+
+```text
+32 tests passed
+```
+
+Coverage:
+
+- `evaluate_wormhole_uninitialized_implementation()` now returns:
+  - `runtime_runner=wormhole_implementation_runtime`;
+  - `missing_proof_pieces=[]`;
+  - `fork_block_number=13818843`.
+- `render_sc01_harness()` emits a Wormhole-specific interface-only harness for
+  proxy `0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B`.
+- phase test confirms the target reaches:
+  - `source_truth_verified_count=1`;
+  - `foundry_allowed=true`;
+  - fake runtime `runtime_completed`.
+
+Real smoke:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design `
+  --design sc01-access `
+  --targets tests/fixtures/targets-sc01-historical-6.json `
+  --output runs/sc01-historical-6-v15-wormhole-runtime `
+  --bootstrap-adapters `
+  --source-cache-dir runs/sc01-historical-6-v11-audius-runtime/_cache/etherscan-v2 `
+  --runtime-authorized
+python -m vassago_contract_runtime.cli impact-review `
+  --run runs/sc01-historical-6-v16-wormhole-runtime `
+  --target-id CT-24700f446e33
+```
+
+Precondition:
+
+- `VASSAGO_FORK_RPC_URL` or `VASSAGO_FORK_RPC_FALLBACK_ETH_URL` must point to
+  an archive-capable Ethereum RPC that serves block `13_818_843`.
+
+Observed real smoke:
+
+```text
+run_dir=runs/sc01-historical-6-v16-wormhole-runtime
+run_id=RUN-07be0359b9b4
+executed_count=66
+failed_count=0
+Wormhole compile_status=compile_only_passed
+Wormhole runtime_status=runtime_completed
+Wormhole assertion.status=passed
+Wormhole evidence_status=runtime_local
+Wormhole no_broadcast=true
+Impact review verdict=historical_reproduced_critical
+Current live risk=not_claimed
+```
+
+Foundry output excerpt:
+
+```text
+[PASS] testWormholeImplementationInitializerReplayExecutesMaliciousDelegatecall()
+```
+
+Artifact:
+
+```text
+runs/sc01-historical-6-v16-wormhole-runtime/targets/CT-24700f446e33/phases/11_impact_review/sc01-impact-review.json
+```
+
+Interpretation:
+
+- Wormhole is locally reproduced on a historical fork for the implementation
+  initializer / malicious upgrade path.
+- This is historical critical context, not a current live severity claim.
+- The harness includes the selfdestruct path, but the assertion measures a
+  storage marker written during malicious delegatecall because code deletion is
+  transaction-final and hardfork-dependent.

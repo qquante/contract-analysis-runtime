@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import os
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -364,6 +365,50 @@ class BootstrapPhaseTests(unittest.TestCase):
             self.assertEqual(final_report["final_status"], "runtime_completed")
             self.assertEqual(final_report["evidence_status"], "runtime_local")
 
+    def test_wormhole_fixture_reaches_runtime_gate_with_specific_harness(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source_fixture = Path(tmp) / "wormhole-source.json"
+            source_fixture.write_text(json.dumps(_wormhole_source_fixture()), encoding="utf-8")
+            design = load_design(Path("designs") / "sc01-access" / "design.yaml")
+            target = ContractTarget("eth", "0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B")
+            foundry = _FakeFoundry()
+            adapters = {
+                "00_intake": IntakeAdapter(),
+                "01_dossier": DossierAdapter(FixtureSourceResolver.from_file(source_fixture)),
+                "02_semantic_surface": SemanticSurfaceAdapter(),
+                "03_corpus_motifs": CorpusMotifsAdapter.from_design_dir("designs/sc01-access"),
+                "04_thesis_acquisition": ThesisAcquisitionAdapter(),
+                "05_source_truth": SourceTruthAdapter(),
+                "06_onchain_state": OnChainStateAdapter(),
+                "07_proof_pieces": ProofPiecesAdapter(),
+                "08_compile_only": CompileOnlyAdapter(foundry),
+                "09_runtime_foundry": RuntimeFoundryAdapter(foundry, runtime_authorized=True),
+                "10_final_report": FinalReportAdapter(),
+            }
+
+            old_rpc = os.environ.get("VASSAGO_FORK_RPC_URL")
+            os.environ["VASSAGO_FORK_RPC_URL"] = "http://127.0.0.1:8545"
+            try:
+                result = run_design(design, [target], Path(tmp) / "run", adapters, RunOptions(resume=True))
+            finally:
+                if old_rpc is None:
+                    os.environ.pop("VASSAGO_FORK_RPC_URL", None)
+                else:
+                    os.environ["VASSAGO_FORK_RPC_URL"] = old_rpc
+
+            self.assertEqual(result.status, "completed")
+            target_dir = Path(tmp) / "run" / "targets" / target.target_id / "phases"
+            source_truth = json.loads((target_dir / "05_source_truth" / "sc01-source-truth.json").read_text())
+            runtime_ready = json.loads((target_dir / "07_proof_pieces" / "sc01-runtime-ready.json").read_text())
+            harness = (target_dir / "08_compile_only" / "VassagoSC01Harness.t.sol").read_text()
+            runtime_result = json.loads((target_dir / "09_runtime_foundry" / "foundry-runtime-result.json").read_text())
+            self.assertEqual(source_truth["source_truth_verified_count"], 1)
+            self.assertEqual(source_truth["reviews"][0]["runtime_runner"], "wormhole_implementation_runtime")
+            self.assertEqual(runtime_ready["foundry_allowed"], True)
+            self.assertIn("testWormholeImplementationInitializerReplayExecutesMaliciousDelegatecall", harness)
+            self.assertIn("MALICIOUS_MARKER_SLOT", harness)
+            self.assertEqual(runtime_result["status"], "runtime_completed")
+
     def test_negative_public_accounting_fixture_rejects_initialize_name_noise(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             design = load_design(Path("designs") / "sc01-access" / "design.yaml")
@@ -518,6 +563,82 @@ def _phase_dirs_by_address(run_dir: Path) -> dict[str, Path]:
 
 def _read_phase(phases_dir: Path, phase_id: str, artifact: str) -> dict:
     return json.loads((phases_dir / phase_id / artifact).read_text())
+
+
+def _wormhole_source_fixture() -> dict:
+    return {
+        "targets": [
+            {
+                "chain": "eth",
+                "address": "0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B",
+                "status": "resolved",
+                "provider": "fixture",
+                "abi": [{"type": "fallback", "stateMutability": "payable"}],
+                "source_files": {"WormholeProxy.sol": "contract WormholeProxy { fallback() external payable {} }"},
+                "compiler": {"language": "Solidity", "version": "v0.8.24"},
+                "metadata": {"contract_name": "WormholeProxy"},
+                "proxy_context": {"proxy": "1", "implementation": "0x3333333333333333333333333333333333333333"},
+            },
+            {
+                "chain": "eth",
+                "address": "0x3333333333333333333333333333333333333333",
+                "status": "resolved",
+                "provider": "fixture",
+                "abi": [
+                    {"type": "function", "name": "initialize", "inputs": [], "outputs": [], "stateMutability": "nonpayable"},
+                    {
+                        "type": "function",
+                        "name": "isInitialized",
+                        "inputs": [{"type": "address"}],
+                        "outputs": [{"type": "bool"}],
+                        "stateMutability": "view",
+                    },
+                    {
+                        "type": "function",
+                        "name": "getGuardianSet",
+                        "inputs": [{"type": "uint32"}],
+                        "outputs": [],
+                        "stateMutability": "view",
+                    },
+                    {
+                        "type": "function",
+                        "name": "submitContractUpgrade",
+                        "inputs": [{"type": "bytes"}],
+                        "outputs": [],
+                        "stateMutability": "nonpayable",
+                    },
+                ],
+                "source_files": {
+                    "Implementation.sol": """
+                    contract Implementation {
+                        modifier initializer() {
+                            address implementation = ERC1967Upgrade._getImplementation();
+                            require(!isInitialized(implementation), "already initialized");
+                            setInitialized(implementation);
+                            _;
+                        }
+                        function initialize() initializer public {}
+                        function isInitialized(address) public view returns (bool) {}
+                        function getGuardianSet(uint32) public view {}
+                        function submitContractUpgrade(bytes memory _vm) public {
+                            Structs.VM memory vm = parseVM(_vm);
+                            verifyGovernanceVM(vm);
+                            GovernanceStructs.ContractUpgrade memory upgrade = parseContractUpgrade(vm.payload);
+                            upgradeImplementation(upgrade.newContract);
+                        }
+                        function upgradeImplementation(address newImplementation) internal {
+                            newImplementation.delegatecall(abi.encodeWithSignature("initialize()"));
+                        }
+                        function verifyGovernanceVM(Structs.VM memory vm) internal view {}
+                        string guardianSet;
+                    }
+                    """,
+                },
+                "compiler": {"language": "Solidity", "version": "v0.8.24"},
+                "metadata": {"contract_name": "Implementation"},
+            },
+        ]
+    }
 
 
 if __name__ == "__main__":

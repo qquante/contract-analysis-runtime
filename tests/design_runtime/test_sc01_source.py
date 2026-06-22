@@ -427,8 +427,9 @@ class SC01SourceVerifierTests(unittest.TestCase):
         self.assertNotIn("measurable_proxy_state_delta_required", result["missing_proof_pieces"])
         self.assertIn("testAudiusProxyInitializerReplayChangesGuardian", harness)
 
-    def test_wormhole_uninitialized_implementation_is_source_verified_but_runtime_blocked(self) -> None:
+    def test_wormhole_uninitialized_implementation_builds_runtime_harness(self) -> None:
         fixture = {
+            "target": {"chain": "eth", "address": "0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B"},
             "proxy_context": {"proxy": "1", "implementation": "0x3333333333333333333333333333333333333333"},
             "abi": [{"type": "fallback", "stateMutability": "payable"}],
             "source_files": {"Wormhole.sol": "contract Wormhole { fallback() external payable {} }"},
@@ -472,10 +473,18 @@ class SC01SourceVerifierTests(unittest.TestCase):
         }
 
         result = evaluate_wormhole_uninitialized_implementation(fixture)
+        harness = render_sc01_harness(fixture)
 
         self.assertTrue(result["verified"], result["blockers"])
         self.assertEqual(result["upgrade_signature"], "submitContractUpgrade(bytes)")
-        self.assertIn("wormhole_governance_vm_payload_builder", result["missing_proof_pieces"])
+        self.assertEqual(result["missing_proof_pieces"], [])
+        self.assertEqual(result["runtime_runner"], "wormhole_implementation_runtime")
+        self.assertEqual(result["fork_block_number"], 13_818_843)
+        self.assertIn("testWormholeImplementationInitializerReplayExecutesMaliciousDelegatecall", harness)
+        self.assertIn("MALICIOUS_MARKER_SLOT", harness)
+        self.assertIn("function _signGovernanceVM", harness)
+        self.assertIn("contract MaliciousImplementation", harness)
+        self.assertIn("submitContractUpgrade", harness)
 
     def test_pool_initializer_is_protocol_initializer_not_admin_initializer(self) -> None:
         fixture = {

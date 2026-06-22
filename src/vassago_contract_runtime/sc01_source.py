@@ -138,9 +138,9 @@ def evaluate_access_control_initializer(source_manifest: dict[str, Any]) -> dict
 def evaluate_wormhole_uninitialized_implementation(source_manifest: dict[str, Any]) -> dict[str, Any]:
     """Recognize Wormhole-style initialized-implementation takeover context.
 
-    This verifies the source thesis only. It deliberately does not claim runtime
-    readiness because an exploit harness still needs a governance VM payload,
-    guardian actor model and malicious implementation contract.
+    This verifies the source thesis and declares the runner requirements. It
+    does not claim live impact; the runtime replay must still compile and pass
+    in a local historical fork.
     """
 
     source_text = _source_text(source_manifest)
@@ -183,19 +183,25 @@ def evaluate_wormhole_uninitialized_implementation(source_manifest: dict[str, An
         "admin_reader": "getGuardianSet(uint32)",
         "actor_model": "attacker_controlled_guardian_after_direct_implementation_initialize",
         "codable_args": [],
-        "missing_proof_pieces": [
-            "wormhole_governance_vm_payload_builder",
+        "missing_proof_pieces": [],
+        "runtime_runner": "wormhole_implementation_runtime",
+        "fork_block_number": 13_818_843,
+        "runtime_strategy": "historical_fork_interface_only",
+        "runtime_components": [
+            "governance_vm_payload_builder",
             "malicious_initializer_implementation_contract",
-            "runtime_runner_wormhole_uninitialized_implementation",
+            "implementation_slot_reader",
         ],
         "measurable_reader": "isInitialized(address), getCurrentGuardianSetIndex(), getGuardianSet(uint32)",
         "measurable_delta": (
-            "Direct implementation initialize marks implementation initialized and enables attacker-controlled "
-            "guardian upgrade path in implementation context."
+            "Direct implementation initialize enables an attacker-controlled guardian set in implementation "
+            "context, and submitContractUpgrade delegates into a malicious implementation that writes a marker "
+            "in historical implementation storage before executing the selfdestruct path in the local fork."
         ),
         "explicit_predicate": (
             "An unauthorized caller can initialize the Wormhole implementation context and then satisfy the "
-            "guardian-governed submitContractUpgrade path against that implementation."
+            "guardian-governed submitContractUpgrade path against that implementation, reaching malicious "
+            "initializer execution in implementation context in the local fork."
         ),
         "evidence_refs": _wormhole_evidence_refs(verified),
     }

@@ -140,6 +140,14 @@ The positive fixture under `tests/fixtures/source_fixture_positive.json` is a
 local regression case for the historical UUPS uninitialized implementation
 pattern. It is not a live-contract severity claim.
 
+Historical runtime runners currently implemented:
+
+- Audius proxy storage collision / delegated initializer replay:
+  local/fork-only, no broadcast, fork block `15201793`;
+- Wormhole uninitialized implementation / guardian VM upgrade replay:
+  local/fork-only, no broadcast, fork block `13818843`, interface-only harness
+  that reads the historical implementation from the proxy EIP-1967 slot.
+
 The adversarial fixture set under
 `tests/fixtures/source_fixture_adversarial.json` covers disabled initializer,
 `tx.origin` authorization, public role-admin mutation and public lifecycle

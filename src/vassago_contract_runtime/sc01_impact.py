@@ -20,6 +20,7 @@ IMPACT_PHASE_ID = "11_impact_review"
 IMPACT_JSON = "sc01-impact-review.json"
 IMPACT_MD = "sc01-impact-review.md"
 AUDIUS_GOVERNANCE_PROXY = "0x4deca517d6817b6510798b7328f2314d3003abac"
+WORMHOLE_PROXY = "0x98f3c9e6e3face36baad05fe09d375ef1464288b"
 
 
 def write_sc01_impact_review(run_dir: str | Path, target_id: str) -> dict[str, Any]:
@@ -55,6 +56,17 @@ def build_sc01_impact_review(run_dir: str | Path, target_id: str) -> dict[str, A
 
     if _is_audius_proxy(address, source_truth):
         return _audius_impact_review(
+            review_id=review_id,
+            run_id=manifest["run_id"],
+            target_id=target_id,
+            target=target,
+            final_report=final_report,
+            assertion=assertion,
+            runtime=runtime,
+            source_truth=source_truth,
+        )
+    if _is_wormhole_proxy(address, source_truth):
+        return _wormhole_impact_review(
             review_id=review_id,
             run_id=manifest["run_id"],
             target_id=target_id,
@@ -208,6 +220,101 @@ def _audius_impact_review(
     }
 
 
+def _wormhole_impact_review(
+    *,
+    review_id: str,
+    run_id: str,
+    target_id: str,
+    target: dict[str, Any],
+    final_report: dict[str, Any],
+    assertion: dict[str, Any],
+    runtime: dict[str, Any],
+    source_truth: dict[str, Any],
+) -> dict[str, Any]:
+    runtime_status = str(runtime.get("status") or final_report.get("runtime_status") or "")
+    assertion_status = str(assertion.get("status") or "")
+    reproduced = runtime_status == "runtime_completed" and assertion_status == "passed"
+    return {
+        "status": "completed",
+        "impact_review_id": review_id,
+        "run_id": run_id,
+        "target_id": target_id,
+        "chain": str(target.get("chain") or final_report.get("chain") or "eth"),
+        "address": str(target.get("address") or final_report.get("address") or WORMHOLE_PROXY),
+        "bug_class": "wormhole_uninitialized_implementation_guardian_takeover",
+        "summary": {
+            "verdict": "historical_reproduced_critical" if reproduced else "historical_context_runtime_not_reproduced",
+            "severity_posture": "critical_historical_do_not_claim_live_without_current_state_review",
+            "reasoning": (
+                "The local historical fork replay proves that an uninitialized Wormhole implementation context "
+                "can be initialized with an attacker guardian and can reach the guardian-governed "
+                "submitContractUpgrade path into a malicious implementation. Public Immunefi context describes "
+                "this as a critical historical issue that could have locked protocol funds; this artifact does "
+                "not prove current live exploitability."
+            ),
+        },
+        "historical_impact": {
+            "severity": "critical_historical",
+            "affected_system": "Wormhole Ethereum core bridge implementation context",
+            "reported_assets_at_risk": "about $1.8B at submission time per public Immunefi review",
+            "reported_loss_context": "fixed before funds were lost",
+            "impact_classes": [
+                "guardian_takeover_in_implementation_context",
+                "malicious_upgrade_path",
+                "potential_bridge_fund_lock_or_denial_of_service",
+            ],
+        },
+        "local_reproduction": {
+            "status": runtime_status,
+            "assertion_status": assertion_status,
+            "evidence_status": assertion.get("evidence_status"),
+            "predicate": assertion.get("predicate"),
+            "measured_delta": assertion.get("measured_delta"),
+            "final_status": final_report.get("final_status"),
+            "runtime_ready_count": final_report.get("runtime_ready_count"),
+            "source_truth_verified_count": final_report.get("source_truth_verified_count"),
+            "no_broadcast": bool(runtime.get("no_broadcast", True)),
+            "fork_block_number": 13_818_843,
+        },
+        "current_live_risk": {
+            "status": "not_claimed",
+            "reason": (
+                "Wormhole publicly fixed the uninitialized implementation. This run uses a historical fork block "
+                "and does not perform current-state verification of the live proxy, implementation and guardian state."
+            ),
+            "required_to_upgrade_to_live_severity": [
+                "current implementation slot and code hash",
+                "current implementation initializer state",
+                "current guardian set and upgrade governance state",
+                "proof that the same direct implementation initialize path is still callable",
+            ],
+        },
+        "source_truth": {
+            "status": source_truth.get("status"),
+            "verified_count": source_truth.get("source_truth_verified_count"),
+            "evidence_kinds": sorted({str(item.get("evidence_kind")) for item in source_truth.get("reviews") or []}),
+        },
+        "external_context": {
+            "status": "public_historical_context",
+            "sources": [
+                {
+                    "name": "Immunefi Wormhole uninitialized proxy bugfix review",
+                    "url": "https://immunefi.com/blog/bug-fix-reviews/wormhole-uninitialized-proxy-bugfix-review/",
+                },
+                {
+                    "name": "Immunefi Wormhole uninitialized PoC repository",
+                    "url": "https://github.com/immunefi-team/wormhole-uninitialized",
+                },
+            ],
+        },
+        "next_steps": [
+            "Keep this as historical reproduced critical unless current exploitability is independently revalidated.",
+            "Use this runner as a regression pattern for implementation-context initializer bugs.",
+            "Move Nomad to a separate bridge root/proof mapper; do not reuse this Wormhole VM runner for Nomad.",
+        ],
+    }
+
+
 def _generic_sc01_impact_review(
     *,
     review_id: str,
@@ -259,5 +366,14 @@ def _is_audius_proxy(address: str, source_truth: dict[str, Any]) -> bool:
         return True
     return any(
         item.get("evidence_kind") == "proxy_storage_collision_reinitializer"
+        for item in source_truth.get("reviews") or []
+    )
+
+
+def _is_wormhole_proxy(address: str, source_truth: dict[str, Any]) -> bool:
+    if address.lower() == WORMHOLE_PROXY:
+        return True
+    return any(
+        item.get("evidence_kind") == "wormhole_uninitialized_implementation"
         for item in source_truth.get("reviews") or []
     )

@@ -1507,3 +1507,68 @@ Decision:
   context, but runtime remains blocked correctly.
 - Next slice is a Wormhole-specific VM/payload and malicious implementation
   harness builder.
+
+## PT-027.T10 - Wormhole historical fork runtime runner
+
+Status: done implementation slice, 2026-06-21.
+
+Implemented:
+
+- added `src/vassago_contract_runtime/sc01_wormhole.py`;
+- added interface-only `VassagoSC01Harness` for Wormhole:
+  - reads the historical implementation from the proxy EIP-1967 slot with
+    `vm.load`;
+  - initializes the implementation context with an attacker guardian;
+  - builds and signs a Wormhole governance VM payload locally with `vm.sign`;
+  - deploys `MaliciousImplementation` and delegates into `selfdestruct`;
+  - asserts historical implementation code length becomes zero in the fork.
+- `CompileOnlyAdapter` and `RuntimeFoundryAdapter` now choose the Wormhole
+  harness only for the canonical Wormhole proxy target.
+- `RuntimeFoundryAdapter` now uses Wormhole fork block `13_818_843`.
+- `SourceTruthAdapter` now emits `runtime_runner=wormhole_implementation_runtime`
+  when Wormhole source truth is complete.
+- `OnChainStateAdapter` accepts the Wormhole runner as local/fork state ready.
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source tests.design_runtime.test_phases
+```
+
+Observed:
+
+```text
+32 tests passed
+```
+
+Real smoke:
+
+```powershell
+$env:PYTHONPATH='src'
+$env:ETHERSCAN_API_KEY = '<cache-only-placeholder>'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v16-wormhole-runtime --bootstrap-adapters --source-cache-dir runs/sc01-historical-6-v11-audius-runtime/_cache/etherscan-v2 --runtime-authorized
+python -m vassago_contract_runtime.cli impact-review --run runs/sc01-historical-6-v16-wormhole-runtime --target-id CT-24700f446e33
+```
+
+Observed Wormhole result:
+
+- target id: `CT-24700f446e33`;
+- `compile_status=compile_only_passed`;
+- `runtime_status=runtime_completed`;
+- `[PASS] testWormholeImplementationInitializerReplayExecutesMaliciousDelegatecall()`;
+- `assertion-result.status=passed`;
+- `evidence_status=runtime_local`;
+- `no_broadcast=true`;
+- fork block: `13_818_843`;
+- impact review verdict: `historical_reproduced_critical`;
+- current live risk: `not_claimed`.
+
+Important limits:
+
+- this is local/fork-only and uses no broadcast;
+- this proves historical local/fork reachability of the malicious initializer
+  delegatecall path, not current live exploitability;
+- the selfdestruct path remains in the harness, but the immediate assertion is
+  a storage marker written during malicious delegatecall because code deletion
+  is a transaction-final effect and newer EVM semantics differ.

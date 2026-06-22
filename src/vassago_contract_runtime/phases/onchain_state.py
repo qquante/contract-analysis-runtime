@@ -41,7 +41,7 @@ class OnChainStateAdapter:
                         "target_id": context.target.target_id,
                         "role_graph_nodes": list(role_graph.get("nodes") or []),
                         "role_graph_edges": list(role_graph.get("edges") or []),
-                        "actor_model": "any_external_caller",
+                        "actor_model": verified_initializer.get("actor_model") or "any_external_caller",
                         "reader": verified_initializer.get("measurable_reader"),
                         "delta": verified_initializer.get("measurable_delta"),
                         "evidence_status": "static_only",
@@ -101,6 +101,7 @@ def _verified_initializer_review(source_truth: dict) -> dict | None:
             "initializer_runtime",
             "access_control_initializer_runtime",
             "proxy_storage_collision_runtime",
+            "wormhole_implementation_runtime",
         }:
             return review
     return None

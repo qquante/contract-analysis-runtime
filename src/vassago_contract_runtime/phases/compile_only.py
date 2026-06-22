@@ -17,6 +17,11 @@ from vassago_contract_runtime.sc01_source import (
     should_use_access_control_initializer_harness,
     should_use_uups_initializer_harness,
 )
+from vassago_contract_runtime.sc01_wormhole import (
+    render_wormhole_harness,
+    should_use_wormhole_harness,
+    wormhole_foundry_toml,
+)
 
 
 class CompileOnlyAdapter:
@@ -48,8 +53,9 @@ class CompileOnlyAdapter:
         item = FoundryHarnessInput(
             target_id=context.target.target_id,
             harness_name="VassagoSC01Harness",
-            source_files=dict(source_manifest.get("source_files") or {}),
+            source_files=_source_files_for_harness(source_manifest),
             test_files={"VassagoSC01Harness.t.sol": harness},
+            foundry_toml=wormhole_foundry_toml(source_manifest),
             metadata={"compile_ready": True, "runtime_ready": False},
         )
         foundry_result = self.foundry.compile_harness(item)
@@ -75,6 +81,12 @@ def _read_json(context: PhaseContext, phase_id: str, name: str) -> dict:
     return payload
 
 
+def _source_files_for_harness(source_manifest: dict) -> dict[str, str]:
+    if should_use_wormhole_harness(source_manifest):
+        return {}
+    return dict(source_manifest.get("source_files") or {})
+
+
 def _sentinel_harness() -> str:
     return "\n".join(
         [
@@ -94,6 +106,8 @@ def _sentinel_harness() -> str:
 def render_sc01_harness(source_manifest: dict) -> str:
     if should_use_proxy_storage_collision_harness(source_manifest):
         return render_proxy_storage_collision_harness(source_manifest)
+    if should_use_wormhole_harness(source_manifest):
+        return render_wormhole_harness(source_manifest)
     if should_use_uups_initializer_harness(source_manifest):
         return _uups_initializer_harness(source_manifest)
     if should_use_access_control_initializer_harness(source_manifest):

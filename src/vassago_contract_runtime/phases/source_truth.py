@@ -129,14 +129,14 @@ def _review_queue_item(
         )
     wormhole = evaluate_wormhole_uninitialized_implementation(source_manifest)
     if item.get("thesis_id") == "uninitialized_implementation_proxy" and wormhole.get("verified") is True:
-        return _verified_but_runtime_blocked_review(
+        return _verified_runtime_specific_review(
             item,
             functions,
             related_surface,
             related_guards,
             related_writes,
             wormhole,
-            runtime_runner="wormhole_implementation_runtime_required",
+            runtime_runner="wormhole_implementation_runtime",
             evidence_kind="wormhole_uninitialized_implementation",
         )
     evaluation = evaluate_uninitialized_uups_initializer(source_manifest)
@@ -274,7 +274,7 @@ def _partial_proxy_collision_review(
     }
 
 
-def _verified_but_runtime_blocked_review(
+def _verified_runtime_specific_review(
     item: dict[str, Any],
     functions: list[str],
     related_surface: list[dict[str, Any]],
@@ -285,18 +285,20 @@ def _verified_but_runtime_blocked_review(
     runtime_runner: str,
     evidence_kind: str,
 ) -> dict[str, Any]:
+    missing = list(evaluation.get("missing_proof_pieces") or [])
+    complete = not missing
     return {
         "source_truth_id": f"ST-{short_hash(str(item.get('queue_id')))}",
         "queue_id": item.get("queue_id"),
         "candidate_id": item.get("candidate_id"),
         "thesis_id": item.get("thesis_id"),
-        "status": "source_truth_verified_runtime_blocked",
+        "status": "source_truth_verified" if complete else "source_truth_verified_runtime_blocked",
         "source_truth_verified": True,
         "evidence_kind": evidence_kind,
         "matched_functions": functions,
         "related_guard_classes": [guard.get("guard_class") for guard in related_guards],
         "related_state_variables": [write.get("variable") for write in related_writes],
-        "missing_proof_pieces": list(evaluation.get("missing_proof_pieces") or []),
+        "missing_proof_pieces": missing,
         "runtime_runner": runtime_runner,
         "actor_model": evaluation.get("actor_model") or "needs_runtime_actor_model",
         "codable_args": list(evaluation.get("codable_args") or []),
@@ -304,7 +306,10 @@ def _verified_but_runtime_blocked_review(
         "measurable_delta": evaluation.get("measurable_delta"),
         "explicit_predicate": evaluation.get("explicit_predicate"),
         "implementation_address": evaluation.get("implementation_address"),
-        "next_required_adapter": runtime_runner,
+        "fork_block_number": evaluation.get("fork_block_number"),
+        "runtime_strategy": evaluation.get("runtime_strategy"),
+        "runtime_components": list(evaluation.get("runtime_components") or []),
+        "next_required_adapter": "compile_only_then_local_foundry" if complete else runtime_runner,
         "evidence_refs": _refs(related_surface, related_guards, related_writes)
         + list(evaluation.get("evidence_refs") or []),
     }

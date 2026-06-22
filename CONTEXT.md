@@ -449,7 +449,8 @@ python -m vassago_contract_runtime.cli impact-review --run runs/sc01-historical-
 ## Current Wormhole Blocker State
 
 Wormhole is no longer blocked at acquisition. The runtime now indexes related
-implementation ABI/source for proxies.
+implementation ABI/source for proxies and has a dedicated historical fork
+runner.
 
 Baseline:
 
@@ -462,13 +463,35 @@ Current Wormhole status:
 - target id: `CT-24700f446e33`;
 - queue count: `3`;
 - source-truth verified count: `1`;
-- evidence kind: `wormhole_uninitialized_implementation`;
-- foundry allowed: `false`.
+- evidence kind: `wormhole_uninitialized_implementation`.
 
-Remaining Wormhole blockers:
+Runner implementation:
 
-- `wormhole_governance_vm_payload_builder`;
-- `malicious_initializer_implementation_contract`;
-- `runtime_runner_wormhole_uninitialized_implementation`.
+- module: `src/vassago_contract_runtime/sc01_wormhole.py`;
+- runtime runner: `wormhole_implementation_runtime`;
+- fork block: `13_818_843`;
+- harness: interface-only, reads EIP-1967 implementation slot with `vm.load`,
+  signs governance VM with local `vm.sign`, and asserts implementation code
+  destruction in the local fork;
+- no broadcast and no private key outside the local Foundry test key.
 
-Do not run Wormhole Foundry runtime until these pieces exist.
+Current Wormhole runtime evidence:
+
+- run: `runs/sc01-historical-6-v16-wormhole-runtime`;
+- target id: `CT-24700f446e33`;
+- compile: `compile_only_passed`;
+- runtime: `runtime_completed`;
+- assertion: `passed`;
+- Foundry test:
+  `testWormholeImplementationInitializerReplayExecutesMaliciousDelegatecall`;
+- impact review:
+  `runs/sc01-historical-6-v16-wormhole-runtime/targets/CT-24700f446e33/phases/11_impact_review/sc01-impact-review.json`;
+- impact verdict: `historical_reproduced_critical`;
+- current live risk: `not_claimed`.
+
+Interpretation:
+
+- Wormhole is historically reproduced in a local fork, no broadcast.
+- Do not claim current live exploitability without a fresh current-state review.
+- Next historical blocker is Nomad root/proof bridge mapping, which is a
+  separate bridge-specific mapper and should not reuse the Wormhole VM runner.

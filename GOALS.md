@@ -56,6 +56,9 @@ Acceptance:
   transparent proxy admin paths, initialized EIP-1967 proxy context, protocol
   pool/factory creation, token approval/operator APIs and caller-funded
   accounting/lifecycle behavior.
+- historical Wormhole runner is implemented as a local/fork-only harness behind
+  the same compile/runtime gates. It is not a live-chain action and still needs
+  real archive-fork smoke before impact wording.
 
 ## G-004 - Small top-level agent Interface
 
@@ -89,7 +92,8 @@ Acceptance:
   `role_admin_escalation` and `public_lifecycle_noise`.
 - remaining records still needed for Safe/module, bridge endpoint/source,
   ERC4337 validator and metamorphic guard edge cases.
-- Audius-style `proxy_storage_collision_reinitializer` is now represented as
-  corpus knowledge and reaches source-backed readiness through implementation
-  source/initializer/write evidence, but remains non-runtime until delegated
-  initializer calldata and proxy-state delta are measurable.
+- Audius-style `proxy_storage_collision_reinitializer` is represented as corpus
+  knowledge and has a historical local/fork reproduction plus conservative
+  impact review.
+- Wormhole-style uninitialized implementation context is represented as
+  source-truth knowledge and now has a dedicated VM/payload runtime harness.

@@ -1778,3 +1778,134 @@ Run full regression before commit:
 `git diff --check`. Then commit this slice. Next implementation is the
 Wormhole runtime builder: generate governance VM payload scaffolding,
 malicious initializer implementation contract and a local-only Foundry runner.
+
+## 2026-06-21 - PT-027.T10 Wormhole Runtime Runner
+
+Goal:
+
+- Implement the Wormhole-specific local/fork Foundry runner requested after
+  `PT-027.T09`.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/sc01_wormhole.py`.
+- Added a self-contained Solidity harness that:
+  - uses `vm.load(proxy, EIP1967_IMPLEMENTATION_SLOT)` to resolve the
+    historical implementation at fork time;
+  - calls implementation `initialize(address[],uint16,uint16,bytes32)`;
+  - creates a local attacker guardian with `vm.addr`/`vm.sign`;
+  - builds a governance VM payload for `submitContractUpgrade(bytes)`;
+  - deploys a `MaliciousImplementation` whose initializer delegatecalls a
+    `Destructor.selfdestruct`;
+  - asserts implementation code is destroyed on the fork.
+- Wired Wormhole harness selection into:
+  - `src/vassago_contract_runtime/phases/compile_only.py`;
+  - `src/vassago_contract_runtime/phases/runtime_foundry.py`.
+- Changed Wormhole source truth from blocked runtime pieces to:
+  - `runtime_runner=wormhole_implementation_runtime`;
+  - `fork_block_number=13818843`;
+  - `runtime_strategy=historical_fork_interface_only`.
+- Added Wormhole runner support in
+  `src/vassago_contract_runtime/phases/onchain_state.py`.
+- Added tests in:
+  - `tests/design_runtime/test_sc01_source.py`;
+  - `tests/design_runtime/test_phases.py`.
+
+Validation so far:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source tests.design_runtime.test_phases
+```
+
+Observed:
+
+```text
+32 tests passed
+```
+
+Decisions and reasoning:
+
+- The harness is interface-only. Current Etherscan source is the patched
+  implementation and must not be compiled as if it were the historical target.
+- The fork block is fixed at `13_818_843`, matching the historical PoC window
+  before Wormhole initialized the implementation.
+- No broadcast, no private key, no raw transaction and no live chain write are
+  used. The guardian key is a local Foundry test key only.
+
+Blockers / in progress:
+
+- Real fork smoke has not yet been run in this slice.
+- It requires an archive-capable Ethereum RPC in
+  `VASSAGO_FORK_RPC_URL` or `VASSAGO_FORK_RPC_FALLBACK_ETH_URL`.
+- If the provider cannot serve block `13_818_843`, the runtime result must be
+  `blocked` or `inconclusive`, not reproduced.
+
+RESUME FROM HERE:
+
+Run full regression:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`;
+`$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check`;
+`git diff --check`.
+If the env has an archive Ethereum fork URL, run historical-6 with
+`--runtime-authorized` into a new `runs/sc01-historical-6-v15-wormhole-runtime`
+artifact and inspect target `CT-24700f446e33`.
+
+## 2026-06-21 - PT-027.T10 Wormhole Runtime Smoke + Impact
+
+Goal:
+
+- Run the Wormhole-specific harness on a real historical fork and separate
+  runtime evidence from impact/severity wording.
+
+What was done:
+
+- Loaded fork RPCs from the old Vassago `.env` into the process without printing
+  values.
+- Ran:
+  `python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v16-wormhole-runtime --bootstrap-adapters --source-cache-dir runs/sc01-historical-6-v11-audius-runtime/_cache/etherscan-v2 --runtime-authorized`.
+- Initial v15 runtime failed because the test asserted `implementation.code.length == 0`
+  inside the same transaction. That was the wrong measurable predicate for the
+  Foundry test boundary.
+- Adjusted the Wormhole harness to write and assert a deterministic marker in
+  implementation storage during malicious delegatecall.
+- Kept the selfdestruct path in the malicious initializer, but no longer uses
+  same-transaction code deletion as the assertion.
+- Added Wormhole-specific impact review in
+  `src/vassago_contract_runtime/sc01_impact.py`.
+- Generated impact artifacts under
+  `runs/sc01-historical-6-v16-wormhole-runtime/targets/CT-24700f446e33/phases/11_impact_review/`.
+
+Observed:
+
+- run id: `RUN-07be0359b9b4`;
+- executed phases: `66`;
+- failed phases: `0`;
+- Wormhole compile: `compile_only_passed`;
+- Wormhole runtime: `runtime_completed`;
+- assertion: `passed`;
+- Foundry test:
+  `[PASS] testWormholeImplementationInitializerReplayExecutesMaliciousDelegatecall()`;
+- impact review verdict: `historical_reproduced_critical`;
+- current live risk: `not_claimed`;
+- broadcast: no.
+
+Decision:
+
+- Wormhole is now historically reproduced in local fork as SC01 runtime
+  evidence.
+- Severity wording must remain historical unless current live state is
+  independently revalidated.
+- Nomad remains a separate bridge root/proof mapper; do not generalize the
+  Wormhole VM runner.
+
+RESUME FROM HERE:
+
+Run final regression after this slice:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`;
+`$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check`;
+`git diff --check`.
+If clean, commit with a message like
+`feat(sc01): add wormhole historical runtime runner`.
+Next technical task: Nomad bridge root/proof mapper, not another Wormhole
+iteration.

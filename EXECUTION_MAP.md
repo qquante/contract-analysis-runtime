@@ -68,6 +68,7 @@ PT-027.T06 Audius proxy storage collision base - done 2026-06-21, run baseline r
 PT-027.T07 Audius proxy collision runtime mapper - done 2026-06-21, run baseline runs/sc01-historical-6-v11-audius-runtime
 PT-027.T08 Audius impact review sidecar - done 2026-06-21, artifact baseline runs/sc01-historical-6-v11-audius-runtime/.../11_impact_review
 PT-027.T09 Wormhole implementation/UUPS context source-truth - done first slice 2026-06-21, run baseline runs/sc01-historical-6-v14-wormhole-source-truth
+PT-027.T10 Wormhole historical fork runtime runner - done 2026-06-21, run baseline runs/sc01-historical-6-v16-wormhole-runtime
 ```
 
 ## Current Next Up
@@ -79,10 +80,9 @@ PT-027.T09 Wormhole implementation/UUPS context source-truth - done first slice 
 2. Implement high-signal target acquisition instead of broad random expansion:
    weak `_authorizeUpgrade`, initialized proxy state impact, concrete
    role-admin graph, Safe/AA/module sidecars with measurable deltas.
-3. Build the next Wormhole runtime pieces:
-   governance VM payload builder, malicious initializer implementation and
-   local-only Foundry runner. Wormhole source truth is now verified but runtime
-   is blocked.
+3. Use `runs/sc01-historical-6-v16-wormhole-runtime` as the Wormhole
+   historical local/fork runtime baseline. Impact review exists and says
+   `historical_reproduced_critical`, with current live risk `not_claimed`.
 4. Build mappers for the remaining historical blockers: Nomad bridge
    root/proof, Furucombo delegatecall/proxy-storage and Alchemix keeper-state.
 5. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
