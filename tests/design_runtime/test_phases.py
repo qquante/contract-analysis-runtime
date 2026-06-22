@@ -300,6 +300,41 @@ class BootstrapPhaseTests(unittest.TestCase):
             review = source_truth["reviews"][0]
             self.assertEqual(review["measurable_reader"], "ownerProxy1()")
 
+    def test_proxy_upgrade_impact_reaches_compile_ready_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source_fixture = Path(tmp) / "proxy-impact-source.json"
+            source_fixture.write_text(json.dumps(_proxy_impact_source_fixture()), encoding="utf-8")
+            design = load_design(Path("designs") / "sc01-access" / "design.yaml")
+            target = ContractTarget("eth", "0x1111111111111111111111111111111111111111")
+            foundry = _FakeFoundry()
+            adapters = {
+                "00_intake": IntakeAdapter(),
+                "01_dossier": DossierAdapter(FixtureSourceResolver.from_file(source_fixture)),
+                "02_semantic_surface": SemanticSurfaceAdapter(),
+                "03_corpus_motifs": CorpusMotifsAdapter.from_design_dir("designs/sc01-access"),
+                "04_thesis_acquisition": ThesisAcquisitionAdapter(),
+                "05_source_truth": SourceTruthAdapter(),
+                "06_onchain_state": OnChainStateAdapter(),
+                "07_proof_pieces": ProofPiecesAdapter(),
+                "08_compile_only": CompileOnlyAdapter(foundry),
+            }
+
+            run_design(design, [target], Path(tmp) / "run", adapters, RunOptions(resume=True))
+
+            target_dir = Path(tmp) / "run" / "targets" / target.target_id / "phases"
+            source_truth = json.loads((target_dir / "05_source_truth" / "sc01-source-truth.json").read_text())
+            impact = json.loads((target_dir / "06_onchain_state" / "proxy-upgrade-impact-review.json").read_text())
+            runtime_ready = json.loads((target_dir / "07_proof_pieces" / "sc01-runtime-ready.json").read_text())
+            compile_result = json.loads((target_dir / "08_compile_only" / "compile-result.json").read_text())
+            harness = (target_dir / "08_compile_only" / "VassagoSC01Harness.t.sol").read_text()
+            self.assertEqual(source_truth["source_truth_verified_count"], 1)
+            self.assertEqual(impact["status"], "proxy_impact_ready")
+            self.assertEqual(runtime_ready["runtime_ready_count"], 1)
+            self.assertEqual(runtime_ready["foundry_allowed"], True)
+            self.assertEqual(compile_result["status"], "compile_only_passed")
+            self.assertIn("testProxyInitializerCanChangeProxyState", harness)
+            self.assertIn('address constant TARGET = address(bytes20(hex"1111111111111111111111111111111111111111"));', harness)
+
     def test_intake_and_dossier_adapters_write_real_bootstrap_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             design = load_design(Path("designs") / "sc01-access" / "design.yaml")
@@ -841,6 +876,87 @@ def _nomad_source_fixture() -> dict:
                 "source_files": {"Replica.sol": replica_source},
                 "compiler": {"language": "Solidity", "version": "v0.7.6"},
                 "metadata": {"contract_name": "Replica"},
+            },
+        ]
+    }
+
+
+def _proxy_impact_source_fixture() -> dict:
+    return {
+        "targets": [
+            {
+                "chain": "eth",
+                "address": "0x1111111111111111111111111111111111111111",
+                "status": "resolved",
+                "provider": "fixture",
+                "abi": [{"type": "fallback", "stateMutability": "payable"}],
+                "source_files": {
+                    "Proxy.sol": """
+                    contract Proxy {
+                        bytes32 internal constant _IMPLEMENTATION_SLOT = bytes32(uint256(1));
+                        constructor(address logic) payable { logic; }
+                        fallback() external payable {
+                            address implementation = address(0x2222222222222222222222222222222222222222);
+                            assembly {
+                                let result := delegatecall(gas(), implementation, 0, calldatasize(), 0, 0)
+                                result
+                            }
+                        }
+                    }
+                    """
+                },
+                "compiler": {"language": "Solidity", "version": "v0.8.20"},
+                "metadata": {"contract_name": "Proxy"},
+                "proxy_context": {
+                    "proxy": "1",
+                    "implementation": "0x2222222222222222222222222222222222222222",
+                },
+            },
+            {
+                "chain": "eth",
+                "address": "0x2222222222222222222222222222222222222222",
+                "status": "resolved",
+                "provider": "fixture",
+                "abi": [
+                    {
+                        "type": "function",
+                        "name": "initialize",
+                        "inputs": [
+                            {"type": "address"},
+                            {"type": "address"},
+                            {"type": "uint16"},
+                            {"type": "address"},
+                        ],
+                        "outputs": [],
+                        "stateMutability": "nonpayable",
+                    },
+                    {
+                        "type": "function",
+                        "name": "owner",
+                        "inputs": [],
+                        "outputs": [{"type": "address"}],
+                        "stateMutability": "view",
+                    },
+                ],
+                "source_files": {
+                    "Vault.sol": """
+                    contract Vault {
+                        address public owner;
+                        address public registry;
+                        uint16 public vaultVersion;
+                        address public baseCurrency;
+                        function initialize(address owner_, address registry_, uint16 vaultVersion_, address baseCurrency_) external {
+                            require(vaultVersion == 0 && owner == address(0), "already initialized");
+                            owner = owner_;
+                            registry = registry_;
+                            vaultVersion = vaultVersion_;
+                            baseCurrency = baseCurrency_;
+                        }
+                    }
+                    """
+                },
+                "compiler": {"language": "Solidity", "version": "v0.8.20"},
+                "metadata": {"contract_name": "Vault"},
             },
         ]
     }

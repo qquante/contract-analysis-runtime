@@ -11,6 +11,7 @@ from vassago_contract_runtime.sc01_alchemix import alchemix_fork, should_use_alc
 from vassago_contract_runtime.sc01_furucombo import furucombo_fork, should_use_furucombo_harness
 from vassago_contract_runtime.sc01_nomad import nomad_fork, should_use_nomad_harness
 from vassago_contract_runtime.sc01_proxy_collision import proxy_storage_collision_fork
+from vassago_contract_runtime.sc01_proxy_impact import proxy_upgrade_fork
 from vassago_contract_runtime.sc01_wormhole import should_use_wormhole_harness, wormhole_fork, wormhole_foundry_toml
 
 
@@ -36,12 +37,13 @@ class RuntimeFoundryAdapter:
         fork = (
             furucombo_fork(source_manifest)
             or alchemix_fork(source_manifest)
+            or proxy_upgrade_fork(source_manifest)
             or proxy_storage_collision_fork(source_manifest)
             or wormhole_fork(source_manifest)
             or nomad_fork(source_manifest)
         )
         if fork.get("requires_rpc_url"):
-            rpc_url = os.environ.get("VASSAGO_FORK_RPC_URL") or os.environ.get("VASSAGO_FORK_RPC_FALLBACK_ETH_URL")
+            rpc_url = _rpc_url_for_fork(fork)
             if not rpc_url:
                 return _blocked(context, "blocked_runtime_fork_rpc_required", ["fork_rpc_url_required"])
             fork = {key: value for key, value in fork.items() if key != "requires_rpc_url"}
@@ -88,6 +90,19 @@ def _read_json(context: PhaseContext, phase_id: str, name: str) -> dict:
     if not isinstance(payload, dict):
         raise ValueError(f"Expected JSON artifact for {phase_id}/{name}")
     return payload
+
+
+def _rpc_url_for_fork(fork: dict) -> str:
+    chain = str(fork.get("chain") or "").upper().replace("-", "_")
+    candidates = []
+    if chain:
+        candidates.append(f"VASSAGO_FORK_RPC_{chain}_URL")
+    candidates.extend(["VASSAGO_FORK_RPC_URL", "VASSAGO_FORK_RPC_FALLBACK_ETH_URL"])
+    for name in candidates:
+        value = os.environ.get(name)
+        if value:
+            return value
+    return ""
 
 
 def _blocked(context: PhaseContext, status: str, blockers: list[str]) -> PhaseResult:

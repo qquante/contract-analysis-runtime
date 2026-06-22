@@ -10,6 +10,7 @@ from vassago_contract_runtime.sc01_proxy_collision import (
     render_proxy_storage_collision_harness,
     should_use_proxy_storage_collision_harness,
 )
+from vassago_contract_runtime.sc01_proxy_impact import render_proxy_upgrade_harness, should_use_proxy_upgrade_harness
 from vassago_contract_runtime.sc01_nomad import render_nomad_harness, should_use_nomad_harness
 from vassago_contract_runtime.sc01_source import (
     contract_name_for_source,
@@ -90,6 +91,7 @@ def _source_files_for_harness(source_manifest: dict) -> dict[str, str]:
         or should_use_nomad_harness(source_manifest)
         or should_use_furucombo_harness(source_manifest)
         or should_use_alchemix_harness(source_manifest)
+        or should_use_proxy_upgrade_harness(source_manifest)
     ):
         return {}
     return dict(source_manifest.get("source_files") or {})
@@ -118,6 +120,8 @@ def render_sc01_harness(source_manifest: dict) -> str:
         return render_alchemix_harness(source_manifest)
     if should_use_proxy_storage_collision_harness(source_manifest):
         return render_proxy_storage_collision_harness(source_manifest)
+    if should_use_proxy_upgrade_harness(source_manifest):
+        return render_proxy_upgrade_harness(source_manifest)
     if should_use_wormhole_harness(source_manifest):
         return render_wormhole_harness(source_manifest)
     if should_use_nomad_harness(source_manifest):

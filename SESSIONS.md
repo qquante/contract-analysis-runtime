@@ -2807,3 +2807,77 @@ Next implementation is `PT-028.T12`: build a proxy impact/proof-piece reader
 that proves or rejects `proxy_or_implementation_state_impact` for the verified
 initializer case using source/ABI/storage, still without Foundry unless a fresh
 report has `runtime_ready_count > 0`.
+
+## 2026-06-22 - PT-028.T12 Proxy Impact/Proof-Piece Reader
+
+Goal:
+
+- Prove or reject `proxy_or_implementation_state_impact` for the T11 verified
+  proxy initializer case.
+- Move to the Foundry gate only if source/ABI/proxy evidence proves delegatecall
+  writes proxy storage and compile-only passes.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/sc01_proxy_impact.py`.
+- Updated phase `06_onchain_state` to write
+  `proxy-upgrade-impact-review.json`.
+- Updated phase `07_proof_pieces` to consume that sidecar and remove
+  `proxy_or_implementation_state_impact` only for a matching ready
+  `source_truth_id`.
+- Updated phase `08_compile_only` to render a proxy-initializer harness instead
+  of a sentinel when proxy impact is ready.
+- Updated phase `09_runtime_foundry` to support chain-specific fork RPC env
+  vars such as `VASSAGO_FORK_RPC_OPTIMISM_URL`.
+- Fixed Foundry subprocess decoding on Windows by using UTF-8 with
+  replacement.
+
+Commands:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_impact tests.design_runtime.test_sc01_proxy_semantics tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_phases tests.design_runtime.test_provider_adapters
+python -m vassago_contract_runtime.cli check
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t12-v2 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t12-v2 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t12-v2\historical-stage-failure
+```
+
+Observed:
+
+```text
+focused tests: Ran 47 tests, OK
+check: passed
+family rerun: executed_count=220 failed_count=0 target_count=20
+runtime_ready_count=1
+ready target: CT-5c096b36038c
+proxy-upgrade-impact-review.json.status=proxy_impact_ready
+compile-result.json.status=compile_only_passed
+runtime stage=authorization pending
+```
+
+Decisions and reasoning:
+
+- The impact gate is source/ABI/proxy backed: it requires proxy delegatecall
+  evidence, related implementation source, initializer, and proxy-callable
+  reader.
+- The ready candidate is now at the door of runtime Foundry, but no runtime
+  evidence exists yet.
+- Runtime was not executed because this run intentionally omitted
+  `--runtime-authorized`, and no Optimism fork RPC was present in the
+  environment.
+
+Blockers:
+
+- `VASSAGO_FORK_RPC_OPTIMISM_URL` or `VASSAGO_FORK_RPC_URL` must be configured
+  before running PT-028.T13.
+
+RESUME FROM HERE:
+
+Run full regression:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`.
+Run `python -m vassago_contract_runtime.cli check` and `git diff --check`.
+Commit T12 if green.
+Next implementation is `PT-028.T13`: set an Optimism fork RPC, rerun
+`runs\_selected\proxy-upgrade-t08-targets.json` with `--runtime-authorized`,
+and inspect only target `CT-5c096b36038c`. No private key, no broadcast, no
+live transaction.

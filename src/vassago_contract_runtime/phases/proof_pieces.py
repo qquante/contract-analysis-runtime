@@ -6,6 +6,7 @@ from typing import Any
 
 from vassago_contract_runtime.design_runtime.models import short_hash
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
+from vassago_contract_runtime.sc01_proxy_impact import IMPACT_PIECE, proxy_impact_ready_for_review
 
 
 class ProofPiecesAdapter:
@@ -30,8 +31,9 @@ class ProofPiecesAdapter:
         admin_state = _read_optional_json(context, "06_onchain_state", "admin-state.json")
         proxy_state = _read_optional_json(context, "06_onchain_state", "proxy-state.json")
         role_state = _read_optional_json(context, "06_onchain_state", "role-state.json")
+        proxy_impact = _read_optional_json(context, "06_onchain_state", "proxy-upgrade-impact-review.json")
         reviews = list(source_truth.get("reviews") or [])
-        pieces = [_proof_piece(review, admin_state, proxy_state, role_state) for review in reviews]
+        pieces = [_proof_piece(review, admin_state, proxy_state, role_state, proxy_impact) for review in reviews]
         hypotheses = [_hypothesis(piece) for piece in pieces if piece["non_compile_pieces_complete"]]
         runtime_ready = [item for item in hypotheses if item["runtime_ready"]]
         compile_ready = [item for item in hypotheses if item["compile_ready"]]
@@ -93,9 +95,20 @@ def _read_optional_json(context: PhaseContext, phase_id: str, name: str) -> dict
         return {"status": "missing", "blockers": [f"{phase_id}/{name}_missing"]}
 
 
-def _proof_piece(review: dict[str, Any], admin_state: dict, proxy_state: dict, role_state: dict) -> dict[str, Any]:
+def _proof_piece(
+    review: dict[str, Any],
+    admin_state: dict,
+    proxy_state: dict,
+    role_state: dict,
+    proxy_impact: dict,
+) -> dict[str, Any]:
     raw_missing = review.get("missing_proof_pieces")
     missing = set(raw_missing if raw_missing is not None else ProofPiecesAdapter.REQUIRED_PIECES)
+    impact_ready = proxy_impact_ready_for_review(proxy_impact, str(review.get("source_truth_id") or ""))
+    impact_refs = []
+    if impact_ready and IMPACT_PIECE in missing:
+        missing.remove(IMPACT_PIECE)
+        impact_refs = list(impact_ready.get("evidence_refs") or [])
     state_blockers = []
     for state in (admin_state, proxy_state, role_state):
         state_blockers.extend(state.get("blockers") or [])
@@ -117,7 +130,8 @@ def _proof_piece(review: dict[str, Any], admin_state: dict, proxy_state: dict, r
         "present_pieces": sorted(set(ProofPiecesAdapter.REQUIRED_PIECES) - missing),
         "missing_pieces": sorted(missing),
         "state_blockers": sorted(set(str(item) for item in state_blockers)),
-        "evidence_refs": list(review.get("evidence_refs") or []),
+        "proxy_impact_status": impact_ready.get("impact_status") if impact_ready else None,
+        "evidence_refs": list(review.get("evidence_refs") or []) + impact_refs,
     }
 
 

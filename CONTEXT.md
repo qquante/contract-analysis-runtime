@@ -1024,3 +1024,58 @@ Interpretation:
   missing `proxy_or_implementation_state_impact`;
 - next task is `PT-028.T12`: prove or reject proxy/implementation state impact
   from source/ABI/storage readers before considering Foundry.
+
+## PT-028.T12 Proxy Impact/Proof-Piece State
+
+`PT-028.T12` adds the proxy/implementation impact gate needed after T11.
+
+Files:
+
+- `src/vassago_contract_runtime/sc01_proxy_impact.py`
+- `src/vassago_contract_runtime/phases/onchain_state.py`
+- `src/vassago_contract_runtime/phases/proof_pieces.py`
+- `src/vassago_contract_runtime/phases/compile_only.py`
+- `src/vassago_contract_runtime/phases/runtime_foundry.py`
+- `tests/design_runtime/test_sc01_proxy_impact.py`
+- `tests/design_runtime/test_phases.py`
+
+Behavior:
+
+- phase `06_onchain_state` writes `proxy-upgrade-impact-review.json`;
+- phase `07_proof_pieces` removes `proxy_or_implementation_state_impact`
+  only when `proxy-upgrade-impact-review.json` has a matching ready
+  `source_truth_id`;
+- phase `08_compile_only` renders a real proxy-initializer harness for this
+  path instead of the sentinel harness;
+- phase `09_runtime_foundry` can resolve chain-specific fork RPC env vars such
+  as `VASSAGO_FORK_RPC_OPTIMISM_URL`.
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_impact tests.design_runtime.test_sc01_proxy_semantics tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_phases tests.design_runtime.test_provider_adapters
+python -m vassago_contract_runtime.cli check
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t12-v2 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t12-v2 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t12-v2\historical-stage-failure
+```
+
+Observed:
+
+```text
+focused tests: Ran 47 tests, OK
+check: passed
+T12 family rerun: executed_count=220 failed_count=0 target_count=20
+runtime_ready_count=1
+ready target: CT-5c096b36038c
+impact status: proxy_impact_ready
+compile status: compile_only_passed
+runtime: not executed, authorization pending
+```
+
+Current interpretation:
+
+- the proxy initializer candidate is now at the Foundry runtime gate;
+- no runtime evidence is claimed yet;
+- next task is `PT-028.T13`: set an Optimism fork RPC and run local Foundry
+  with `--runtime-authorized`, still no broadcast.

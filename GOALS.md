@@ -155,10 +155,13 @@ Current state:
   `05_source_truth`: `proxy-upgrade-dossier.json`,
   `proxy-upgrade-semantic-proposals.json` and
   `proxy-upgrade-proposal-validation.json`.
-- The current proxy/upgrade blocker is no longer source/proxy context or
-  semantic mapping. It is proxy/implementation state impact:
-  `runtime_ready_count=0`, with the verified initializer case still missing
-  `proxy_or_implementation_state_impact`.
+- `PT-028.T12` added proxy impact review:
+  `proxy-upgrade-impact-review.json`. The current proxy-upgrade family run
+  `runs/sc01-historical-proxy-upgrade-t12-v2` has `runtime_ready_count=1`,
+  target `CT-5c096b36038c`, and `compile_only_passed`.
+- The current proxy/upgrade blocker is runtime execution environment, not
+  source/proxy context: an Optimism fork RPC and explicit runtime authorization
+  are required before any local Foundry runtime.
 
 Non-goal:
 

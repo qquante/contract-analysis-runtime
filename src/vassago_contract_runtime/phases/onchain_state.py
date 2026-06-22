@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from vassago_contract_runtime.sc01_nomad import NOMAD_EXPLOIT_FORK_BLOCK, build_nomad_root_proof_analysis
+from vassago_contract_runtime.sc01_proxy_impact import build_proxy_upgrade_impact_review
 from vassago_contract_runtime.design_runtime.runner import PhaseContext, PhaseResult
 
 
@@ -13,10 +14,14 @@ class OnChainStateAdapter:
         source_manifest = _read_json(context, "01_dossier", "source-manifest.json")
         role_graph = _read_json(context, "02_semantic_surface", "role-graph.json")
         source_truth = _read_json(context, "05_source_truth", "sc01-source-truth.json")
+        proxy_validation = _read_optional_json(context, "05_source_truth", "proxy-upgrade-proposal-validation.json")
+        proxy_impact = build_proxy_upgrade_impact_review(source_manifest, source_truth, proxy_validation)
         proxy_context = dict(source_manifest.get("proxy_context") or {})
         nomad_review = _verified_runtime_review(source_truth, {"nomad_bridge_root_proof_runtime"})
         if nomad_review:
             return _nomad_state_result(context, source_manifest, role_graph, source_truth, nomad_review)
+        if proxy_impact.get("impact_ready_count"):
+            return _proxy_impact_state_result(context, source_manifest, role_graph, source_truth, proxy_impact)
         verified_initializer = _verified_initializer_review(source_truth)
         if verified_initializer:
             return PhaseResult.completed(
@@ -54,6 +59,7 @@ class OnChainStateAdapter:
                         "note": "Role state is asserted only for local Foundry reproduction.",
                         "blockers": [],
                     },
+                    "proxy-upgrade-impact-review.json": proxy_impact,
                 }
             )
         return PhaseResult.completed(
@@ -82,6 +88,7 @@ class OnChainStateAdapter:
                     "evidence_status": "static_only",
                     "blockers": ["role_reader_or_event_history_required"],
                 },
+                "proxy-upgrade-impact-review.json": proxy_impact,
             }
         )
 
@@ -92,6 +99,13 @@ def _read_json(context: PhaseContext, phase_id: str, name: str) -> dict:
     if not isinstance(payload, dict):
         raise ValueError(f"Expected JSON artifact for {phase_id}/{name}")
     return payload
+
+
+def _read_optional_json(context: PhaseContext, phase_id: str, name: str) -> dict:
+    try:
+        return _read_json(context, phase_id, name)
+    except Exception:
+        return {"status": "missing", "blockers": [f"{phase_id}/{name}_missing"]}
 
 
 def _admin_candidates(role_graph: dict) -> list[dict]:
@@ -153,6 +167,54 @@ def _nomad_state_result(
                 "evidence_status": "static_only",
                 "blockers": [],
             },
+        }
+    )
+
+
+def _proxy_impact_state_result(
+    context: PhaseContext,
+    source_manifest: dict,
+    role_graph: dict,
+    source_truth: dict,
+    proxy_impact: dict,
+) -> PhaseResult:
+    ready = next((item for item in proxy_impact.get("reviews") or [] if item.get("impact_ready") is True), {})
+    return PhaseResult.completed(
+        json_artifacts={
+            "admin-state.json": {
+                "status": "proxy_initializer_admin_state_ready",
+                "target_id": context.target.target_id,
+                "admin_candidates": _admin_candidates(role_graph),
+                "source_truth_review_count": source_truth.get("review_count", 0),
+                "reader": ready.get("measurable_reader"),
+                "post_condition": ready.get("explicit_predicate"),
+                "evidence_status": "static_only",
+                "note": "Static readiness only. Runtime must execute on a local fork and never broadcasts.",
+                "blockers": [],
+            },
+            "proxy-state.json": {
+                "status": "proxy_delegatecall_impact_ready",
+                "target_id": context.target.target_id,
+                "proxy_context": dict(source_manifest.get("proxy_context") or {}),
+                "execution_address": ready.get("execution_address"),
+                "implementation_address": ready.get("implementation_address"),
+                "state_owner": ready.get("state_owner"),
+                "runtime_strategy": ready.get("runtime_strategy"),
+                "evidence_status": "static_only",
+                "blockers": [],
+            },
+            "role-state.json": {
+                "status": "proxy_initializer_actor_state_ready",
+                "target_id": context.target.target_id,
+                "role_graph_nodes": list(role_graph.get("nodes") or []),
+                "role_graph_edges": list(role_graph.get("edges") or []),
+                "actor_model": "unauthorized_external_initializer_caller",
+                "reader": ready.get("measurable_reader"),
+                "delta": ready.get("measurable_delta"),
+                "evidence_status": "static_only",
+                "blockers": [],
+            },
+            "proxy-upgrade-impact-review.json": proxy_impact,
         }
     )
 

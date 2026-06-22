@@ -1697,6 +1697,62 @@ Interpretation:
 - the next test target is `PT-028.T12`, proving or rejecting
   `proxy_or_implementation_state_impact` for the verified initializer case.
 
+## PT-028.T12 proxy impact/proof-piece reader
+
+Focused regression:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_impact tests.design_runtime.test_sc01_proxy_semantics tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_phases tests.design_runtime.test_provider_adapters
+python -m vassago_contract_runtime.cli check
+```
+
+Observed:
+
+```text
+focused regression: Ran 47 tests, OK
+check: passed, failed_count=0
+```
+
+Fresh proxy-upgrade family rerun:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t12-v2 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t12-v2 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t12-v2\historical-stage-failure
+```
+
+Observed:
+
+```text
+run-design executed_count=220 failed_count=0 target_count=20
+stage report:
+  04_no_thesis_candidate=3
+  05_source_truth_not_verified=16
+  09_runtime_authorization_pending=1
+  runtime_ready_count=1
+ready target: CT-5c096b36038c
+impact: proxy_impact_ready
+compile-only: compile_only_passed
+runtime: not executed, explicit authorization still required
+```
+
+Generated harness excerpt:
+
+```solidity
+interface IVassagoProxyInitializerTarget {
+    function initialize(address arg0, address arg1, uint16 arg2, address arg3) external;
+    function owner() external view returns (address);
+}
+```
+
+Interpretation:
+
+- T12 reached the Foundry runtime gate for one proxy initializer candidate.
+- No runtime evidence or exploit claim was produced.
+- Next validation is a local/fork runtime with `VASSAGO_FORK_RPC_OPTIMISM_URL`
+  or `VASSAGO_FORK_RPC_URL` plus `--runtime-authorized`.
+
 Observed:
 
 ```text

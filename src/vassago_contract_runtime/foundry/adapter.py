@@ -157,6 +157,8 @@ def _run_subprocess(command: list[str], cwd: Path, timeout_seconds: int) -> subp
         cwd=cwd,
         timeout=timeout_seconds,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )

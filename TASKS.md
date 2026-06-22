@@ -26,9 +26,9 @@ PT-028.T05 post-run scorer is implemented as
 
 ## NEXT UP
 
-1. `PT-028.T12` - proxy impact/proof-piece reader for the one verified
-   initializer case: prove or reject `proxy_or_implementation_state_impact`
-   from source/ABI/storage, without labels or addresses as detector logic.
+1. `PT-028.T13` - proxy initializer runtime Foundry local/fork for the one
+   T12-ready case. Requires an Optimism fork RPC via
+   `VASSAGO_FORK_RPC_OPTIMISM_URL` or generic `VASSAGO_FORK_RPC_URL`.
 2. `PT-028.T06` - expand corpus beyond 100 using DeFiHackLabs, DeFiVulnLabs,
    SmartContractAttackPoC, Rekt/SlowMist incident lists and manually verified
    addresses.
@@ -2303,7 +2303,7 @@ Result:
 
 ## PT-028.T12 - Proxy impact/proof-piece reader
 
-Status: queued.
+Status: done first slice, 2026-06-22.
 
 Goal:
 
@@ -2321,6 +2321,69 @@ Rules:
 - no Foundry unless the fresh report has `runtime_ready_count > 0`;
 - no address/label-specific shortcut;
 - no live transaction or broadcast.
+
+Implemented:
+
+- Added `src/vassago_contract_runtime/sc01_proxy_impact.py`.
+- Phase `06_onchain_state` now writes `proxy-upgrade-impact-review.json`.
+- Phase `07_proof_pieces` consumes the impact sidecar and removes
+  `proxy_or_implementation_state_impact` only for a matching ready
+  `source_truth_id`.
+- Phase `08_compile_only` renders a proxy-initializer harness instead of a
+  sentinel when the proxy impact gate is ready.
+- Phase `09_runtime_foundry` supports chain-specific fork RPC env vars such as
+  `VASSAGO_FORK_RPC_OPTIMISM_URL`.
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_proxy_impact tests.design_runtime.test_sc01_proxy_semantics tests.design_runtime.test_sc01_proxy_upgrade tests.design_runtime.test_phases tests.design_runtime.test_provider_adapters
+python -m vassago_contract_runtime.cli check
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t08-targets.json --output runs\sc01-historical-proxy-upgrade-t12-v2 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t12-v2 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t12-v2\historical-stage-failure
+```
+
+Observed:
+
+```text
+focused tests: Ran 47 tests, OK
+check: passed
+T12 family rerun: executed_count=220 failed_count=0 target_count=20
+runtime_ready_count=1
+runtime_ready target: CT-5c096b36038c
+impact status: proxy_impact_ready
+compile status: compile_only_passed
+runtime stage: authorization pending, no runtime executed
+```
+
+Result:
+
+- The Arcadia-style proxy initializer candidate reached the door of Foundry:
+  source truth, impact sidecar, proof pieces and compile-only all passed.
+- No runtime evidence has been claimed.
+- Next task is `PT-028.T13`: run the local/fork runtime only with explicit
+  runtime authorization and a configured Optimism fork RPC. Expected outcomes
+  are `runtime_completed` or `not_reproduced/runtime_failed`; no broadcast.
+
+## PT-028.T13 - Proxy initializer runtime Foundry local/fork
+
+Status: queued.
+
+Goal:
+
+- execute the T12 compile-passed harness for `CT-5c096b36038c` on a local
+  Optimism fork;
+- measure whether calling `initialize(address,address,uint16,address)` through
+  the proxy changes `owner()` on fork state;
+- record `foundry-runtime-result.json`, `assertion-result.json` and evidence
+  only under local/fork scope.
+
+Prerequisites:
+
+- set `VASSAGO_FORK_RPC_OPTIMISM_URL` or `VASSAGO_FORK_RPC_URL`;
+- run with `--runtime-authorized`;
+- no private key, no broadcast, no live transaction.
 
 ## PT-028.T06 - Corpus expansion to 100+
 
