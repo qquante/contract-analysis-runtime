@@ -184,6 +184,8 @@ def _surface_function(
         "stateMutability": function.get("stateMutability"),
         "inputs": inputs,
         "outputs": list(function.get("outputs") or []),
+        "source_relation": function.get("source_relation") or "target",
+        "execution_context": function.get("execution_context") or "target",
         "source_excerpt": body[:2000],
         "source_status": "found" if body else "not_found",
         "guard_signals": _guard_signals(body),
@@ -217,6 +219,8 @@ def _surface_function_from_slither(
         "stateMutability": function.get("stateMutability") or slither_function.get("stateMutability"),
         "inputs": list(function.get("inputs") or []),
         "outputs": list(function.get("outputs") or []),
+        "source_relation": function.get("source_relation") or "target",
+        "execution_context": function.get("execution_context") or "target",
         "source_excerpt": body[:2000],
         "source_status": "found" if body else "not_found",
         "guard_signals": guard_signals,
@@ -232,12 +236,22 @@ def _surface_function_from_slither(
 def _find_function_body(name: str, source_manifest: dict[str, Any]) -> str:
     if not name:
         return ""
-    for source in (source_manifest.get("source_files") or {}).values():
+    for source in _all_source_values(source_manifest):
         text = str(source)
         match = re.search(rf"function\s+{re.escape(name)}\s*\([^)]*\)(?P<body>[\s\S]{{0,2400}})", text)
         if match:
             return match.group(0)
     return ""
+
+
+def _all_source_values(source_manifest: dict[str, Any]) -> list[str]:
+    values = [str(value) for value in (source_manifest.get("source_files") or {}).values()]
+    related = source_manifest.get("related_sources")
+    if isinstance(related, dict):
+        for item in related.values():
+            if isinstance(item, dict):
+                values.extend(str(value) for value in (item.get("source_files") or {}).values())
+    return values
 
 
 def _guard_signals(body: str) -> list[str]:
@@ -366,7 +380,7 @@ def _state_write_map(functions: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _role_graph(functions: list[dict[str, Any]], source_manifest: dict[str, Any]) -> dict[str, Any]:
-    source_text = " ".join(str(value) for value in (source_manifest.get("source_files") or {}).values())
+    source_text = " ".join(_all_source_values(source_manifest))
     nodes = []
     edges = []
     if "owner" in source_text:

@@ -12,6 +12,7 @@ from .design_runtime.models import ModelValidationError
 from .mcp import run_stdio
 from .quality import run_checks
 from .runtime_api import read_artifact_from_payload, resume_design_from_payload, run_design_from_payload
+from .sc01_impact import write_sc01_impact_review
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -76,6 +77,10 @@ def main(argv: list[str] | None = None) -> int:
     artifact_read.add_argument("--run", required=True, help="Run directory.")
     artifact_read.add_argument("--uri", required=True, help="Artifact URI.")
 
+    impact_review = sub.add_parser("impact-review", help="Write an SC01 impact review sidecar for one target.")
+    impact_review.add_argument("--run", required=True, help="Run directory.")
+    impact_review.add_argument("--target-id", required=True, help="Target id inside the run.")
+
     mcp = sub.add_parser("mcp", help="Run the local MCP server.")
     mcp.add_argument("--stdio", action="store_true", help="Use stdio transport.")
 
@@ -91,6 +96,8 @@ def main(argv: list[str] | None = None) -> int:
             return _resume_command(args)
         if args.command == "artifact-read":
             return _artifact_read_command(args)
+        if args.command == "impact-review":
+            return _impact_review_command(args)
         if args.command == "mcp":
             if not args.stdio:
                 raise ValueError("Only local stdio MCP is supported. Pass --stdio.")
@@ -143,6 +150,12 @@ def _artifact_read_command(args: argparse.Namespace) -> int:
     else:
         print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
+
+
+def _impact_review_command(args: argparse.Namespace) -> int:
+    payload = write_sc01_impact_review(args.run, args.target_id)
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0 if payload["status"] == "completed" else 1
 
 
 if __name__ == "__main__":

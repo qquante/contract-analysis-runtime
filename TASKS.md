@@ -1429,3 +1429,81 @@ Audius result:
 
 This is historical fork/local evidence for Audius. It is not a current live
 funds-at-risk claim.
+
+## PT-027.T08 - Audius impact review sidecar
+
+Status: done, 2026-06-21.
+
+Implemented:
+
+- added `src/vassago_contract_runtime/sc01_impact.py`;
+- added CLI command:
+  `python -m vassago_contract_runtime.cli impact-review --run <run> --target-id <target>`;
+- writes:
+  - `11_impact_review/sc01-impact-review.json`;
+  - `11_impact_review/sc01-impact-review.md`.
+
+Validated artifact:
+
+```text
+runs/sc01-historical-6-v11-audius-runtime/targets/CT-3f08e02c1bef/phases/11_impact_review/sc01-impact-review.json
+```
+
+Audius impact review result:
+
+- `verdict=historical_reproduced_critical`;
+- `historical_impact.severity=critical_historical`;
+- `local_reproduction.status=runtime_completed`;
+- `local_reproduction.assertion_status=passed`;
+- `current_live_risk.status=not_claimed`;
+- `no_broadcast=true`.
+
+Decision:
+
+- Audius can be discussed as historical reproduced critical.
+- Do not claim current live high/critical severity without a fresh current-state
+  review of patched deployments, proxy state, token balances and permissions.
+
+## PT-027.T09 - Wormhole implementation/UUPS context blocker
+
+Status: done first slice, 2026-06-21.
+
+Implemented:
+
+- `DossierAdapter` now indexes functions/events from
+  `related_sources.implementation` with:
+  - `source_relation=proxy_implementation`;
+  - `execution_context=proxy_delegatecall`.
+- `SemanticSurfaceAdapter` now finds function bodies in related implementation
+  sources.
+- SC01 source recognizers now evaluate effective proxy + implementation
+  ABI/source.
+- added `evaluate_wormhole_uninitialized_implementation()`.
+
+Validated run:
+
+```powershell
+$env:PYTHONPATH='src'
+$env:ETHERSCAN_API_KEY = 'cache-only-placeholder'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v14-wormhole-source-truth --bootstrap-adapters --source-cache-dir runs/sc01-historical-6-v11-audius-runtime/_cache/etherscan-v2
+```
+
+Wormhole result:
+
+- target id: `CT-24700f446e33`;
+- queue count changed from `0` to `3`;
+- `source_truth_verified_count=1`;
+- evidence kind: `wormhole_uninitialized_implementation`;
+- `implementation_address=0x3c3d457f1522d3540ab3325aa5f1864e34cba9d0`;
+- `foundry_allowed=false`;
+- missing runtime pieces:
+  - `wormhole_governance_vm_payload_builder`;
+  - `malicious_initializer_implementation_contract`;
+  - `runtime_runner_wormhole_uninitialized_implementation`.
+
+Decision:
+
+- Wormhole is now source-truth verified for the historical implementation
+  context, but runtime remains blocked correctly.
+- Next slice is a Wormhole-specific VM/payload and malicious implementation
+  harness builder.

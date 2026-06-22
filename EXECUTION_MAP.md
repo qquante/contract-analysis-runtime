@@ -66,6 +66,8 @@ PT-027.T04 high-signal target acquisition before any larger batch
 PT-027.T05 historical SC01 curated runtime suite - done 2026-06-21, run baseline runs/sc01-historical-6-v4-runtime
 PT-027.T06 Audius proxy storage collision base - done 2026-06-21, run baseline runs/sc01-historical-6-v9-audius-privileged-writes-live
 PT-027.T07 Audius proxy collision runtime mapper - done 2026-06-21, run baseline runs/sc01-historical-6-v11-audius-runtime
+PT-027.T08 Audius impact review sidecar - done 2026-06-21, artifact baseline runs/sc01-historical-6-v11-audius-runtime/.../11_impact_review
+PT-027.T09 Wormhole implementation/UUPS context source-truth - done first slice 2026-06-21, run baseline runs/sc01-historical-6-v14-wormhole-source-truth
 ```
 
 ## Current Next Up
@@ -77,11 +79,14 @@ PT-027.T07 Audius proxy collision runtime mapper - done 2026-06-21, run baseline
 2. Implement high-signal target acquisition instead of broad random expansion:
    weak `_authorizeUpgrade`, initialized proxy state impact, concrete
    role-admin graph, Safe/AA/module sidecars with measurable deltas.
-3. Build mappers for the remaining historical blockers: Nomad bridge
-   root/proof, Furucombo delegatecall/proxy-storage, Alchemix keeper-state and
-   Wormhole implementation/UUPS context.
-4. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
+3. Build the next Wormhole runtime pieces:
+   governance VM payload builder, malicious initializer implementation and
+   local-only Foundry runner. Wormhole source truth is now verified but runtime
+   is blocked.
+4. Build mappers for the remaining historical blockers: Nomad bridge
+   root/proof, Furucombo delegatecall/proxy-storage and Alchemix keeper-state.
+5. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
    Safe/module, bridge endpoint/source and ERC4337 validator.
-5. Add per-target Slither/source summary only if a larger real smoke shows
+6. Add per-target Slither/source summary only if a larger real smoke shows
    repeated compiler/import misses.
-6. Implement PT-026.T04 A2A card after the design runtime remains stable.
+7. Implement PT-026.T04 A2A card after the design runtime remains stable.

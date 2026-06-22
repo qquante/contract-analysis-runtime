@@ -1681,3 +1681,100 @@ Use `runs/sc01-historical-6-v11-audius-runtime` as the current Audius runtime
 baseline. Next productive blocker is either Wormhole implementation/UUPS
 context or Nomad bridge root/proof mapper. Keep runtime local/fork only, with
 no broadcast and no severity claim without explicit impact review.
+
+## S-20260621-027 - Audius impact review + Wormhole implementation context
+
+Goal:
+
+- Add a conservative impact review for the reproduced Audius historical case.
+- Move the next historical blocker, Wormhole, past the empty-queue state by
+  indexing proxy implementation context.
+
+What changed:
+
+- Added `src/vassago_contract_runtime/sc01_impact.py`.
+- Added CLI command `impact-review`.
+- Added `tests/design_runtime/test_sc01_impact.py`.
+- `DossierAdapter` now includes implementation ABI functions/events when
+  Explorer reports `proxy_context.implementation`.
+- `SemanticSurfaceAdapter` searches `related_sources.*.source_files`.
+- `sc01_source.py` now evaluates effective proxy + implementation ABI/source.
+- Added `evaluate_wormhole_uninitialized_implementation()`.
+- `SourceTruthAdapter` can emit
+  `source_truth_verified_runtime_blocked` for Wormhole.
+
+Audius impact review command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli impact-review --run runs/sc01-historical-6-v11-audius-runtime --target-id CT-3f08e02c1bef
+```
+
+Audius impact artifact:
+
+```text
+runs/sc01-historical-6-v11-audius-runtime/targets/CT-3f08e02c1bef/phases/11_impact_review/sc01-impact-review.json
+```
+
+Observed Audius result:
+
+- `verdict=historical_reproduced_critical`;
+- `historical_impact.severity=critical_historical`;
+- `current_live_risk.status=not_claimed`;
+- `local_reproduction.status=runtime_completed`;
+- `local_reproduction.assertion_status=passed`;
+- `no_broadcast=true`.
+
+Wormhole rerun command:
+
+```powershell
+$env:PYTHONPATH='src'
+$env:ETHERSCAN_API_KEY = 'cache-only-placeholder'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v14-wormhole-source-truth --bootstrap-adapters --source-cache-dir runs/sc01-historical-6-v11-audius-runtime/_cache/etherscan-v2
+```
+
+Observed Wormhole result:
+
+- `queue_count=3`;
+- `source_truth_verified_count=1`;
+- evidence kind: `wormhole_uninitialized_implementation`;
+- `foundry_allowed=false`;
+- blockers are now specific:
+  `wormhole_governance_vm_payload_builder`,
+  `malicious_initializer_implementation_contract`,
+  `runtime_runner_wormhole_uninitialized_implementation`.
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source tests.design_runtime.test_phases tests.design_runtime.test_sc01_impact
+python -m vassago_contract_runtime.cli check
+```
+
+Observed:
+
+- focused tests: `32 passed`;
+- check: `status=passed`, `failed_count=0`.
+
+Decisions:
+
+- Audius is historical reproduced critical, not current live severity.
+- Wormhole should not run Foundry yet. It needs a dedicated VM/payload builder
+  and malicious implementation harness before runtime.
+- Use implementation-aware indexing for all proxy targets going forward.
+
+Blockers:
+
+- `ETHERSCAN_API_KEY` is not loaded by default in a fresh shell. Existing cache
+  can be reused with a non-secret cache-only placeholder, but fresh Explorer calls
+  need the real key loaded securely.
+
+RESUME FROM HERE:
+
+Run full regression before commit:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`,
+`$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check`, and
+`git diff --check`. Then commit this slice. Next implementation is the
+Wormhole runtime builder: generate governance VM payload scaffolding,
+malicious initializer implementation contract and a local-only Foundry runner.

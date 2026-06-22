@@ -144,6 +144,72 @@ class BootstrapPhaseTests(unittest.TestCase):
                 compile_context["solc_remaps"],
             )
 
+    def test_proxy_dossier_indexes_related_implementation_functions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source_fixture = Path(tmp) / "source.json"
+            source_fixture.write_text(
+                json.dumps(
+                    {
+                        "targets": [
+                            {
+                                "chain": "eth",
+                                "address": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                                "status": "resolved",
+                                "provider": "fixture",
+                                "abi": [{"type": "fallback", "stateMutability": "payable"}],
+                                "source_files": {"Proxy.sol": "contract Proxy { fallback() external payable {} }"},
+                                "compiler": {"language": "Solidity", "version": "v0.8.20"},
+                                "metadata": {"contract_name": "Proxy"},
+                                "proxy_context": {
+                                    "proxy": "1",
+                                    "implementation": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                                },
+                            },
+                            {
+                                "chain": "eth",
+                                "address": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                                "status": "resolved",
+                                "provider": "fixture",
+                                "abi": [
+                                    {
+                                        "type": "function",
+                                        "name": "initialize",
+                                        "inputs": [],
+                                        "outputs": [],
+                                        "stateMutability": "nonpayable",
+                                    }
+                                ],
+                                "source_files": {
+                                    "Implementation.sol": "contract Implementation { function initialize() external {} }"
+                                },
+                                "compiler": {"language": "Solidity", "version": "v0.8.20"},
+                                "metadata": {"contract_name": "Implementation"},
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            design = load_design(Path("designs") / "sc01-access" / "design.yaml")
+            target = ContractTarget("eth", "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            adapters = {
+                "00_intake": IntakeAdapter(),
+                "01_dossier": DossierAdapter(FixtureSourceResolver.from_file(source_fixture)),
+                "02_semantic_surface": SemanticSurfaceAdapter(),
+            }
+
+            run_design(design, [target], Path(tmp) / "run", adapters, RunOptions(resume=True))
+
+            target_dir = Path(tmp) / "run" / "targets" / target.target_id / "phases"
+            function_index = json.loads((target_dir / "01_dossier" / "function-index.json").read_text())
+            surface = json.loads((target_dir / "02_semantic_surface" / "access-surface.json").read_text())
+            initialize_index = next(item for item in function_index["functions"] if item["name"] == "initialize")
+            initialize_surface = next(item for item in surface["functions"] if item["name"] == "initialize")
+            self.assertEqual(initialize_index["source_relation"], "proxy_implementation")
+            self.assertEqual(initialize_index["execution_context"], "proxy_delegatecall")
+            self.assertEqual(initialize_surface["source_status"], "found")
+            self.assertEqual(initialize_surface["source_relation"], "proxy_implementation")
+
     def test_intake_and_dossier_adapters_write_real_bootstrap_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             design = load_design(Path("designs") / "sc01-access" / "design.yaml")

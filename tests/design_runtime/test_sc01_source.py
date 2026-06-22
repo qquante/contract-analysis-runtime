@@ -10,6 +10,7 @@ from vassago_contract_runtime.sc01_source import (
     evaluate_proxy_storage_collision_reinitializer,
     evaluate_public_normal_behavior,
     evaluate_uninitialized_uups_initializer,
+    evaluate_wormhole_uninitialized_implementation,
 )
 from vassago_contract_runtime.phases.compile_only import render_sc01_harness
 
@@ -425,6 +426,56 @@ class SC01SourceVerifierTests(unittest.TestCase):
         self.assertNotIn("proxy_delegatecall_initializer_calldata_required", result["missing_proof_pieces"])
         self.assertNotIn("measurable_proxy_state_delta_required", result["missing_proof_pieces"])
         self.assertIn("testAudiusProxyInitializerReplayChangesGuardian", harness)
+
+    def test_wormhole_uninitialized_implementation_is_source_verified_but_runtime_blocked(self) -> None:
+        fixture = {
+            "proxy_context": {"proxy": "1", "implementation": "0x3333333333333333333333333333333333333333"},
+            "abi": [{"type": "fallback", "stateMutability": "payable"}],
+            "source_files": {"Wormhole.sol": "contract Wormhole { fallback() external payable {} }"},
+            "related_sources": {
+                "implementation": {
+                    "status": "resolved",
+                    "abi": [
+                        {"type": "function", "name": "initialize", "inputs": [], "outputs": [], "stateMutability": "nonpayable"},
+                        {"type": "function", "name": "isInitialized", "inputs": [{"type": "address"}], "outputs": [{"type": "bool"}], "stateMutability": "view"},
+                        {"type": "function", "name": "getGuardianSet", "inputs": [{"type": "uint32"}], "outputs": [], "stateMutability": "view"},
+                        {"type": "function", "name": "submitContractUpgrade", "inputs": [{"type": "bytes"}], "outputs": [], "stateMutability": "nonpayable"},
+                    ],
+                    "source_files": {
+                        "Implementation.sol": """
+                        contract Implementation {
+                            modifier initializer() {
+                                address implementation = ERC1967Upgrade._getImplementation();
+                                require(!isInitialized(implementation), "already initialized");
+                                setInitialized(implementation);
+                                _;
+                            }
+                            function initialize() initializer public {}
+                            function isInitialized(address) public view returns (bool) {}
+                            function getGuardianSet(uint32) public view {}
+                            function submitContractUpgrade(bytes memory _vm) public {
+                                Structs.VM memory vm = parseVM(_vm);
+                                verifyGovernanceVM(vm);
+                                GovernanceStructs.ContractUpgrade memory upgrade = parseContractUpgrade(vm.payload);
+                                upgradeImplementation(upgrade.newContract);
+                            }
+                            function upgradeImplementation(address newImplementation) internal {
+                                newImplementation.delegatecall(abi.encodeWithSignature("initialize()"));
+                            }
+                            function verifyGovernanceVM(Structs.VM memory vm) internal view {}
+                            string guardianSet;
+                        }
+                        """,
+                    },
+                }
+            },
+        }
+
+        result = evaluate_wormhole_uninitialized_implementation(fixture)
+
+        self.assertTrue(result["verified"], result["blockers"])
+        self.assertEqual(result["upgrade_signature"], "submitContractUpgrade(bytes)")
+        self.assertIn("wormhole_governance_vm_payload_builder", result["missing_proof_pieces"])
 
     def test_pool_initializer_is_protocol_initializer_not_admin_initializer(self) -> None:
         fixture = {

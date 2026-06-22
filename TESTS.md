@@ -871,3 +871,70 @@ Interpretation:
 - Audius is locally reproduced on a historical fork for the proxy storage
   collision / initializer replay thesis.
 - This remains `runtime_local`, not a current live severity claim.
+
+## PT-027.T08/T09 Impact Review + Wormhole Context
+
+Focused regression:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source tests.design_runtime.test_phases tests.design_runtime.test_sc01_impact
+python -m vassago_contract_runtime.cli check
+```
+
+Observed:
+
+```text
+focused tests=32 passed
+check.status=passed
+check.failed_count=0
+```
+
+Audius impact review:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli impact-review --run runs/sc01-historical-6-v11-audius-runtime --target-id CT-3f08e02c1bef
+```
+
+Observed:
+
+```text
+status=completed
+impact_review_id=AIR-148fb9a383d8
+verdict=historical_reproduced_critical
+severity_posture=critical_historical_do_not_claim_live_without_current_state_review
+```
+
+Artifact:
+
+```text
+runs/sc01-historical-6-v11-audius-runtime/targets/CT-3f08e02c1bef/phases/11_impact_review/sc01-impact-review.json
+```
+
+Wormhole source-truth rerun:
+
+```powershell
+$env:PYTHONPATH='src'
+$env:ETHERSCAN_API_KEY = 'cache-only-placeholder'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets tests/fixtures/targets-sc01-historical-6.json --output runs/sc01-historical-6-v14-wormhole-source-truth --bootstrap-adapters --source-cache-dir runs/sc01-historical-6-v11-audius-runtime/_cache/etherscan-v2
+```
+
+Observed:
+
+```text
+executed_count=66
+failed_count=0
+Wormhole queue_count=3
+Wormhole source_truth_verified_count=1
+Wormhole evidence_kind=wormhole_uninitialized_implementation
+Wormhole foundry_allowed=false
+```
+
+Interpretation:
+
+- Audius has impact-review wording suitable for severity discussion, but no
+  current live risk claim.
+- Wormhole implementation context is now recognized and source-truth verified.
+- Wormhole runtime remains blocked until VM payload, malicious initializer
+  implementation and dedicated runner exist.

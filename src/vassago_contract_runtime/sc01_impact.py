@@ -1,0 +1,263 @@
+"""SC01 impact review sidecars.
+
+Impact review is intentionally separated from runtime reproduction. A local
+Foundry replay can prove a predicate, but severity still needs historical
+context and current-state scope. This module writes that distinction as
+auditable artifacts.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from vassago_contract_runtime.artifacts.store import ArtifactStore
+from vassago_contract_runtime.design_runtime.manifest import load_run_manifest
+from vassago_contract_runtime.design_runtime.models import short_hash
+
+
+IMPACT_PHASE_ID = "11_impact_review"
+IMPACT_JSON = "sc01-impact-review.json"
+IMPACT_MD = "sc01-impact-review.md"
+AUDIUS_GOVERNANCE_PROXY = "0x4deca517d6817b6510798b7328f2314d3003abac"
+
+
+def write_sc01_impact_review(run_dir: str | Path, target_id: str) -> dict[str, Any]:
+    """Build and write an SC01 impact review for one completed target."""
+
+    manifest = load_run_manifest(run_dir)
+    store = ArtifactStore(run_dir, manifest["run_id"])
+    review = build_sc01_impact_review(run_dir, target_id)
+    json_artifact = store.write_json_artifact(target_id, IMPACT_PHASE_ID, IMPACT_JSON, review)
+    md_artifact = store.write_text_artifact(target_id, IMPACT_PHASE_ID, IMPACT_MD, render_sc01_impact_review_markdown(review))
+    return {
+        "status": review["status"],
+        "run_id": manifest["run_id"],
+        "target_id": target_id,
+        "impact_review_id": review["impact_review_id"],
+        "artifacts": [json_artifact, md_artifact],
+        "summary": review["summary"],
+    }
+
+
+def build_sc01_impact_review(run_dir: str | Path, target_id: str) -> dict[str, Any]:
+    manifest = load_run_manifest(run_dir)
+    store = ArtifactStore(run_dir, manifest["run_id"])
+    final_report = _read_json(store, target_id, "10_final_report", "sc01-final-report.json")
+    assertion = _read_json(store, target_id, "09_runtime_foundry", "assertion-result.json")
+    runtime = _read_json(store, target_id, "09_runtime_foundry", "foundry-runtime-result.json")
+    source_truth = _read_json(store, target_id, "05_source_truth", "sc01-source-truth.json")
+    source_manifest = _read_json(store, target_id, "01_dossier", "source-manifest.json")
+    target = dict(source_manifest.get("target") or {})
+    address = str(target.get("address") or final_report.get("address") or "").lower()
+    run_id = str(manifest["run_id"])
+    review_id = f"AIR-{short_hash(f'{run_id}|{target_id}|{address}|sc01')}"
+
+    if _is_audius_proxy(address, source_truth):
+        return _audius_impact_review(
+            review_id=review_id,
+            run_id=manifest["run_id"],
+            target_id=target_id,
+            target=target,
+            final_report=final_report,
+            assertion=assertion,
+            runtime=runtime,
+            source_truth=source_truth,
+        )
+    return _generic_sc01_impact_review(
+        review_id=review_id,
+        run_id=manifest["run_id"],
+        target_id=target_id,
+        target=target,
+        final_report=final_report,
+        assertion=assertion,
+        runtime=runtime,
+    )
+
+
+def render_sc01_impact_review_markdown(review: dict[str, Any]) -> str:
+    summary = dict(review.get("summary") or {})
+    current = dict(review.get("current_live_risk") or {})
+    reproduction = dict(review.get("local_reproduction") or {})
+    historical = dict(review.get("historical_impact") or {})
+    lines = [
+        "# SC01 Impact Review",
+        "",
+        f"- Status: `{review.get('status')}`",
+        f"- Impact review id: `{review.get('impact_review_id')}`",
+        f"- Target: `{review.get('chain')}` `{review.get('address')}`",
+        f"- Bug class: `{review.get('bug_class')}`",
+        f"- Summary verdict: `{summary.get('verdict')}`",
+        f"- Severity posture: `{summary.get('severity_posture')}`",
+        f"- Historical severity: `{historical.get('severity')}`",
+        f"- Local runtime: `{reproduction.get('status')}`",
+        f"- Assertion: `{reproduction.get('assertion_status')}`",
+        f"- Current live risk: `{current.get('status')}`",
+        "",
+        "## Reasoning",
+        "",
+        str(summary.get("reasoning") or ""),
+        "",
+        "## Evidence Boundary",
+        "",
+        "- This review does not broadcast transactions.",
+        "- Runtime evidence is local/fork-only.",
+        "- Historical severity is not automatically a current live severity claim.",
+        "",
+    ]
+    for item in review.get("next_steps") or []:
+        if "## Next Steps" not in lines:
+            lines.extend(["## Next Steps", ""])
+        lines.append(f"- {item}")
+    return "\n".join(lines) + "\n"
+
+
+def _audius_impact_review(
+    *,
+    review_id: str,
+    run_id: str,
+    target_id: str,
+    target: dict[str, Any],
+    final_report: dict[str, Any],
+    assertion: dict[str, Any],
+    runtime: dict[str, Any],
+    source_truth: dict[str, Any],
+) -> dict[str, Any]:
+    runtime_status = str(runtime.get("status") or final_report.get("runtime_status") or "")
+    assertion_status = str(assertion.get("status") or "")
+    reproduced = runtime_status == "runtime_completed" and assertion_status == "passed"
+    return {
+        "status": "completed",
+        "impact_review_id": review_id,
+        "run_id": run_id,
+        "target_id": target_id,
+        "chain": str(target.get("chain") or final_report.get("chain") or "eth"),
+        "address": str(target.get("address") or final_report.get("address") or AUDIUS_GOVERNANCE_PROXY),
+        "bug_class": "proxy_storage_collision_reinitializer_governance_takeover",
+        "summary": {
+            "verdict": "historical_reproduced_critical" if reproduced else "historical_context_runtime_not_reproduced",
+            "severity_posture": "critical_historical_do_not_claim_live_without_current_state_review",
+            "reasoning": (
+                "The local fork replay proves that proxy-delegated initialize changes Audius governance privileged "
+                "state. Public post-mortem context records a governance takeover and treasury token transfer. "
+                "This artifact does not prove a current live exploitable balance or unpatched deployment."
+            ),
+        },
+        "historical_impact": {
+            "severity": "critical_historical",
+            "affected_system": "Audius governance, staking and delegation contracts",
+            "reported_assets_moved": "18,564,497 AUDIO",
+            "reported_loss_context": "public reports describe roughly 704 ETH / about $1.08M realized after sale",
+            "impact_classes": [
+                "governance_takeover",
+                "treasury_asset_transfer",
+                "privileged_state_reinitialization",
+            ],
+        },
+        "local_reproduction": {
+            "status": runtime_status,
+            "assertion_status": assertion_status,
+            "evidence_status": assertion.get("evidence_status"),
+            "predicate": assertion.get("predicate"),
+            "measured_delta": assertion.get("measured_delta"),
+            "final_status": final_report.get("final_status"),
+            "runtime_ready_count": final_report.get("runtime_ready_count"),
+            "source_truth_verified_count": final_report.get("source_truth_verified_count"),
+            "no_broadcast": bool(runtime.get("no_broadcast", True)),
+        },
+        "current_live_risk": {
+            "status": "not_claimed",
+            "reason": (
+                "Audius publicly reported remediation. This run did not perform a fresh current-state review of all "
+                "patched contracts, token balances, proxies, governance state and access-control state."
+            ),
+            "required_to_upgrade_to_live_severity": [
+                "current proxy implementation and admin state",
+                "current initializer/reinitializer status",
+                "current treasury/proxy token balances and permissions",
+                "proof that the same call path still mutates privileged proxy storage",
+            ],
+        },
+        "source_truth": {
+            "status": source_truth.get("status"),
+            "verified_count": source_truth.get("source_truth_verified_count"),
+            "evidence_kinds": sorted({str(item.get("evidence_kind")) for item in source_truth.get("reviews") or []}),
+        },
+        "external_context": {
+            "status": "public_historical_context",
+            "sources": [
+                {
+                    "name": "Audius governance takeover post-mortem",
+                    "url": "https://blog.audius.co/article/audius-governance-takeover-post-mortem-7-23-22",
+                },
+                {
+                    "name": "DeFiHackLabs Audius exploit reproduction",
+                    "url": "https://github.com/SunWeb3Sec/DeFiHackLabs/blob/main/src/test/2022-07/Audius_exp.sol",
+                },
+                {
+                    "name": "ChainLight Audius variant scanner",
+                    "url": "https://blog.chainlight.io/en-audius-variant-scanner-scanning-storage-collisions-between-ethereum-contracts-4d2d64b77566",
+                },
+            ],
+        },
+        "next_steps": [
+            "If discussing live severity, run a current-state review against the patched Audius deployments.",
+            "Keep this as historical reproduced critical unless current exploitability is independently revalidated.",
+            "Use the proxy-collision mapper as a regression pattern for Wormhole-style implementation context next.",
+        ],
+    }
+
+
+def _generic_sc01_impact_review(
+    *,
+    review_id: str,
+    run_id: str,
+    target_id: str,
+    target: dict[str, Any],
+    final_report: dict[str, Any],
+    assertion: dict[str, Any],
+    runtime: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "status": "completed",
+        "impact_review_id": review_id,
+        "run_id": run_id,
+        "target_id": target_id,
+        "chain": str(target.get("chain") or final_report.get("chain") or ""),
+        "address": str(target.get("address") or final_report.get("address") or ""),
+        "bug_class": "sc01_access_control",
+        "summary": {
+            "verdict": "impact_not_classified",
+            "severity_posture": "do_not_claim_severity_without_threat_model_and_current_state",
+            "reasoning": "No project-specific impact mapper exists for this target.",
+        },
+        "historical_impact": {"severity": "unclassified"},
+        "local_reproduction": {
+            "status": runtime.get("status"),
+            "assertion_status": assertion.get("status"),
+            "predicate": assertion.get("predicate"),
+            "measured_delta": assertion.get("measured_delta"),
+            "no_broadcast": bool(runtime.get("no_broadcast", True)),
+        },
+        "current_live_risk": {
+            "status": "not_claimed",
+            "reason": "Generic SC01 impact review does not establish current live exploitability.",
+        },
+        "next_steps": ["Add a project-specific impact mapper before discussing severity."],
+    }
+
+
+def _read_json(store: ArtifactStore, target_id: str, phase_id: str, name: str) -> dict[str, Any]:
+    payload = store.read_artifact(store.uri(target_id, phase_id, name))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Expected JSON artifact for {phase_id}/{name}")
+    return payload
+
+
+def _is_audius_proxy(address: str, source_truth: dict[str, Any]) -> bool:
+    if address.lower() == AUDIUS_GOVERNANCE_PROXY:
+        return True
+    return any(
+        item.get("evidence_kind") == "proxy_storage_collision_reinitializer"
+        for item in source_truth.get("reviews") or []
+    )

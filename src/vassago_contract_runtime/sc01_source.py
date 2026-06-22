@@ -20,7 +20,7 @@ def evaluate_uninitialized_uups_initializer(source_manifest: dict[str, Any]) -> 
     """Return source-backed evidence for the UUPS uninitialized initializer thesis."""
 
     source_text = _source_text(source_manifest)
-    abi = list(source_manifest.get("abi") or [])
+    abi = _effective_abi(source_manifest)
     contract_name = _contract_name(source_manifest, source_text)
     init_abi = _abi_function(abi, "initialize")
     upgrade_abi = _abi_function(abi, "upgradeTo") or _abi_function(abi, "upgradeToAndCall")
@@ -80,7 +80,7 @@ def evaluate_access_control_initializer(source_manifest: dict[str, Any]) -> dict
     """
 
     source_text = _source_text(source_manifest)
-    abi = list(source_manifest.get("abi") or [])
+    abi = _effective_abi(source_manifest)
     contract_name = _contract_name(source_manifest, source_text)
     initializer = _function_body(source_text, "initialize")
     init_abi = _abi_function(abi, "initialize")
@@ -132,6 +132,72 @@ def evaluate_access_control_initializer(source_manifest: dict[str, Any]) -> dict
             "hasRole(DEFAULT_ADMIN_ROLE, caller) is true."
         ),
         "evidence_refs": _access_control_evidence_refs(verified, role_setups),
+    }
+
+
+def evaluate_wormhole_uninitialized_implementation(source_manifest: dict[str, Any]) -> dict[str, Any]:
+    """Recognize Wormhole-style initialized-implementation takeover context.
+
+    This verifies the source thesis only. It deliberately does not claim runtime
+    readiness because an exploit harness still needs a governance VM payload,
+    guardian actor model and malicious implementation contract.
+    """
+
+    source_text = _source_text(source_manifest)
+    abi = _effective_abi(source_manifest)
+    proxy_context = dict(source_manifest.get("proxy_context") or {})
+    implementation = str(proxy_context.get("implementation") or "")
+    initializer = _function_body(source_text, "initialize")
+    submit_upgrade = _function_body(source_text, "submitContractUpgrade")
+    blockers = []
+    if not implementation or implementation.lower() in {"0x", "0x0000000000000000000000000000000000000000"}:
+        blockers.append("implementation_address_missing")
+    if not initializer:
+        blockers.append("initialize_function_missing")
+    if initializer and "initializer" not in initializer.get("header", ""):
+        blockers.append("initializer_modifier_missing")
+    if "function isInitialized(address" not in source_text and _abi_function(abi, "isInitialized") is None:
+        blockers.append("is_initialized_reader_missing")
+    if "setInitialized(implementation)" not in source_text:
+        blockers.append("implementation_initialized_marker_missing")
+    if "ERC1967Upgrade._getImplementation()" not in source_text and "_getImplementation()" not in initializer.get("body", ""):
+        blockers.append("implementation_slot_reader_missing")
+    if not submit_upgrade:
+        blockers.append("submit_contract_upgrade_missing")
+    if "verifyGovernanceVM" not in source_text or "guardianSet" not in source_text:
+        blockers.append("guardian_governance_validation_missing")
+    if "upgradeImplementation(upgrade.newContract)" not in source_text:
+        blockers.append("governance_upgrade_sink_missing")
+    if 'delegatecall(abi.encodeWithSignature("initialize()"))' not in source_text:
+        blockers.append("upgrade_initializer_delegatecall_missing")
+
+    verified = not blockers
+    return {
+        "verified": verified,
+        "blockers": blockers,
+        "contract_name": "Wormhole Implementation",
+        "implementation_address": implementation,
+        "initializer_signature": "initialize()",
+        "upgrade_signature": "submitContractUpgrade(bytes)",
+        "admin_variable": "_state.guardianSets",
+        "admin_reader": "getGuardianSet(uint32)",
+        "actor_model": "attacker_controlled_guardian_after_direct_implementation_initialize",
+        "codable_args": [],
+        "missing_proof_pieces": [
+            "wormhole_governance_vm_payload_builder",
+            "malicious_initializer_implementation_contract",
+            "runtime_runner_wormhole_uninitialized_implementation",
+        ],
+        "measurable_reader": "isInitialized(address), getCurrentGuardianSetIndex(), getGuardianSet(uint32)",
+        "measurable_delta": (
+            "Direct implementation initialize marks implementation initialized and enables attacker-controlled "
+            "guardian upgrade path in implementation context."
+        ),
+        "explicit_predicate": (
+            "An unauthorized caller can initialize the Wormhole implementation context and then satisfy the "
+            "guardian-governed submitContractUpgrade path against that implementation."
+        ),
+        "evidence_refs": _wormhole_evidence_refs(verified),
     }
 
 
@@ -411,7 +477,42 @@ def _is_protocol_pool_initializer(source_text: str, matched_functions: list[str]
 
 
 def _source_text(source_manifest: dict[str, Any]) -> str:
-    return "\n".join(str(value) for value in (source_manifest.get("source_files") or {}).values())
+    return "\n".join(_all_source_values(source_manifest))
+
+
+def _all_source_values(source_manifest: dict[str, Any]) -> list[str]:
+    values = [str(value) for value in (source_manifest.get("source_files") or {}).values()]
+    related = source_manifest.get("related_sources")
+    if isinstance(related, dict):
+        for item in related.values():
+            if isinstance(item, dict):
+                values.extend(str(value) for value in (item.get("source_files") or {}).values())
+    return values
+
+
+def _effective_abi(source_manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    abi = list(source_manifest.get("abi") or [])
+    related = source_manifest.get("related_sources")
+    if isinstance(related, dict):
+        for item in related.values():
+            if isinstance(item, dict) and item.get("status") == "resolved":
+                abi.extend(list(item.get("abi") or []))
+    return abi
+
+
+def _wormhole_evidence_refs(verified: bool) -> list[str]:
+    refs = [
+        "source:initialize() initializer",
+        "source:isInitialized(address)",
+        "source:setInitialized(implementation)",
+        "source:submitContractUpgrade(bytes)",
+        "source:verifyGovernanceVM",
+        "source:upgradeImplementation(upgrade.newContract)",
+        "source:newImplementation.delegatecall initialize()",
+    ]
+    if verified:
+        refs.append("explorer:proxy implementation")
+    return refs
 
 
 def _contract_name(source_manifest: dict[str, Any], source_text: str) -> str:

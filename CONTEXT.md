@@ -423,3 +423,52 @@ Current Audius status:
 
 This is historical fork/local reproduction of the Audius initializer replay
 proxy-collision thesis. It is not a current live funds-at-risk claim.
+
+## Current Impact Review State
+
+Audius now has a conservative sidecar impact review:
+
+```text
+runs/sc01-historical-6-v11-audius-runtime/targets/CT-3f08e02c1bef/phases/11_impact_review/sc01-impact-review.json
+```
+
+Current Audius impact posture:
+
+- historical reproduced critical: yes;
+- local/fork runtime assertion: passed;
+- current live severity claim: no;
+- broadcast: no.
+
+Use:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli impact-review --run runs/sc01-historical-6-v11-audius-runtime --target-id CT-3f08e02c1bef
+```
+
+## Current Wormhole Blocker State
+
+Wormhole is no longer blocked at acquisition. The runtime now indexes related
+implementation ABI/source for proxies.
+
+Baseline:
+
+```text
+runs/sc01-historical-6-v14-wormhole-source-truth
+```
+
+Current Wormhole status:
+
+- target id: `CT-24700f446e33`;
+- queue count: `3`;
+- source-truth verified count: `1`;
+- evidence kind: `wormhole_uninitialized_implementation`;
+- foundry allowed: `false`.
+
+Remaining Wormhole blockers:
+
+- `wormhole_governance_vm_payload_builder`;
+- `malicious_initializer_implementation_contract`;
+- `runtime_runner_wormhole_uninitialized_implementation`.
+
+Do not run Wormhole Foundry runtime until these pieces exist.

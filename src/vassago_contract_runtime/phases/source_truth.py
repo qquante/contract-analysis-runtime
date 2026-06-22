@@ -12,6 +12,7 @@ from vassago_contract_runtime.sc01_source import (
     evaluate_proxy_storage_collision_reinitializer,
     evaluate_public_normal_behavior,
     evaluate_uninitialized_uups_initializer,
+    evaluate_wormhole_uninitialized_implementation,
 )
 
 
@@ -125,6 +126,18 @@ def _review_queue_item(
             related_guards,
             related_writes,
             proxy_collision,
+        )
+    wormhole = evaluate_wormhole_uninitialized_implementation(source_manifest)
+    if item.get("thesis_id") == "uninitialized_implementation_proxy" and wormhole.get("verified") is True:
+        return _verified_but_runtime_blocked_review(
+            item,
+            functions,
+            related_surface,
+            related_guards,
+            related_writes,
+            wormhole,
+            runtime_runner="wormhole_implementation_runtime_required",
+            evidence_kind="wormhole_uninitialized_implementation",
         )
     evaluation = evaluate_uninitialized_uups_initializer(source_manifest)
     if _is_verified_uninitialized_uups_initializer(item, related_surface, related_writes, evaluation):
@@ -256,6 +269,42 @@ def _partial_proxy_collision_review(
         "measurable_delta": evaluation.get("measurable_delta"),
         "explicit_predicate": evaluation.get("explicit_predicate"),
         "next_required_adapter": "implementation_source_layout_and_delegatecall_initializer_mapper",
+        "evidence_refs": _refs(related_surface, related_guards, related_writes)
+        + list(evaluation.get("evidence_refs") or []),
+    }
+
+
+def _verified_but_runtime_blocked_review(
+    item: dict[str, Any],
+    functions: list[str],
+    related_surface: list[dict[str, Any]],
+    related_guards: list[dict[str, Any]],
+    related_writes: list[dict[str, Any]],
+    evaluation: dict[str, Any],
+    *,
+    runtime_runner: str,
+    evidence_kind: str,
+) -> dict[str, Any]:
+    return {
+        "source_truth_id": f"ST-{short_hash(str(item.get('queue_id')))}",
+        "queue_id": item.get("queue_id"),
+        "candidate_id": item.get("candidate_id"),
+        "thesis_id": item.get("thesis_id"),
+        "status": "source_truth_verified_runtime_blocked",
+        "source_truth_verified": True,
+        "evidence_kind": evidence_kind,
+        "matched_functions": functions,
+        "related_guard_classes": [guard.get("guard_class") for guard in related_guards],
+        "related_state_variables": [write.get("variable") for write in related_writes],
+        "missing_proof_pieces": list(evaluation.get("missing_proof_pieces") or []),
+        "runtime_runner": runtime_runner,
+        "actor_model": evaluation.get("actor_model") or "needs_runtime_actor_model",
+        "codable_args": list(evaluation.get("codable_args") or []),
+        "measurable_reader": evaluation.get("measurable_reader"),
+        "measurable_delta": evaluation.get("measurable_delta"),
+        "explicit_predicate": evaluation.get("explicit_predicate"),
+        "implementation_address": evaluation.get("implementation_address"),
+        "next_required_adapter": runtime_runner,
         "evidence_refs": _refs(related_surface, related_guards, related_writes)
         + list(evaluation.get("evidence_refs") or []),
     }

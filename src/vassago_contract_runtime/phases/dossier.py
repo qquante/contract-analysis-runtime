@@ -72,18 +72,23 @@ def _function_index(source: dict) -> dict:
     events = []
     for item in abi:
         if item.get("type") == "function":
+            functions.append(_function_item(item, relation="target", execution_context="target"))
+        elif item.get("type") == "event":
+            events.append(_event_item(item, relation="target"))
+
+    implementation = _related_implementation(source)
+    for item in implementation.get("abi") or []:
+        if item.get("type") == "function":
             functions.append(
-                {
-                    "name": item.get("name"),
-                    "stateMutability": item.get("stateMutability"),
-                    "inputs": item.get("inputs", []),
-                    "outputs": item.get("outputs", []),
-                    "semantic_role": "unknown",
-                    "semantic_status": "abi_inventory_only",
-                }
+                _function_item(
+                    item,
+                    relation="proxy_implementation",
+                    execution_context="proxy_delegatecall",
+                )
             )
         elif item.get("type") == "event":
-            events.append({"name": item.get("name"), "inputs": item.get("inputs", [])})
+            events.append(_event_item(item, relation="proxy_implementation"))
+
     return {
         "status": "completed",
         "source_status": source.get("status"),
@@ -92,6 +97,33 @@ def _function_index(source: dict) -> dict:
         "function_count": len(functions),
         "event_count": len(events),
     }
+
+
+def _function_item(item: dict, *, relation: str, execution_context: str) -> dict:
+    return {
+        "name": item.get("name"),
+        "stateMutability": item.get("stateMutability"),
+        "inputs": item.get("inputs", []),
+        "outputs": item.get("outputs", []),
+        "semantic_role": "unknown",
+        "semantic_status": "abi_inventory_only",
+        "source_relation": relation,
+        "execution_context": execution_context,
+    }
+
+
+def _event_item(item: dict, *, relation: str) -> dict:
+    return {"name": item.get("name"), "inputs": item.get("inputs", []), "source_relation": relation}
+
+
+def _related_implementation(source: dict) -> dict:
+    related = source.get("related_sources")
+    if not isinstance(related, dict):
+        return {}
+    implementation = related.get("implementation")
+    if isinstance(implementation, dict) and implementation.get("status") == "resolved":
+        return implementation
+    return {}
 
 
 def _protocol_fingerprint(source: dict) -> dict:
