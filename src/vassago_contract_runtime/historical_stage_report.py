@@ -156,6 +156,8 @@ def _blocking_stage(score_record: dict[str, Any], sidecars: dict[str, dict[str, 
         return "10_final_report_missing", ["final_report_missing"]
     if signal == "runtime":
         return "09_runtime_completed", [_runtime_status(sidecars)]
+    if signal == "runtime_failed":
+        return "09_runtime_failed", [_runtime_status(sidecars)]
     if signal == "runtime_ready":
         return "09_runtime_authorization_pending", ["runtime_ready_but_runtime_not_authorized_in_blind_run"]
     if signal == "compile_only":
@@ -271,6 +273,8 @@ def _next_action(record: dict[str, Any], stage: str) -> str:
         return "Repair compile context or harness generation."
     if stage.startswith("09_runtime_authorization"):
         return "Review runtime-ready case and run local Foundry only when authorized."
+    if stage.startswith("09_runtime_failed"):
+        return "Inspect runtime failure, then either repair a thesis-specific harness or mark the thesis not reproduced."
     if stage.startswith("09_runtime_completed"):
         return "Preserve runtime evidence and do not claim live risk without current-state review."
     return "Inspect target artifacts and rerun the stage after the missing mapper exists."

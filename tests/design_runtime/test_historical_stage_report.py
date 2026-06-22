@@ -150,6 +150,44 @@ class HistoricalStageReportTests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertTrue((output / "cli" / "historical-stage-failure-report.json").is_file())
 
+    def test_runtime_failed_uses_runtime_failed_stage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = root / "historical.json"
+            run = root / "run"
+            case = _case("HEC-X04", "proxy_upgrade_signature", "0x4444444444444444444444444444444444444444")
+            atomic_write_json(manifest, {"kind": "vassago-historical-exploit-corpus", "version": "test", "cases": [case]})
+            _write_run_manifest(run)
+            _write_target_artifacts(
+                run,
+                _target(case),
+                final_report={
+                    "final_status": "runtime_failed",
+                    "evidence_status": "inconclusive",
+                    "queue_count": 1,
+                    "source_truth_verified_count": 1,
+                    "compile_status": "compile_only_passed",
+                    "runtime_ready_count": 1,
+                    "foundry_allowed": True,
+                    "runtime_status": "runtime_failed",
+                },
+            )
+            _write(
+                run
+                / "targets"
+                / _target(case).target_id
+                / "phases"
+                / "09_runtime_foundry"
+                / "foundry-runtime-result.json",
+                {"status": "runtime_failed", "blockers": ["forge_failed"]},
+            )
+
+            report = build_historical_stage_report(run, manifest)
+
+            self.assertEqual(report["summary"]["runtime_ready_count"], 0)
+            self.assertEqual(report["summary"]["by_stage"]["09_runtime_failed"], 1)
+            self.assertEqual(report["records"][0]["blocking_stage"], "09_runtime_failed")
+
 
 def _case(benchmark_id: str, family: str, address: str) -> dict[str, object]:
     return {

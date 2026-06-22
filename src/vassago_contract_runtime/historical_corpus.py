@@ -118,6 +118,7 @@ def _validate_case(case: dict[str, Any]) -> dict[str, Any] | None:
 
 def _target_from_case(case: dict[str, Any]) -> dict[str, Any] | None:
     blind = case.get("blind_inputs") or {}
+    replay_fork_block = _replay_fork_block(case)
     try:
         target = ContractTarget(
             chain=str(blind.get("chain") or "unknown"),
@@ -130,11 +131,30 @@ def _target_from_case(case: dict[str, Any]) -> dict[str, Any] | None:
                 "family_hint": case.get("family"),
                 "source_repo_path": blind.get("source_repo_path"),
                 "has_foundry_poc": bool(blind.get("has_foundry_poc")),
+                **({"replay_fork_block_number": replay_fork_block} if replay_fork_block is not None else {}),
             },
         )
     except ModelValidationError:
         return None
     return target.to_json()
+
+
+def _replay_fork_block(case: dict[str, Any]) -> int | None:
+    """Return a historical replay fork block without exposing detector labels.
+
+    This value is operational metadata for local/fork runtime reproduction. It
+    must not be used by source-truth, scoring, or target selection logic.
+    """
+
+    truth = case.get("hidden_ground_truth") or {}
+    blocks = truth.get("fork_blocks") or []
+    if not blocks:
+        return None
+    try:
+        block = int(str(blocks[0]))
+    except (TypeError, ValueError):
+        return None
+    return block if block > 0 else None
 
 
 def _duplicates(values: Any) -> list[str]:

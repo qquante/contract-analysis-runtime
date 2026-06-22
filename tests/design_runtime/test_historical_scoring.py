@@ -101,6 +101,36 @@ class HistoricalScoringTests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertTrue((output / "cli" / "historical-corpus-score.json").is_file())
 
+    def test_runtime_failed_is_not_counted_as_runtime_ready(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = root / "historical.json"
+            run = root / "run"
+            case = _case("HEC-X04", "proxy_upgrade_signature", "0x4444444444444444444444444444444444444444")
+            atomic_write_json(manifest, {"kind": "vassago-historical-exploit-corpus", "version": "test", "cases": [case]})
+            _write_run_manifest(run)
+            _write_final_report(
+                run,
+                _target(case),
+                {
+                    "final_status": "runtime_failed",
+                    "evidence_status": "inconclusive",
+                    "queue_count": 1,
+                    "source_truth_verified_count": 1,
+                    "compile_status": "compile_only_passed",
+                    "runtime_ready_count": 1,
+                    "foundry_allowed": True,
+                    "runtime_status": "runtime_failed",
+                },
+            )
+
+            score = build_historical_score(run, manifest)
+
+            self.assertEqual(score["summary"]["runtime_ready_count"], 0)
+            self.assertEqual(score["summary"]["runtime_failed_count"], 1)
+            self.assertEqual(score["summary"]["actionable_count"], 0)
+            self.assertEqual(score["summary"]["by_family_signal"]["proxy_upgrade_signature"]["runtime_failed"], 1)
+
 
 def _case(benchmark_id: str, family: str, address: str) -> dict[str, object]:
     return {

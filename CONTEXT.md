@@ -1079,3 +1079,42 @@ Current interpretation:
 - no runtime evidence is claimed yet;
 - next task is `PT-028.T13`: set an Optimism fork RPC and run local Foundry
   with `--runtime-authorized`, still no broadcast.
+
+## PT-028.T13 proxy initializer runtime local/fork
+
+`PT-028.T13` executed the proxy initializer runtime gate for the proxy-upgrade
+family.
+
+Current baseline:
+
+- run: `runs/sc01-historical-proxy-upgrade-t13-v3`;
+- target: `CT-5c096b36038c`, HEC-085 / ArcadiaFi;
+- proxy: `0x13c0ef5f1996b4f119e9d6c32f5e23e8dc313109`;
+- implementation: `0x3ae354d7e49039ccd582f1f3c9e65034ffd17bad`;
+- historical replay block: `106676494`;
+- runtime command includes `--fork-block-number 106676494`;
+- compile-only: `compile_only_passed`;
+- runtime: `runtime_failed`;
+- evidence: `inconclusive`;
+- assertion: failed, no `owner()` delta.
+
+Important interpretation:
+
+- The local/fork runner works and uses the historical fork block.
+- This target does not reproduce the SC01 proxy-initializer thesis. The proxy
+  call to `initialize(address,address,uint16,address)` reverts.
+- The local DeFiHackLabs PoC classifies ArcadiaFi as reentrancy/protocol-flow,
+  not proxy initializer access-control. Do not treat HEC-085 as proxy-upgrade
+  runtime evidence.
+- The current stage report is:
+  - `04_no_thesis_candidate=3`;
+  - `05_source_truth_not_verified=16`;
+  - `09_runtime_failed=1`;
+  - `runtime_ready_count=0`.
+
+Next practical step:
+
+- `PT-028.T14`: repair historical corpus routing/family classification for
+  cases where the metadata family does not match the actual PoC thesis.
+- Then resume proxy-upgrade on a different candidate with real proxy/upgrade
+  impact.

@@ -51,7 +51,7 @@ def _read_optional_json(context: PhaseContext, phase_id: str, name: str) -> dict
 
 def _final_status(runtime_ready: dict[str, Any], compile_result: dict[str, Any], runtime_result: dict[str, Any]) -> str:
     reproduction_status = "reproduced" + "_runtime"
-    if runtime_result.get("status") in {"runtime_completed", "not_reproduced", reproduction_status}:
+    if runtime_result.get("status") in {"runtime_completed", "not_reproduced", "runtime_failed", reproduction_status}:
         return str(runtime_result.get("status"))
     if runtime_ready.get("foundry_allowed") is True:
         return "runtime_ready_pending_local_execution"
@@ -65,12 +65,16 @@ def _summary(final_status: str) -> str:
         return "No runtime-ready SC01 hypothesis was produced. Foundry runtime was not executed."
     if final_status == "runtime_ready_pending_local_execution":
         return "A runtime-ready hypothesis exists, but local runtime execution has not been run in this phase."
+    if final_status == "runtime_failed":
+        return "Local Foundry runtime was executed and failed; no SC01 reproduction is claimed."
     return f"Final SC01 status: {final_status}."
 
 
 def _evidence_status(runtime_result: dict[str, Any], compile_result: dict[str, Any]) -> str:
     if runtime_result.get("evidence_status") == "runtime_local":
         return "runtime_local"
+    if runtime_result.get("evidence_status") == "inconclusive":
+        return "inconclusive"
     if compile_result.get("evidence_status") == "compile_only":
         return "compile_only"
     return "static_only"
@@ -84,6 +88,11 @@ def _next_steps(final_status: str) -> list[str]:
         ]
     if final_status == "runtime_ready_pending_local_execution":
         return ["Run local Foundry only with explicit authorization and no broadcast."]
+    if final_status == "runtime_failed":
+        return [
+            "Review foundry-runtime-result.json and assertion-result.json.",
+            "If the harness tested the wrong thesis, reclassify the target or build a thesis-specific mapper.",
+        ]
     return ["Review runtime output and evidence gate before any severity claim."]
 
 

@@ -159,9 +159,12 @@ Current state:
   `proxy-upgrade-impact-review.json`. The current proxy-upgrade family run
   `runs/sc01-historical-proxy-upgrade-t12-v2` has `runtime_ready_count=1`,
   target `CT-5c096b36038c`, and `compile_only_passed`.
-- The current proxy/upgrade blocker is runtime execution environment, not
-  source/proxy context: an Optimism fork RPC and explicit runtime authorization
-  are required before any local Foundry runtime.
+- `PT-028.T13` ran local/fork Foundry for that target using
+  `--fork-block-number 106676494`. The runtime failed and evidence is
+  `inconclusive`; ArcadiaFi/HEC-085 should not be counted as proxy-initializer
+  SC01 reproduction.
+- The current proxy/upgrade blocker is route quality: find a different
+  source-truth proxy/upgrade candidate or repair corpus family routing first.
 
 Non-goal:
 

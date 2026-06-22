@@ -63,6 +63,7 @@ def build_historical_score(
             "invalid_target_count": sum(1 for record in records if record["status"] == "invalid_target"),
             "actionable_count": sum(1 for record in records if record["signal_level"] in actionable),
             "runtime_count": by_signal.get("runtime", 0),
+            "runtime_failed_count": by_signal.get("runtime_failed", 0),
             "runtime_ready_count": by_signal.get("runtime_ready", 0),
             "compile_only_count": by_signal.get("compile_only", 0),
             "source_truth_count": by_signal.get("source_truth", 0),
@@ -164,6 +165,8 @@ def _signal_level(report: dict[str, Any]) -> str:
         return "runtime"
     if report.get("runtime_status") in {"runtime_completed", "not_reproduced"}:
         return "runtime"
+    if report.get("runtime_status") == "runtime_failed" or report.get("final_status") == "runtime_failed":
+        return "runtime_failed"
     if bool(report.get("foundry_allowed")) or int(report.get("runtime_ready_count") or 0) > 0:
         return "runtime_ready"
     if report.get("compile_status") == "compile_only_passed":
@@ -231,9 +234,12 @@ def _next_steps(records: list[dict[str, Any]]) -> list[str]:
     missing = sum(1 for record in records if record["status"] == "final_report_missing")
     source_truth = sum(1 for record in records if record["signal_level"] == "source_truth")
     actionable = sum(1 for record in records if record["signal_level"] in {"compile_only", "runtime_ready", "runtime"})
+    runtime_failed = sum(1 for record in records if record["signal_level"] == "runtime_failed")
     steps: list[str] = []
     if missing:
         steps.append("Resume or rerun the blind benchmark until every target has a final report.")
+    if runtime_failed:
+        steps.append("Inspect runtime_failed cases before changing mappers or claiming reproduction.")
     if source_truth:
         steps.append("Inspect source_truth cases and add proof-piece mappers for actor, args, reader and delta.")
     if actionable:

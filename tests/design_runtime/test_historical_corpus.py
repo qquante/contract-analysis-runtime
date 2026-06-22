@@ -52,6 +52,22 @@ class HistoricalCorpusTests(unittest.TestCase):
             self.assertNotIn("hidden_ground_truth", json.dumps(payload))
             self.assertTrue(all(item["metadata"]["family_hint"] == "bridge_message_auth" for item in payload["targets"]))
 
+    def test_blind_targets_include_runtime_replay_block_without_hidden_truth(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "targets.json"
+
+            result = write_historical_blind_targets(
+                output,
+                DEFAULT_HISTORICAL_CORPUS,
+                family="proxy_upgrade_signature",
+            )
+
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            arcadia = next(item for item in payload["targets"] if item["metadata"]["benchmark_id"] == "HEC-085")
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(arcadia["metadata"]["replay_fork_block_number"], 106676494)
+            self.assertNotIn("hidden_ground_truth", json.dumps(arcadia))
+
 
 if __name__ == "__main__":
     unittest.main()

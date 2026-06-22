@@ -2368,7 +2368,7 @@ Result:
 
 ## PT-028.T13 - Proxy initializer runtime Foundry local/fork
 
-Status: queued.
+Status: done first slice, 2026-06-22.
 
 Goal:
 
@@ -2384,6 +2384,62 @@ Prerequisites:
 - set `VASSAGO_FORK_RPC_OPTIMISM_URL` or `VASSAGO_FORK_RPC_URL`;
 - run with `--runtime-authorized`;
 - no private key, no broadcast, no live transaction.
+
+Implemented:
+
+- Historical blind target export now includes
+  `metadata.replay_fork_block_number` for local/fork replay only. It does not
+  expose `hidden_ground_truth` and must not drive source-truth or acquisition.
+- `proxy_upgrade_fork()` now passes `block_number` from target replay metadata
+  into the Foundry fork config.
+- Final reports and historical scoring now distinguish `runtime_failed` from
+  `runtime_ready_pending_local_execution`.
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_historical_corpus tests.design_runtime.test_sc01_proxy_impact tests.design_runtime.test_phases tests.design_runtime.test_historical_scoring tests.design_runtime.test_historical_stage_report
+python -m vassago_contract_runtime.cli historical-corpus-report --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --targets-output runs\_selected\proxy-upgrade-t13-targets.json
+$env:VASSAGO_FORK_RPC_OPTIMISM_URL='https://mainnet.optimism.io'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t13-targets.json --output runs\sc01-historical-proxy-upgrade-t13-v3 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters --runtime-authorized
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t13-v3 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t13-v3\historical-stage-failure
+```
+
+Observed:
+
+```text
+focused tests: Ran 30 tests, OK
+T13 v3 family rerun: executed_count=220 failed_count=0 target_count=20
+HEC-085/CT-5c096b36038c:
+  fork command includes --fork-block-number 106676494
+  compile_status=compile_only_passed
+  runtime_status=runtime_failed
+  evidence_status=inconclusive
+  assertion_status=failed
+stage report:
+  04_no_thesis_candidate=3
+  05_source_truth_not_verified=16
+  09_runtime_failed=1
+  runtime_ready_count=0
+```
+
+Result:
+
+- Runtime Foundry local/fork executed with no broadcast.
+- The proxy-initializer thesis did not reproduce for HEC-085. The call through
+  the proxy reverted; no owner delta was observed.
+- Local PoC context shows ArcadiaFi is a historical reentrancy case, not a
+  clean SC01 proxy-initializer reproduction. It should be reclassified or moved
+  to a reentrancy/protocol-flow mapper instead of being treated as proxy
+  initializer evidence.
+
+Next:
+
+- `PT-028.T14`: historical corpus family reclassification/route repair for
+  cases where a generic family label mismatches the actual PoC thesis.
+- Then resume proxy-upgrade by choosing another source-truth candidate with
+  real proxy/upgrade impact, not ArcadiaFi.
 
 ## PT-028.T06 - Corpus expansion to 100+
 

@@ -89,7 +89,8 @@ PT-028.T09 Proxy family thesis acquisition/routing - done first slice 2026-06-22
 PT-028.T10 Source resolver/cache reliability for family reruns - done first slice 2026-06-22, run runs/sc01-historical-proxy-upgrade-t10-v1
 PT-028.T11 Proxy source-truth/proof-piece hardening - done first slice 2026-06-22, run runs/sc01-historical-proxy-upgrade-t11-v1
 PT-028.T12 Proxy impact/proof-piece reader - done first slice 2026-06-22, run runs/sc01-historical-proxy-upgrade-t12-v2
-PT-028.T13 Proxy initializer runtime Foundry local/fork - next
+PT-028.T13 Proxy initializer runtime Foundry local/fork - done first slice 2026-06-22, run runs/sc01-historical-proxy-upgrade-t13-v3, runtime_failed/inconclusive for HEC-085
+PT-028.T14 Historical corpus family reclassification/route repair - next
 PT-028.T06 Expand corpus beyond 100 - queued
 ```
 
@@ -145,11 +146,13 @@ PT-028.T06 Expand corpus beyond 100 - queued
    proposal baseline. It writes `proxy-upgrade-dossier.json`,
    `proxy-upgrade-semantic-proposals.json` and
    `proxy-upgrade-proposal-validation.json` for phase `05_source_truth`.
-17. Use `runs/sc01-historical-proxy-upgrade-t12-v2` as the proxy impact
-   baseline. It has `runtime_ready_count=1`, target `CT-5c096b36038c`,
-   `proxy-upgrade-impact-review.json.status=proxy_impact_ready`, and
-   `compile-result.json.status=compile_only_passed`.
-18. Implement `PT-028.T13`: run local/fork Foundry for the proxy initializer
-   only after setting an Optimism fork RPC and passing explicit runtime
-   authorization. No broadcast.
-19. Implement PT-026.T04 A2A card after the design runtime remains stable.
+17. Use `runs/sc01-historical-proxy-upgrade-t13-v3` as the proxy initializer
+   runtime test baseline. It uses `--fork-block-number 106676494`, but HEC-085
+   ends as `runtime_failed` and `evidence_status=inconclusive`; no SC01
+   reproduction is claimed.
+18. Implement `PT-028.T14`: reclassify or route historical cases whose corpus
+   family differs from the actual PoC thesis. ArcadiaFi/HEC-085 is currently
+   a proxy-upgrade family candidate, but the local PoC is reentrancy.
+19. Resume proxy-upgrade on a different candidate only after source-truth,
+   impact, compile-only and runtime gate are all true.
+20. Implement PT-026.T04 A2A card after the design runtime remains stable.

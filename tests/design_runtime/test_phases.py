@@ -49,6 +49,18 @@ class _FakeFoundry:
         )
 
 
+class _FailingRuntimeFoundry(_FakeFoundry):
+    def run_local_fork(self, item):
+        return FoundryRunResult(
+            status="runtime_failed",
+            provider="fake_foundry",
+            target_id=item.target_id,
+            stderr="reverted",
+            metadata={"evidence_status": "inconclusive", "no_broadcast_command": True},
+            error={"code": "forge_failed", "message": "reverted"},
+        )
+
+
 class _FakeSlither:
     def __init__(self) -> None:
         self.calls = []
@@ -334,6 +346,43 @@ class BootstrapPhaseTests(unittest.TestCase):
             self.assertEqual(compile_result["status"], "compile_only_passed")
             self.assertIn("testProxyInitializerCanChangeProxyState", harness)
             self.assertIn('address constant TARGET = address(bytes20(hex"1111111111111111111111111111111111111111"));', harness)
+
+    def test_failed_runtime_is_final_failed_not_pending(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source_fixture = Path(tmp) / "proxy-impact-source.json"
+            source_fixture.write_text(json.dumps(_proxy_impact_source_fixture()), encoding="utf-8")
+            design = load_design(Path("designs") / "sc01-access" / "design.yaml")
+            target = ContractTarget("eth", "0x1111111111111111111111111111111111111111")
+            foundry = _FailingRuntimeFoundry()
+            adapters = {
+                "00_intake": IntakeAdapter(),
+                "01_dossier": DossierAdapter(FixtureSourceResolver.from_file(source_fixture)),
+                "02_semantic_surface": SemanticSurfaceAdapter(),
+                "03_corpus_motifs": CorpusMotifsAdapter.from_design_dir("designs/sc01-access"),
+                "04_thesis_acquisition": ThesisAcquisitionAdapter(),
+                "05_source_truth": SourceTruthAdapter(),
+                "06_onchain_state": OnChainStateAdapter(),
+                "07_proof_pieces": ProofPiecesAdapter(),
+                "08_compile_only": CompileOnlyAdapter(foundry),
+                "09_runtime_foundry": RuntimeFoundryAdapter(foundry, runtime_authorized=True),
+                "10_final_report": FinalReportAdapter(),
+            }
+            old_rpc = os.environ.get("VASSAGO_FORK_RPC_URL")
+            os.environ["VASSAGO_FORK_RPC_URL"] = "http://127.0.0.1:8545"
+            try:
+                run_design(design, [target], Path(tmp) / "run", adapters, RunOptions(resume=True))
+            finally:
+                if old_rpc is None:
+                    os.environ.pop("VASSAGO_FORK_RPC_URL", None)
+                else:
+                    os.environ["VASSAGO_FORK_RPC_URL"] = old_rpc
+
+            target_dir = Path(tmp) / "run" / "targets" / target.target_id / "phases"
+            runtime_result = json.loads((target_dir / "09_runtime_foundry" / "foundry-runtime-result.json").read_text())
+            final_report = json.loads((target_dir / "10_final_report" / "sc01-final-report.json").read_text())
+            self.assertEqual(runtime_result["status"], "runtime_failed")
+            self.assertEqual(final_report["final_status"], "runtime_failed")
+            self.assertEqual(final_report["evidence_status"], "inconclusive")
 
     def test_intake_and_dossier_adapters_write_real_bootstrap_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

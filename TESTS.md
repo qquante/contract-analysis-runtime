@@ -1761,3 +1761,52 @@ assertion status=passed
 evidence_status=runtime_local
 score case_count=1 runtime_count=1
 ```
+
+## PT-028.T13 proxy initializer local/fork runtime
+
+Focused regression:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_historical_corpus tests.design_runtime.test_sc01_proxy_impact tests.design_runtime.test_phases tests.design_runtime.test_historical_scoring tests.design_runtime.test_historical_stage_report
+```
+
+Observed:
+
+```text
+Ran 30 tests in 11.710s
+OK
+```
+
+Runtime run:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-report --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --targets-output runs\_selected\proxy-upgrade-t13-targets.json
+$env:VASSAGO_FORK_RPC_OPTIMISM_URL='https://mainnet.optimism.io'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t13-targets.json --output runs\sc01-historical-proxy-upgrade-t13-v3 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters --runtime-authorized
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t13-v3 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t13-v3\historical-stage-failure
+```
+
+Observed:
+
+```text
+run-design executed_count=220 failed_count=0 target_count=20
+HEC-085 command includes --fork-block-number 106676494
+HEC-085 compile_status=compile_only_passed
+HEC-085 runtime_status=runtime_failed
+HEC-085 assertion_status=failed
+HEC-085 evidence_status=inconclusive
+stage report:
+  04_no_thesis_candidate=3
+  05_source_truth_not_verified=16
+  09_runtime_failed=1
+  runtime_ready_count=0
+```
+
+Interpretation:
+
+- PT-028.T13 proves local/fork runtime execution is wired.
+- It does not reproduce the SC01 proxy-initializer thesis for ArcadiaFi.
+- The ArcadiaFi historical PoC is reentrancy/protocol-flow, so this is a
+  routing/classification problem to fix in `PT-028.T14`.

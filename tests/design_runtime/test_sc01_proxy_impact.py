@@ -4,6 +4,7 @@ import unittest
 
 from vassago_contract_runtime.sc01_proxy_impact import (
     build_proxy_upgrade_impact_review,
+    proxy_upgrade_fork,
     render_proxy_upgrade_harness,
     should_use_proxy_upgrade_harness,
 )
@@ -43,6 +44,17 @@ class SC01ProxyImpactTests(unittest.TestCase):
         self.assertIn("function owner() external view returns (address)", harness)
         self.assertIn("target.initialize(address(this), address(this), 1, address(this));", harness)
         self.assertIn("testProxyInitializerCanChangeProxyState", harness)
+
+    def test_proxy_upgrade_fork_uses_historical_replay_block_when_present(self) -> None:
+        source_manifest = _proxy_manifest(delegatecall=True)
+        source_manifest["target"]["chain"] = "optimism"
+        source_manifest["target"]["metadata"] = {"replay_fork_block_number": 106676494}
+
+        fork = proxy_upgrade_fork(source_manifest)
+
+        self.assertEqual(fork["chain"], "optimism")
+        self.assertEqual(fork["block_number"], 106676494)
+        self.assertTrue(fork["requires_rpc_url"])
 
 
 def _source_truth_verified() -> dict:

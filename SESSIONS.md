@@ -2881,3 +2881,84 @@ Next implementation is `PT-028.T13`: set an Optimism fork RPC, rerun
 `runs\_selected\proxy-upgrade-t08-targets.json` with `--runtime-authorized`,
 and inspect only target `CT-5c096b36038c`. No private key, no broadcast, no
 live transaction.
+
+## 2026-06-22 - PT-028.T13 Proxy Initializer Runtime Foundry Local/Fork
+
+Goal:
+
+- Execute the proxy initializer runtime gate locally on a historical Optimism
+  fork for `CT-5c096b36038c` / HEC-085.
+- Confirm whether the T12 compile-passed harness changes `owner()` through the
+  proxy.
+- Keep scope local/fork only: no private key, no broadcast, no live
+  transaction.
+
+What was done:
+
+- Added `metadata.replay_fork_block_number` to historical blind target exports
+  for runtime replay only. `hidden_ground_truth` remains excluded from target
+  JSON.
+- Updated `proxy_upgrade_fork()` so proxy-upgrade runtime passes the replay
+  block to Foundry.
+- Updated final scoring/reporting so executed-but-failed runtime becomes
+  `runtime_failed` and `inconclusive`, not "pending".
+- Regenerated proxy-upgrade targets:
+  `runs\_selected\proxy-upgrade-t13-targets.json`.
+- Ran runtime-authorized proxy-upgrade family run:
+  `runs\sc01-historical-proxy-upgrade-t13-v3`.
+
+Commands:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_historical_corpus tests.design_runtime.test_sc01_proxy_impact tests.design_runtime.test_phases tests.design_runtime.test_historical_scoring tests.design_runtime.test_historical_stage_report
+python -m vassago_contract_runtime.cli historical-corpus-report --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --targets-output runs\_selected\proxy-upgrade-t13-targets.json
+$env:VASSAGO_FORK_RPC_OPTIMISM_URL='https://mainnet.optimism.io'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets runs\_selected\proxy-upgrade-t13-targets.json --output runs\sc01-historical-proxy-upgrade-t13-v3 --source-cache-dir runs\source-cache-historical-100 --bootstrap-adapters --runtime-authorized
+python -m vassago_contract_runtime.cli historical-stage-report --run runs\sc01-historical-proxy-upgrade-t13-v3 --manifest designs\historical-exploits\manifest.json --family proxy_upgrade_signature --output-dir runs\sc01-historical-proxy-upgrade-t13-v3\historical-stage-failure
+```
+
+Observed:
+
+```text
+focused tests: Ran 30 tests, OK
+run-design: executed_count=220 failed_count=0 target_count=20
+HEC-085 Foundry command:
+  forge test --match-contract VassagoSC01Harness --fork-url <redacted> --fork-block-number 106676494
+HEC-085 compile_status=compile_only_passed
+HEC-085 runtime_status=runtime_failed
+HEC-085 evidence_status=inconclusive
+HEC-085 assertion_status=failed
+stage report:
+  04_no_thesis_candidate=3
+  05_source_truth_not_verified=16
+  09_runtime_failed=1
+  runtime_ready_count=0
+```
+
+Decisions and reasoning:
+
+- PT-028.T13 did execute Foundry local/fork correctly; the historical block was
+  propagated.
+- The SC01 proxy-initializer thesis did not reproduce for HEC-085. The proxy
+  initializer call reverted and no `owner()` delta was observed.
+- The local DeFiHackLabs PoC for ArcadiaFi is a reentrancy/protocol-flow case,
+  not a clean proxy-initializer SC01 case. This is a corpus-routing problem,
+  not a successful SC01 runtime reproduction.
+- No severity or live-risk claim is made from this run.
+
+Blockers:
+
+- Proxy-upgrade still needs a different source-truth candidate with real
+  proxy/upgrade impact.
+- Historical corpus needs route/family repair so non-SC01 cases do not consume
+  proxy-initializer runtime budget.
+
+RESUME FROM HERE:
+
+Run the full regression:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`.
+Run `python -m vassago_contract_runtime.cli check` and `git diff --check`.
+Commit T13 if green.
+Next implementation is `PT-028.T14`: historical corpus family
+reclassification/route repair, starting with HEC-085 ArcadiaFi.

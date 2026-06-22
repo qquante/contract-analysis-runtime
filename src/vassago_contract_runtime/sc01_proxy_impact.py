@@ -100,11 +100,15 @@ def proxy_upgrade_fork(source_manifest: dict[str, Any]) -> dict[str, Any]:
     if not should_use_proxy_upgrade_harness(source_manifest):
         return {}
     chain = ((source_manifest.get("target") or {}).get("chain") or "").lower()
-    return {
+    fork = {
         "requires_rpc_url": True,
         "chain": chain,
         "reason": "proxy initializer impact must be tested against local fork state",
     }
+    replay_block = _replay_fork_block(source_manifest)
+    if replay_block is not None:
+        fork["block_number"] = replay_block
+    return fork
 
 
 def _impact_for_review(
@@ -373,6 +377,22 @@ def _is_proxy_upgrade_review(review: dict[str, Any]) -> bool:
 def _proxy_address(source_manifest: dict[str, Any]) -> str:
     target = source_manifest.get("target") or {}
     return str(target.get("address") or "")
+
+
+def _replay_fork_block(source_manifest: dict[str, Any]) -> int | None:
+    target = source_manifest.get("target") or {}
+    metadata = target.get("metadata") if isinstance(target, dict) else {}
+    if not isinstance(metadata, dict):
+        return None
+    for key in ("replay_fork_block_number", "fork_block_number"):
+        value = metadata.get(key)
+        try:
+            block = int(str(value))
+        except (TypeError, ValueError):
+            continue
+        if block > 0:
+            return block
+    return None
 
 
 def _implementation_address(source_manifest: dict[str, Any]) -> str:
