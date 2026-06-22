@@ -2143,3 +2143,162 @@ Run full regression:
 `git diff --check`.
 If clean, commit with
 `feat(sc01): add nomad current-state review`.
+
+## 2026-06-22 - PT-027.T17 Bridge Current-Path Review Sidecar
+
+Goal:
+
+- Stop insisting on the rejected Nomad default-root path and add a generic
+  read-only bridge path router for current live-risk follow-up.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/sc01_bridge_review.py`.
+- Added CLI command `bridge-current-review`.
+- Added `tests/design_runtime/test_sc01_bridge_review.py`.
+- Wrote sidecars:
+  - `12_current_state_review/sc01-bridge-current-review.json`;
+  - `12_current_state_review/sc01-bridge-current-review.md`.
+- Hardened Hyperlane fingerprinting so `function handle` alone does not create
+  a protocol match.
+
+Command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli bridge-current-review --run runs/sc01-historical-6-v23-nomad-sidecars --target-id CT-05f41610b129
+```
+
+Observed:
+
+```text
+review_id=BCR-3ed18c3eb479
+protocol_fingerprints=[nomad_replica]
+active_path_count=4
+ready_for_state_review_count=1
+blocked_path_count=3
+root_proof_verifier=candidate_ready_for_state_review
+processed_message_replay=blocked_reader_missing
+escrow_supply_delta=blocked_reader_missing
+recipient_asset_moving=blocked_asset_delta_missing
+current_live_risk=not_claimed
+```
+
+Decisions and reasoning:
+
+- Bridge live-risk work should split by current path:
+  endpoint/source validation, processed-message replay, root/proof verifier,
+  escrow/supply delta and recipient asset-moving.
+- The new sidecar is static/source/ABI triage. It does not execute Foundry, does
+  not call write RPC methods and does not claim live exploitability.
+- For Nomad current state, the only ready path is still root/proof state review;
+  the already-run current-state probe rejected the historical default-root
+  predicate.
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_bridge_review
+python -m unittest discover -s tests
+python -m vassago_contract_runtime.cli check
+git diff --check
+```
+
+Observed:
+
+```text
+5 focused tests passed
+94 full tests passed
+check status=passed
+git diff --check: only CRLF warning for cli.py
+```
+
+RESUME FROM HERE:
+
+Commit this slice if desired, for example:
+`feat(sc01): add bridge current path review`.
+Then choose the next bridge path by sidecar status. For live-risk bridge work,
+do not return to Nomad default-root; review another current path/protocol with
+endpoint/source state, processed-message reader, root/proof state,
+escrow/supply delta or recipient asset-moving evidence.
+
+## 2026-06-22 - PT-028 Historical Exploit Corpus Seed
+
+Goal:
+
+- Stop depending on random target samples and build a benchmark-grade
+  historical exploit corpus that can drive blind evaluation.
+
+What was researched:
+
+- `SunWeb3Sec/DeFiHackLabs` was cloned locally at commit `c496513`.
+- The repo contained hundreds of Foundry reproduction PoCs; the first seed was
+  curated from direct `src/test/*/*.sol` metadata.
+- External expansion references were checked: DeFiHackLabs incident explorer,
+  DeFiVulnLabs, MetaTrust SmartContractAttackPoC, Rekt and SlowMist Hacked.
+
+What was implemented:
+
+- Added `designs/historical-exploits/manifest.json`.
+- Added `designs/historical-exploits/README.md`.
+- Added `designs/historical-exploits/targets-blind-100.json`.
+- Added `src/vassago_contract_runtime/historical_corpus.py`.
+- Added CLI command:
+  `python -m vassago_contract_runtime.cli historical-corpus-report`.
+- Added `tests/design_runtime/test_historical_corpus.py`.
+
+Corpus state:
+
+```text
+case_count=100
+target_count=100
+duplicate_target_count=0
+invalid_cases=[]
+sc01_access_control=20
+bridge_message_auth=20
+oracle_accounting=20
+reentrancy_token=20
+proxy_upgrade_signature=20
+with_attack_tx=96
+with_fork_block=90
+with_vulnerable_contract=74
+```
+
+Validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-report --targets-output designs/historical-exploits/targets-blind-100.json
+python -m unittest tests.design_runtime.test_historical_corpus tests.design_runtime.test_sc01_bridge_review
+```
+
+Observed:
+
+```text
+historical-corpus-report status=completed
+focused tests: 7 passed
+```
+
+Decisions:
+
+- `blind_inputs` is the only part allowed during detector runs.
+- `hidden_ground_truth` is scoring-only and must not drive detection logic.
+- Historical metadata is not a live exploitability claim.
+- PoC Solidity stays external; runtime corpus stores metadata and provenance.
+
+Blockers:
+
+- Full regression still needs to be rerun after this documentation/update
+  slice.
+- The blind benchmark itself has not been run yet.
+
+RESUME FROM HERE:
+
+Run:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`.
+Then run:
+`$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check`.
+Then run `git diff --check`. If clean, run the blind benchmark with
+`designs/historical-exploits/targets-blind-100.json`. Do not read
+`hidden_ground_truth` until scoring after the blind run.

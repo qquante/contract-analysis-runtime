@@ -1242,3 +1242,122 @@ Interpretation:
 - The current deployment rejects the same default-root predicate checked here.
 - No asset-moving recipient runtime is required for this specific path because
   the root gate blocks before recipient execution.
+
+## PT-027.T17 Bridge Current-Path Review
+
+Focused unit:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_bridge_review
+```
+
+Observed:
+
+```text
+5 tests passed
+```
+
+Full regression:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest discover -s tests
+```
+
+Observed:
+
+```text
+94 tests passed
+```
+
+Repository gate:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli check
+git diff --check
+```
+
+Observed:
+
+```text
+check status=passed
+git diff --check: only CRLF warning for cli.py
+```
+
+Real static/read-only sidecar smoke:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli bridge-current-review --run runs/sc01-historical-6-v23-nomad-sidecars --target-id CT-05f41610b129
+```
+
+Observed:
+
+```text
+review_id=BCR-3ed18c3eb479
+protocol=nomad_replica
+active_path_count=4
+ready_for_state_review_count=1
+blocked_path_count=3
+root_proof_verifier=candidate_ready_for_state_review
+processed_message_replay=blocked_reader_missing
+escrow_supply_delta=blocked_reader_missing
+recipient_asset_moving=blocked_asset_delta_missing
+current_live_risk=not_claimed
+```
+
+## PT-028.T01-T03 Historical Exploit Corpus
+
+Purpose:
+
+- replace random-only target selection with a blind historical exploit corpus;
+- keep detector inputs separate from scoring labels;
+- seed 100 cases across five families.
+
+Commands:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-report --targets-output designs/historical-exploits/targets-blind-100.json
+python -m unittest tests.design_runtime.test_historical_corpus tests.design_runtime.test_sc01_bridge_review
+```
+
+Observed:
+
+```text
+historical-corpus-report status=completed
+case_count=100
+target_count=100
+duplicate_target_count=0
+invalid_cases=[]
+target_export.status=completed
+focused tests: 7 passed
+```
+
+Corpus balance:
+
+```text
+sc01_access_control=20
+bridge_message_auth=20
+oracle_accounting=20
+reentrancy_token=20
+proxy_upgrade_signature=20
+```
+
+Next validation:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest discover -s tests
+python -m vassago_contract_runtime.cli check
+git diff --check
+```
+
+Next benchmark:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets designs/historical-exploits/targets-blind-100.json --output runs/sc01-historical-blind-100-v1 --source-cache-dir runs/source-cache-v20 --bootstrap-adapters
+```

@@ -170,6 +170,25 @@ The current Nomad default-root probe observed
 `acceptableRoot(bytes32(0)) == false`, so the reproduced historical default-root
 path is rejected in current state. This is not a broad bridge-safety claim.
 
+Bridge current-path triage is available as a static/read-only sidecar:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli bridge-current-review --run runs/sc01-historical-6-v23-nomad-sidecars --target-id CT-05f41610b129
+```
+
+It writes `sc01-bridge-current-review.json/.md` under phase
+`12_current_state_review` and routes follow-up by path:
+
+- endpoint/source validation;
+- processed-message replay;
+- root/proof verifier;
+- escrow/supply delta;
+- recipient asset-moving.
+
+This command does not use transactions, private keys, Foundry runtime or live
+exploitability promotion.
+
 The adversarial fixture set under
 `tests/fixtures/source_fixture_adversarial.json` covers disabled initializer,
 `tx.origin` authorization, public role-admin mutation and public lifecycle
@@ -249,3 +268,34 @@ Historical local/fork reproductions currently tracked:
 
 All are local/fork-only with no broadcast. The reports do not claim current
 live exploitability.
+
+## Historical Exploit Corpus
+
+The repo now has a 100-case historical exploit corpus seed for blind
+benchmarking:
+
+```text
+designs/historical-exploits/manifest.json
+designs/historical-exploits/README.md
+designs/historical-exploits/targets-blind-100.json
+```
+
+Refresh the report and blind target export:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-report --targets-output designs/historical-exploits/targets-blind-100.json
+```
+
+Run the blind benchmark:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets designs/historical-exploits/targets-blind-100.json --output runs/sc01-historical-blind-100-v1 --source-cache-dir runs/source-cache-v20 --bootstrap-adapters
+```
+
+Boundary:
+
+- phases may consume only `blind_inputs`;
+- `hidden_ground_truth` is scoring-only after the run;
+- no private keys, no write RPC and no broadcast.

@@ -18,13 +18,22 @@ read-only Etherscan V2 Explorer adapter when no `--source-fixture` is supplied.
 PT-027.T01 first adversarial fixture slice is implemented: disabled
 initializer, tx.origin authorization, open role-admin mutation and public
 lifecycle noise.
+PT-028.T01-T03 first historical exploit corpus seed is implemented: 100 blind
+targets from DeFiHackLabs metadata, balanced across SC01, bridge/message-auth,
+oracle/accounting, reentrancy/token and proxy/upgrade/signature.
 
 ## NEXT UP
 
-1. `PT-027.T02B` - optionally rerun curated 5 with `--allow-solc-install` to provision solc 0.4.24 for USDC.
-2. `PT-027.T01B` - expand adversarial fixtures for no-op guard, post-check modifier, Safe/module, bridge endpoint/source and ERC4337 validator.
-3. `PT-027.T03` - run 20 curated contracts only after deciding compiler provisioning policy.
-4. `PT-024.T19` - add per-target Slither failure summary if larger smoke shows repeated compile/import misses.
+1. `PT-028.T04` - run blind benchmark on
+   `designs/historical-exploits/targets-blind-100.json`, grouped by family,
+   without reading `hidden_ground_truth` during detection.
+2. `PT-028.T05` - add scoring/report phase that compares run outputs against
+   `hidden_ground_truth` after the blind run.
+3. `PT-028.T06` - expand corpus beyond 100 using DeFiHackLabs, DeFiVulnLabs,
+   SmartContractAttackPoC, Rekt/SlowMist incident lists and manually verified
+   addresses.
+4. `PT-024.T19` - add per-target Slither/source failure summary if the blind
+   benchmark shows repeated compile/import misses.
 
 ---
 
@@ -1753,3 +1762,166 @@ Security boundary:
 - read-only RPC only;
 - no transaction, no signing, no broadcast;
 - historical reproduction is not promoted to live exploitability.
+
+## PT-027.T17 - Bridge current-path review sidecar
+
+Status: done implementation + real static/read-only smoke, 2026-06-22.
+
+Implemented:
+
+- added `src/vassago_contract_runtime/sc01_bridge_review.py`;
+- added CLI command:
+  `python -m vassago_contract_runtime.cli bridge-current-review --run <run> --target-id <target>`;
+- bridge current-path review writes:
+  - `12_current_state_review/sc01-bridge-current-review.json`;
+  - `12_current_state_review/sc01-bridge-current-review.md`.
+
+Paths reviewed:
+
+- `endpoint_source_validation`;
+- `processed_message_replay`;
+- `root_proof_verifier`;
+- `escrow_supply_delta`;
+- `recipient_asset_moving`.
+
+Real smoke:
+
+- run: `runs/sc01-historical-6-v23-nomad-sidecars`;
+- target id: `CT-05f41610b129`;
+- protocol fingerprint: `nomad_replica`;
+- `root_proof_verifier`: `candidate_ready_for_state_review`;
+- `processed_message_replay`: `blocked_reader_missing`;
+- `escrow_supply_delta`: `blocked_reader_missing`;
+- `recipient_asset_moving`: `blocked_asset_delta_missing`;
+- current live risk: `not_claimed`.
+
+Security boundary:
+
+- static/source/ABI sidecar only;
+- no RPC write, no transaction, no signing, no broadcast;
+- no runtime Foundry execution;
+- no live exploitability claim.
+
+# PT-028 - Historical Exploit Corpus
+
+## PT-028.T01 - Research historical exploit sources
+
+Status: done first slice, 2026-06-22.
+
+Sources used:
+
+- `SunWeb3Sec/DeFiHackLabs`, cloned at commit `c496513`;
+- DeFiHackLabs incident explorer;
+- `SunWeb3Sec/DeFiVulnLabs`;
+- `MetaTrustLabs/SmartContractAttackPoC`;
+- Rekt leaderboard and SlowMist Hacked as expansion references.
+
+Decision:
+
+- Use historical exploit repositories as benchmark/evaluation input, not as
+  detector rules.
+- Keep PoC code external. The runtime corpus stores metadata, target address,
+  family and scoring-only hidden labels.
+
+## PT-028.T02 - Seed 100 balanced historical cases
+
+Status: done, 2026-06-22.
+
+Artifacts:
+
+- `designs/historical-exploits/manifest.json`;
+- `designs/historical-exploits/README.md`;
+- `designs/historical-exploits/targets-blind-100.json`.
+
+Current corpus:
+
+- `100` cases total;
+- `20` SC01/access-control;
+- `20` bridge/message-auth;
+- `20` oracle/accounting;
+- `20` reentrancy/token;
+- `20` proxy/upgrade/signature;
+- `100` blind benchmark targets;
+- `0` duplicate targets;
+- `0` invalid cases;
+- `96` cases with attack tx metadata;
+- `90` cases with fork block metadata;
+- `74` cases with explicitly annotated vulnerable contract metadata.
+
+Safety boundary:
+
+- `blind_inputs` is allowed for detector runs;
+- `hidden_ground_truth` is scoring-only;
+- no private keys, no broadcast, no live exploit claim.
+
+## PT-028.T03 - Historical corpus CLI and tests
+
+Status: done, 2026-06-22.
+
+Implemented:
+
+- `src/vassago_contract_runtime/historical_corpus.py`;
+- CLI command:
+  `python -m vassago_contract_runtime.cli historical-corpus-report`;
+- tests:
+  `tests/design_runtime/test_historical_corpus.py`.
+
+Validation command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-report --targets-output designs/historical-exploits/targets-blind-100.json
+python -m unittest tests.design_runtime.test_historical_corpus
+```
+
+Observed:
+
+- `status=completed`;
+- `case_count=100`;
+- `target_count=100`;
+- `duplicate_target_count=0`;
+- `invalid_cases=[]`;
+- focused tests passed.
+
+## PT-028.T04 - Blind benchmark run
+
+Status: next.
+
+Run the design against the blind target list. The detector must not read
+`hidden_ground_truth` during this phase.
+
+Command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets designs/historical-exploits/targets-blind-100.json --output runs/sc01-historical-blind-100-v1 --source-cache-dir runs/source-cache-v20 --bootstrap-adapters
+```
+
+Acceptance:
+
+- per-family runtime/source/Slither failure counts are visible;
+- no hidden labels are consumed by phases;
+- no Foundry runtime unless the normal proof gate marks runtime-ready.
+
+## PT-028.T05 - Post-run scoring
+
+Status: queued.
+
+Compare run outputs with `hidden_ground_truth` only after the blind run:
+
+- true positive / false negative by family;
+- source failure by chain/compiler/import;
+- thesis mismatch;
+- runtime-ready count;
+- required mapper/corpus expansion.
+
+## PT-028.T06 - Corpus expansion to 100+
+
+Status: queued.
+
+Expand beyond the first 100 with stricter curation:
+
+- normalize chain for every target;
+- verify target roles against PoC comments/source;
+- import additional historical cases from licensed/local sources;
+- keep external PoC code out of runtime artifacts unless license is reviewed.

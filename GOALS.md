@@ -68,6 +68,10 @@ Acceptance:
 - Nomad current-state review now rejects the historical default-root path in
   current state with read-only calls:
   `acceptableRoot(bytes32(0)) == false`.
+- Bridge current-path review now routes future live-risk work by path
+  (`endpoint_source_validation`, `processed_message_replay`,
+  `root_proof_verifier`, `escrow_supply_delta`, `recipient_asset_moving`)
+  while keeping `current_live_risk=not_claimed`.
 
 ## G-004 - Small top-level agent Interface
 
@@ -113,3 +117,28 @@ Acceptance:
   fork runtime harness.
 - Alchemix-style generic keeper parameter access-control is represented as
   corpus knowledge and has a dedicated historical fork runtime harness.
+
+## G-008 - Historical exploit benchmark corpus
+
+Status: active.
+
+Goal:
+
+- stop relying on random target samples as the main signal source;
+- maintain a blind corpus of historical exploit targets with scoring-only
+  ground truth;
+- use the corpus to measure false positives, false negatives, source/import
+  failures and missing protocol mappers.
+
+Current state:
+
+- PT-028 first seed has `100` cases balanced across access-control,
+  bridge/message-auth, oracle/accounting, reentrancy/token and
+  proxy/upgrade/signature.
+- `designs/historical-exploits/targets-blind-100.json` is ready for the next
+  blind benchmark.
+
+Non-goal:
+
+- do not turn historical case names, addresses or labels into detector rules.
+- do not claim current live exploitability from historical metadata.

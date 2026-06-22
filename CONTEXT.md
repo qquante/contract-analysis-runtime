@@ -579,6 +579,41 @@ Interpretation:
 - This does not prove every bridge path safe; it specifically rejects the
   reproduced historical default-root path in current state.
 
+## Current Bridge Current-Path Review
+
+Bridge live-risk follow-up now has a static/read-only router command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli bridge-current-review --run runs/sc01-historical-6-v23-nomad-sidecars --target-id CT-05f41610b129
+```
+
+Current artifact:
+
+```text
+runs/sc01-historical-6-v23-nomad-sidecars/targets/CT-05f41610b129/phases/12_current_state_review/sc01-bridge-current-review.json
+```
+
+Observed on 2026-06-22:
+
+- protocol fingerprint: `nomad_replica`;
+- `endpoint_source_validation`: `not_detected`;
+- `processed_message_replay`: `blocked_reader_missing`;
+- `root_proof_verifier`: `candidate_ready_for_state_review`;
+- `escrow_supply_delta`: `blocked_reader_missing`;
+- `recipient_asset_moving`: `blocked_asset_delta_missing`;
+- current live risk: `not_claimed`.
+
+Interpretation:
+
+- Do not keep insisting on the Nomad default-root path after the read-only
+  current-state rejection.
+- For bridge live risk, use this sidecar to choose a concrete current path:
+  endpoint/source validation, processed-message replay, root/proof verifier,
+  escrow/supply delta or recipient asset-moving.
+- This sidecar is static/source/ABI triage. It does not use RPC writes, does
+  not execute Foundry and does not claim live exploitability.
+
 ## Current SC01 Historical Reproduction Inventory
 
 Consolidated report:
@@ -607,3 +642,63 @@ Historical local/fork cases currently reproduced:
 
 All five are local/fork-only, no broadcast, and current live risk remains
 `not_claimed` unless a fresh current-state review proves otherwise.
+
+## Current Historical Exploit Corpus
+
+PT-028 adds the first benchmark-grade historical exploit corpus seed.
+
+Artifacts:
+
+```text
+designs/historical-exploits/manifest.json
+designs/historical-exploits/README.md
+designs/historical-exploits/targets-blind-100.json
+```
+
+Source:
+
+- `SunWeb3Sec/DeFiHackLabs`, local clone
+  `C:\Users\PC\AppData\Local\Temp\vassago-research\DeFiHackLabs`, commit
+  `c496513`;
+- the corpus stores metadata only. It does not copy PoC Solidity into runtime
+  fixtures.
+
+Current counts:
+
+- `100` cases total;
+- `20` `sc01_access_control`;
+- `20` `bridge_message_auth`;
+- `20` `oracle_accounting`;
+- `20` `reentrancy_token`;
+- `20` `proxy_upgrade_signature`;
+- `100` blind benchmark targets;
+- `0` duplicate targets;
+- `0` invalid cases.
+
+Policy:
+
+- phases may consume only `blind_inputs`;
+- `hidden_ground_truth` is post-run scoring-only;
+- no private key, no write RPC, no broadcast;
+- do not convert historical labels or addresses into detector hardcode.
+
+Command to refresh the report/export:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli historical-corpus-report --targets-output designs/historical-exploits/targets-blind-100.json
+```
+
+Next execution:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli run-design --design sc01-access --targets designs/historical-exploits/targets-blind-100.json --output runs/sc01-historical-blind-100-v1 --source-cache-dir runs/source-cache-v20 --bootstrap-adapters
+```
+
+Interpretation:
+
+- This is the right path to measure detection quality before another random
+  scan.
+- It is not proof that Vassago catches those cases yet; it is the blind
+  benchmark input for proving or falsifying that.
