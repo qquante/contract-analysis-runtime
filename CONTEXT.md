@@ -543,6 +543,42 @@ Interpretation:
   plan, runtime assertions and current-state checks required before any
   live-risk claim.
 
+## Current Nomad Current-State Review
+
+Nomad now has a read-only current-state review command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli current-state-review --run runs/sc01-historical-6-v23-nomad-sidecars --target-id CT-05f41610b129
+```
+
+Current artifact:
+
+```text
+runs/sc01-historical-6-v23-nomad-sidecars/targets/CT-05f41610b129/phases/12_current_state_review/sc01-current-state-review.json
+```
+
+Observed on 2026-06-22:
+
+- block: `25372508`;
+- implementation from Explorer proxy context:
+  `0x7f221a1850c12b57fed1f0831dd25399a13b68c2`;
+- `acceptableRoot(bytes32(0)) == false`;
+- `confirmAt(bytes32(0)) == 1`;
+- `messages(forged_message_hash) == 0x00...00`;
+- current source still calls `acceptableRoot(messages[messageHash])`, but
+  `acceptableRoot` rejects `LEGACY_STATUS_NONE`;
+- verdict: `current_default_root_path_rejected`;
+- current live risk:
+  `not_indicated_by_current_default_root_probe`.
+
+Interpretation:
+
+- The historical Nomad default-root exploit path is rejected by current
+  default-root handling.
+- This does not prove every bridge path safe; it specifically rejects the
+  reproduced historical default-root path in current state.
+
 ## Current SC01 Historical Reproduction Inventory
 
 Consolidated report:

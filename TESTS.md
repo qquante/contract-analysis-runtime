@@ -1198,3 +1198,47 @@ current_state_review.live_claim_allowed=false
 final_status=runtime_ready_pending_local_execution
 runtime_status=blocked_runtime_authorization_required
 ```
+
+## PT-027.T16 Nomad Current-State Read-Only Review
+
+Focused unit:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m unittest tests.design_runtime.test_sc01_source
+```
+
+Observed:
+
+```text
+25 tests passed
+```
+
+Real read-only current-state command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli current-state-review --run runs/sc01-historical-6-v23-nomad-sidecars --target-id CT-05f41610b129
+```
+
+Observed:
+
+```text
+review_id=CSR-f8f008ef218c
+current_block_number=25372508
+implementation=0x7f221a1850c12b57fed1f0831dd25399a13b68c2
+localDomain()=6648936
+acceptableRoot(bytes32(0))=false
+confirmAt(bytes32(0))=1
+messages(forged_message_hash)=0x0000000000000000000000000000000000000000000000000000000000000000
+verdict=current_default_root_path_rejected
+current_live_risk=not_indicated_by_current_default_root_probe
+no_broadcast=true
+```
+
+Interpretation:
+
+- The historical Nomad fork exploit remains reproduced historically.
+- The current deployment rejects the same default-root predicate checked here.
+- No asset-moving recipient runtime is required for this specific path because
+  the root gate blocks before recipient execution.

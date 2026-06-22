@@ -2089,3 +2089,57 @@ Run full regression:
 `git diff --check`.
 If clean, commit with
 `feat(sc01): add nomad root proof sidecars`.
+
+## 2026-06-22 - PT-027.T16 Nomad Current-State Read-Only Review
+
+Goal:
+
+- Test whether Nomad's historical default-root path still indicates current
+  live risk, using read-only calls only.
+
+What was done:
+
+- Added `src/vassago_contract_runtime/sc01_current_state.py`.
+- Added CLI command `current-state-review`.
+- Added a unit test using fake RPC for the Nomad current-state gate.
+- Ran real read-only current-state review against
+  `runs/sc01-historical-6-v23-nomad-sidecars`, target
+  `CT-05f41610b129`.
+
+Command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli current-state-review --run runs/sc01-historical-6-v23-nomad-sidecars --target-id CT-05f41610b129
+```
+
+Observed:
+
+```text
+review_id=CSR-f8f008ef218c
+current_block_number=25372508
+implementation=0x7f221a1850c12b57fed1f0831dd25399a13b68c2
+acceptableRoot(bytes32(0))=false
+confirmAt(bytes32(0))=1
+messages(forged_message_hash)=0x0000000000000000000000000000000000000000000000000000000000000000
+verdict=current_default_root_path_rejected
+current_live_risk=not_indicated_by_current_default_root_probe
+```
+
+Decision:
+
+- The current source still uses `acceptableRoot(messages[messageHash])`, but
+  the current implementation rejects `LEGACY_STATUS_NONE/default root`.
+- Because the forged unproven message cannot pass the root gate, no
+  asset-moving recipient proof is required for this path.
+- Nomad remains `historical_reproduced_critical` with current live risk
+  rejected for the default-root path tested here.
+
+RESUME FROM HERE:
+
+Run full regression:
+`$env:PYTHONPATH='src'; python -m unittest discover -s tests`;
+`$env:PYTHONPATH='src'; python -m vassago_contract_runtime.cli check`;
+`git diff --check`.
+If clean, commit with
+`feat(sc01): add nomad current-state review`.

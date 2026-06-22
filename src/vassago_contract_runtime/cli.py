@@ -12,6 +12,7 @@ from .design_runtime.models import ModelValidationError
 from .mcp import run_stdio
 from .quality import run_checks
 from .runtime_api import read_artifact_from_payload, resume_design_from_payload, run_design_from_payload
+from .sc01_current_state import write_sc01_current_state_review
 from .sc01_impact import write_sc01_impact_review
 
 
@@ -81,6 +82,14 @@ def main(argv: list[str] | None = None) -> int:
     impact_review.add_argument("--run", required=True, help="Run directory.")
     impact_review.add_argument("--target-id", required=True, help="Target id inside the run.")
 
+    current_state = sub.add_parser(
+        "current-state-review",
+        help="Write a read-only SC01 current-state review sidecar for one target.",
+    )
+    current_state.add_argument("--run", required=True, help="Run directory.")
+    current_state.add_argument("--target-id", required=True, help="Target id inside the run.")
+    current_state.add_argument("--rpc-url", help="Read-only RPC URL. Defaults to VASSAGO_CURRENT_STATE_RPC_URL/fallback env.")
+
     mcp = sub.add_parser("mcp", help="Run the local MCP server.")
     mcp.add_argument("--stdio", action="store_true", help="Use stdio transport.")
 
@@ -98,6 +107,8 @@ def main(argv: list[str] | None = None) -> int:
             return _artifact_read_command(args)
         if args.command == "impact-review":
             return _impact_review_command(args)
+        if args.command == "current-state-review":
+            return _current_state_review_command(args)
         if args.command == "mcp":
             if not args.stdio:
                 raise ValueError("Only local stdio MCP is supported. Pass --stdio.")
@@ -154,6 +165,12 @@ def _artifact_read_command(args: argparse.Namespace) -> int:
 
 def _impact_review_command(args: argparse.Namespace) -> int:
     payload = write_sc01_impact_review(args.run, args.target_id)
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0 if payload["status"] == "completed" else 1
+
+
+def _current_state_review_command(args: argparse.Namespace) -> int:
+    payload = write_sc01_current_state_review(args.run, args.target_id, rpc_url=args.rpc_url)
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0 if payload["status"] == "completed" else 1
 

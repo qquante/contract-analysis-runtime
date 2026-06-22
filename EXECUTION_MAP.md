@@ -74,6 +74,7 @@ PT-027.T12 Furucombo delegatecall/proxy-storage mapper - done 2026-06-22, run ba
 PT-027.T13 Alchemix keeper-state mapper - done 2026-06-22, run baseline runs/sc01-historical-6-v22-furucombo-alchemix-runtime
 PT-027.T14 SC01 historical reproduction report - done 2026-06-22, artifact SC01_HISTORICAL_REPRODUCTION_REPORT.md
 PT-027.T15 Nomad root/proof sidecars and current-state separation - done 2026-06-22
+PT-027.T16 Nomad current-state read-only review - done 2026-06-22, artifact runs/sc01-historical-6-v23-nomad-sidecars/.../12_current_state_review
 ```
 
 ## Current Next Up
@@ -94,12 +95,15 @@ PT-027.T15 Nomad root/proof sidecars and current-state separation - done 2026-06
 5. Use new Nomad sidecars `nomad-root-proof-analysis.json` and
    `bridge-state-review.json` for bridge/root/proof reasoning before any
    current-state claim.
-6. Use `runs/sc01-historical-6-v22-furucombo-alchemix-runtime` as the
+6. Use Nomad `12_current_state_review/sc01-current-state-review.json` as the
+   read-only current-state baseline. It rejects the historical default-root
+   path in current state because `acceptableRoot(bytes32(0)) == false`.
+7. Use `runs/sc01-historical-6-v22-furucombo-alchemix-runtime` as the
    Furucombo and Alchemix historical local/fork runtime baseline.
-7. Use `SC01_HISTORICAL_REPRODUCTION_REPORT.md` as the consolidated SC01
+8. Use `SC01_HISTORICAL_REPRODUCTION_REPORT.md` as the consolidated SC01
    historical reproduction inventory.
-8. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
+9. Expand remaining local adversarial fixtures: no-op guard, post-check guard,
    Safe/module, bridge endpoint/source and ERC4337 validator.
-9. Add per-target Slither/source summary only if a larger real smoke shows
+10. Add per-target Slither/source summary only if a larger real smoke shows
    repeated compiler/import misses.
-10. Implement PT-026.T04 A2A card after the design runtime remains stable.
+11. Implement PT-026.T04 A2A card after the design runtime remains stable.

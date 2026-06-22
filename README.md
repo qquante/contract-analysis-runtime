@@ -159,6 +159,17 @@ Historical impact-review sidecars exist for Audius, Wormhole and Nomad. They
 classify those cases as `historical_reproduced_critical` only; current live
 risk remains `not_claimed` unless a fresh current-state review proves otherwise.
 
+Nomad also has a read-only current-state command:
+
+```powershell
+$env:PYTHONPATH='src'
+python -m vassago_contract_runtime.cli current-state-review --run runs/sc01-historical-6-v23-nomad-sidecars --target-id CT-05f41610b129
+```
+
+The current Nomad default-root probe observed
+`acceptableRoot(bytes32(0)) == false`, so the reproduced historical default-root
+path is rejected in current state. This is not a broad bridge-safety claim.
+
 The adversarial fixture set under
 `tests/fixtures/source_fixture_adversarial.json` covers disabled initializer,
 `tx.origin` authorization, public role-admin mutation and public lifecycle

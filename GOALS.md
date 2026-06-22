@@ -65,6 +65,9 @@ Acceptance:
   `not_claimed`.
 - Nomad now also emits root/proof and current-state-review sidecars so
   historical reproduction cannot be confused with a live exploitability claim.
+- Nomad current-state review now rejects the historical default-root path in
+  current state with read-only calls:
+  `acceptableRoot(bytes32(0)) == false`.
 
 ## G-004 - Small top-level agent Interface
 

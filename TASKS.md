@@ -1707,3 +1707,49 @@ Key decision:
 - Nomad remains historical local/fork reproduction. Current live risk stays
   `not_claimed` unless a separate current implementation/root/message/recipient
   review is performed.
+
+## PT-027.T16 - Nomad current-state read-only review
+
+Status: done implementation + real read-only smoke, 2026-06-22.
+
+Implemented:
+
+- added `src/vassago_contract_runtime/sc01_current_state.py`;
+- added CLI command:
+  `python -m vassago_contract_runtime.cli current-state-review --run <run> --target-id <target>`;
+- current-state review writes:
+  - `12_current_state_review/sc01-current-state-review.json`;
+  - `12_current_state_review/sc01-current-state-review.md`.
+
+Nomad read-only checks:
+
+- current implementation from Explorer proxy context;
+- `eth_getCode` for proxy and implementation;
+- `localDomain()`;
+- `acceptableRoot(bytes32(0))`;
+- `confirmAt(bytes32(0))`;
+- deterministic forged message hash;
+- `messages(forged_message_hash)`;
+- current source check for `process(bytes)` and `acceptableRoot(...)`.
+
+Real smoke:
+
+- run: `runs/sc01-historical-6-v23-nomad-sidecars`;
+- target id: `CT-05f41610b129`;
+- current block: `25372508`;
+- implementation: `0x7f221a1850c12b57fed1f0831dd25399a13b68c2`;
+- `acceptableRoot(bytes32(0)) == false`;
+- `confirmAt(bytes32(0)) == 1`;
+- `messages(forged_message_hash) == 0x00...00`;
+- source still routes `process(bytes)` through
+  `acceptableRoot(messages[messageHash])`, but current `acceptableRoot` rejects
+  `LEGACY_STATUS_NONE`;
+- verdict: `current_default_root_path_rejected`;
+- current live risk:
+  `not_indicated_by_current_default_root_probe`.
+
+Security boundary:
+
+- read-only RPC only;
+- no transaction, no signing, no broadcast;
+- historical reproduction is not promoted to live exploitability.

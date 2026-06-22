@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from vassago_contract_runtime.sc01_alchemix import evaluate_alchemix_keeper_state
+from vassago_contract_runtime.sc01_current_state import build_nomad_current_state_review
 from vassago_contract_runtime.sc01_furucombo import evaluate_furucombo_delegatecall_proxy_storage
 from vassago_contract_runtime.sc01_nomad import build_nomad_root_proof_analysis, evaluate_nomad_bridge_root_proof
 from vassago_contract_runtime.sc01_source import (
@@ -583,6 +584,49 @@ class SC01SourceVerifierTests(unittest.TestCase):
         self.assertEqual(analysis["current_state_review"]["status"], "not_performed")
         self.assertFalse(analysis["current_state_review"]["live_claim_allowed"])
 
+    def test_nomad_current_state_review_rejects_default_root_path(self) -> None:
+        fixture = {
+            "target": {"chain": "eth", "address": "0x5d94309e5a0090b165fa4181519701637b6daeba"},
+            "proxy_context": {"proxy": "1", "implementation": "0x7f221a1850c12b57fed1f0831dd25399a13b68c2"},
+            "source_files": {"Proxy.sol": "contract UpgradeBeaconProxy { fallback() external payable {} }"},
+            "related_sources": {
+                "implementation": {
+                    "status": "resolved",
+                    "source_files": {
+                        "Replica.sol": """
+                        contract Replica {
+                            mapping(bytes32 => uint256) public confirmAt;
+                            mapping(bytes32 => bytes32) public messages;
+                            bytes32 public constant LEGACY_STATUS_NONE = bytes32(0);
+                            bytes32 public constant LEGACY_STATUS_PROCESSED = bytes32(uint256(2));
+                            function process(bytes memory _message) public returns (bool _success) {
+                                bytes32 _messageHash = keccak256(_message);
+                                require(acceptableRoot(messages[_messageHash]), "!proven");
+                                messages[_messageHash] = LEGACY_STATUS_PROCESSED;
+                                return true;
+                            }
+                            function acceptableRoot(bytes32 _root) public view returns (bool) {
+                                if (_root == LEGACY_STATUS_PROCESSED || _root == LEGACY_STATUS_NONE)
+                                    return false;
+                                uint256 _time = confirmAt[_root];
+                                if (_time == 0) return false;
+                                return block.timestamp >= _time;
+                            }
+                        }
+                        """,
+                    },
+                }
+            },
+        }
+
+        review = build_nomad_current_state_review(fixture, rpc=_NomadCurrentStateFakeRpc())
+
+        self.assertEqual(review["summary"]["verdict"], "current_default_root_path_rejected")
+        self.assertEqual(review["summary"]["current_live_risk"], "not_indicated_by_current_default_root_probe")
+        self.assertEqual(review["read_only_calls"]["acceptableRoot(bytes32(0))"], False)
+        self.assertEqual(review["read_only_calls"]["confirmAt(bytes32(0))"], 1)
+        self.assertTrue(review["policy"]["no_broadcast"])
+
     def test_furucombo_delegatecall_proxy_storage_requires_historical_proxy(self) -> None:
         fixture = {
             "target": {"chain": "eth", "address": "0xA013AfbB9A92cEF49e898C87C060e6660E050569"},
@@ -821,6 +865,30 @@ class SC01SourceVerifierTests(unittest.TestCase):
 
         self.assertTrue(result["rejected"])
         self.assertEqual(result["classification"], "caller_scoped_operator")
+
+
+class _NomadCurrentStateFakeRpc:
+    def request(self, method: str, params: list) -> str:
+        if method == "eth_blockNumber":
+            return "0x183340f"
+        if method == "eth_getCode":
+            return "0x60006000"
+        if method == "eth_call":
+            data = str(params[0]["data"])
+            selector = data[2:10]
+            if selector == "8d3638f4":  # localDomain()
+                return _word_hex(6648936)
+            if selector == "a3f81d68":  # acceptableRoot(bytes32)
+                return _word_hex(0)
+            if selector == "71bfb7b8":  # confirmAt(bytes32)
+                return _word_hex(1)
+            if selector == "2bbd59ca":  # messages(bytes32)
+                return _word_hex(0)
+        raise AssertionError(f"unexpected rpc call: {method} {params}")
+
+
+def _word_hex(value: int) -> str:
+    return "0x" + int(value).to_bytes(32, "big").hex()
 
 
 if __name__ == "__main__":
