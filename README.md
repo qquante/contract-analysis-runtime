@@ -1,80 +1,47 @@
 # Contract Analysis Runtime
 
-**Resumable smart-contract security campaigns with explicit evidence states.**
-
 ![Language: Python](https://img.shields.io/badge/Language-Python-3776AB?style=flat-square&logo=python) ![Artifacts: JSON and YAML](https://img.shields.io/badge/Artifacts-JSON%20and%20YAML-555555?style=flat-square) [![License: MIT](https://img.shields.io/badge/License-MIT-555555?style=flat-square)](LICENSE)
 
-[Overview](#overview) · [Quickstart](#quickstart) · [Example](#example) · [Validation](#validation) · [Documentation](#documentation)
+Run contract-security investigations as explicit campaigns, with resumable phases and evidence states that survive process boundaries.
 
-## Overview
+This runtime organizes source acquisition, compiler/static-analysis adapters, fork-oriented checks and final artifacts. It does not equate a static suspicion with a reproduced exploit.
 
-A contract-first runtime for repeatable, resumable security campaigns with explicit evidence states.
+## Evidence is part of the data model
 
-**Stack:** Python · JSON manifests · YAML designs · optional Slither/Foundry adapters · MCP interface
+[models.py](src/vassago_contract_runtime/design_runtime/models.py) distinguishes phase progress from evidence strength:
 
-## Every phase has an evidence boundary
-
-| Component | Behavior |
+| Phase status | Example evidence states |
 | --- | --- |
-| Design | Versioned campaign designs specify phases, inputs, outputs and gates. |
-| Execution state | Run manifests and artifact indexes support inspection and resumption. |
-| Evidence status | Static candidates, compilation and runtime reproduction are distinct states. |
+| `pending`, `running`, `completed`, `failed`, `skipped` | `static_only`, `compile_only_passed`, `not_reproduced`, `reproduced_runtime`, `human_review_required` |
 
-## Processing path
+A completed phase can therefore produce a limited or blocked result. Target IDs are derived from normalized chain/address identity; artifact and gate definitions are validated before a design runs.
 
 ```mermaid
-flowchart LR
-  N0["Contract target"]
-  N1["versioned design"]
-  N2["gated phases"]
-  N3["indexed artifacts"]
-  N4["evidence-qualified report"]
-N0 --> N1 --> N2 --> N3 --> N4
+stateDiagram-v2
+  [*] --> pending
+  pending --> running
+  running --> completed: artifacts and required gates
+  running --> failed: execution or validation failure
+  pending --> skipped: design decision
+  failed --> running: resume eligible work
 ```
 
-## Quickstart
+## Read a campaign from the outside in
+
+Start with [designs](designs), then follow the [runner](src/vassago_contract_runtime/design_runtime/runner.py), [manifest](src/vassago_contract_runtime/design_runtime/manifest.py) and [source resolver](src/vassago_contract_runtime/contracts/source_resolver.py). Adapters for Slither, Foundry, explorers and MCP sit behind these runtime contracts.
 
 ```console
 python -m venv .venv
-# Activate .venv, then:
 python -m pip install -e .
 python -m unittest discover -s tests/design_runtime -p test_models.py -v
 ```
 
-The commands above install prerequisites or run the specified offline checks. Live collection, cloud operations, messaging and trading are separate operational steps when present.
+Python 3.11+ is declared by the package. The focused model suite is offline and previously passed six tests. It does not install a Solidity compiler, contact a chain or start a fork.
 
-## Example
+## Taking the runtime further
 
-**Inspect the workflow**
+[ARCHITECTURE.md](ARCHITECTURE.md) and [DECISIONS.md](DECISIONS.md) explain the design. Compiler versions, source availability, RPC access and adapter prerequisites must be configured for the chosen campaign. Private run artifacts are not included, and historical corpus support is not a claim that every referenced scenario was reproduced by this checkout.
 
-Read a campaign design before executing adapters. Follow the target through source resolution, gated phases and indexed artifacts. A report should identify the strongest evidence actually produced; static suspicion alone is not reproduced exploitability. The focused model suite exercises offline runtime contracts.
+**Technology:** Python · JSON manifests · YAML designs · optional Slither/Foundry adapters · MCP interface
 
-## Configuration and storage
-
-Python 3.11+ is required. JSON manifests retain target/run/artifact state; YAML designs define phases. Slither, Foundry and MCP integrations have separate runtime prerequisites.
-
-## Repository guide
-
-| Location | Responsibility |
-| --- | --- |
-| [src/vassago_contract_runtime/cli.py](src/vassago_contract_runtime/cli.py) | CLI boundary |
-| [src/vassago_contract_runtime/contracts/source_resolver.py](src/vassago_contract_runtime/contracts/source_resolver.py) | Source resolution |
-| [designs](designs) | Campaign designs |
-| [tests/design_runtime/test_models.py](tests/design_runtime/test_models.py) | Focused contract tests |
-
-## Validation
-
-All six model tests passed on Python 3.13.16 using offline fixtures. Compiler, fork and campaign integrations were not exercised.
-
-## Scope and operational boundaries
-
-The last recorded check passed six offline model tests on Python 3.13.16. It did not provision a compiler, run a fork or conduct a deployed-contract campaign. Private run outputs are not bundled.
-
-## Documentation
-
-- [Architecture](ARCHITECTURE.md)
-- [Design decisions](DECISIONS.md)
-
-## License and attribution
-
-Project-authored source code is licensed under the [MIT License](LICENSE). Third-party components and datasets retain their respective rights and licenses.
+Project-authored source: [MIT](LICENSE). Third-party components retain their own notices and terms.
