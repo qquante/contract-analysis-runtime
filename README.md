@@ -34,7 +34,7 @@ Only the focused offline model suite was run here. No deployed-contract campaign
 python -m unittest discover -s tests/design_runtime -p test_models.py -v
 ```
 
-These checks use offline fixtures or controlled backends.
+All six model tests passed on Python 3.13.16 using offline fixtures. Compiler, fork and campaign integrations were not exercised.
 
 ## License
 
